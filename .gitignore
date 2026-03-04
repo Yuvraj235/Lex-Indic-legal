@@ -1,0 +1,33 @@
+# Environment & secrets
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Generated outputs (user-specific)
+outputs/
+
+# ChromaDB local storage
+chroma_db/
+
+# Embedding cache (auto-regenerated)
+data/legal_corpus/embedding_cache.json
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code
+.claude/

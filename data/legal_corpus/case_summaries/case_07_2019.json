@@ -1,0 +1,19 @@
+{
+  "case_name": "Ritesh Sinha v. State of U.P. (2019) 8 SCC 1",
+  "court": "Supreme Court of India",
+  "year": 2019,
+  "relevant_sections": [
+    "Voice Sample",
+    "Digital Evidence",
+    "Investigation"
+  ],
+  "summary": "The Supreme Court held that a Magistrate can direct an accused to give a voice sample for comparison during investigation, without this violating Article 20(3) (right against self-incrimination). SIGNIFICANCE: Relevant in cases where WhatsApp audio, phone calls, or recorded threats are key evidence. Police can be asked to obtain voice samples.",
+  "ratio": "Magistrate can order voice sample collection from accused. Does not violate Article 20(3).",
+  "keywords": [
+    "voice sample",
+    "digital evidence",
+    "WhatsApp audio",
+    "phone call recording",
+    "investigation"
+  ]
+}

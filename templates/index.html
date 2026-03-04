@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lex-Indic | BNS Transition Engine</title>
+  <!-- Bootstrap 5 CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <!-- Our custom styles -->
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TOP NAVIGATION BAR
+═══════════════════════════════════════════════════════════════════════════ -->
+<nav class="navbar navbar-dark" id="topnav">
+  <div class="container-fluid px-3">
+    <span class="navbar-brand mb-0 h1">
+      <span class="brand-lex">LEX</span><span class="brand-indic">-INDIC</span>
+      <span class="brand-sub ms-2">BNS Transition Engine</span>
+    </span>
+    <span class="text-light small opacity-75">
+      <i class="bi bi-shield-check me-1"></i>
+      AI-Powered Junior Associate &nbsp;|&nbsp; Bharatiya Nyaya Sanhita 2023
+    </span>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MAIN LAYOUT: sidebar + content
+═══════════════════════════════════════════════════════════════════════════ -->
+<div class="d-flex" style="height: calc(100vh - 56px); overflow: hidden;">
+
+  <!-- ── LEFT SIDEBAR ───────────────────────────────────────────────────── -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <button class="btn btn-new-case w-100" onclick="newCase()">
+        <i class="bi bi-plus-circle me-2"></i>New Case
+      </button>
+    </div>
+
+    <div class="sidebar-section-title">CASE HISTORY</div>
+    <div id="historyList" class="sidebar-history">
+      <div class="history-loading text-center text-muted small py-3">
+        <div class="spinner-border spinner-border-sm me-1" role="status"></div>
+        Loading history...
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN CONTENT AREA ─────────────────────────────────────────────── -->
+  <main id="mainContent" class="flex-grow-1 overflow-auto p-4">
+
+    <!-- ── INTAKE FORM ─────────────────────────────────────────────────── -->
+    <div id="intakePanel">
+      <div class="intake-header mb-3">
+        <h4 class="mb-0"><i class="bi bi-person-lines-fill me-2 text-primary"></i>Client Intake</h4>
+        <p class="text-muted small mb-0 mt-1">
+          Type or paste the client's statement below. Include: who was harmed, what happened, when,
+          where, names of accused, and any evidence available.
+        </p>
+      </div>
+
+      <div class="card intake-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <label for="clientStory" class="form-label fw-semibold mb-0">
+              Client's Statement <span class="text-danger">*</span>
+            </label>
+            <button type="button" class="voice-btn" id="mainMicBtn"
+                    onclick="toggleVoiceInput('clientStory','mainMicBtn')"
+                    title="Speak your client's story"
+                    aria-label="Click to dictate client statement using voice">
+              <i class="bi bi-mic-fill"></i>
+              <span class="voice-label">Speak</span>
+            </button>
+          </div>
+          <textarea
+            id="clientStory"
+            class="form-control mt-1"
+            rows="10"
+            aria-label="Client statement text area — type or use the microphone button to dictate"
+            placeholder="Example: Client is a 28-year-old married woman. Since the first month of marriage, her husband and his mother have been demanding a car as additional dowry, threatening to throw her out. Three days ago her husband physically assaulted her, breaking her wrist, and locked her out at midnight. She has WhatsApp messages showing the demands and hospital photos of her injuries..."
+          ></textarea>
+          <!-- File attachment zone (optional, collapsed by default) -->
+          <div class="mt-3">
+            <button type="button" class="attach-toggle" onclick="toggleAttach('main')">
+              <i class="bi bi-paperclip me-1"></i>Attach Evidence
+              <span class="text-muted fw-normal ms-1 small">(optional — PDF, JPG, PNG)</span>
+              <i class="bi bi-chevron-down ms-auto attach-chevron" id="mainChevron"></i>
+            </button>
+            <div id="mainAttachArea" style="display:none" class="mt-2">
+              <div
+                class="drop-zone"
+                id="mainDropZone"
+                onclick="document.getElementById('mainFileInput').click()"
+                ondragover="event.preventDefault(); this.classList.add('dz-over')"
+                ondragleave="this.classList.remove('dz-over')"
+                ondrop="handleDrop(event, 'main')"
+              >
+                <i class="bi bi-cloud-upload fs-4 text-muted"></i>
+                <div class="small text-muted mt-1">
+                  Drag &amp; drop files here, or <strong>click to browse</strong>
+                </div>
+                <div class="dz-hint">Police reports, medical records, screenshots, contracts&hellip;</div>
+              </div>
+              <input type="file" id="mainFileInput" multiple accept=".pdf,.jpg,.jpeg,.png"
+                     style="display:none" onchange="addFiles('main', this.files)" />
+              <div id="mainFileList" class="file-chips mt-2"></div>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mt-3">
+            <span id="charCount" class="text-muted small">0 characters</span>
+            <button id="analyzeBtn" class="btn btn-analyze" onclick="runAnalysis()">
+              <i class="bi bi-lightning-charge-fill me-2"></i>Run Legal Analysis
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sample cases quick-load -->
+      <div class="mt-3">
+        <span class="text-muted small me-2">Quick test:</span>
+        <button class="btn btn-sm btn-outline-secondary me-2" onclick="loadSample(1)">
+          Domestic Violence
+        </button>
+        <button class="btn btn-sm btn-outline-secondary me-2" onclick="loadSample(2)">
+          Cyber Threat &amp; Defamation
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="loadSample(3)">
+          Stalking &amp; Voyeurism
+        </button>
+      </div>
+    </div>
+
+    <!-- ── LOADING SPINNER ─────────────────────────────────────────────── -->
+    <div id="loadingPanel" class="d-none text-center py-5">
+      <div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;" role="status"></div>
+      <h5 class="text-primary">Running Legal Analysis...</h5>
+      <p class="text-muted">
+        Searching BNS knowledge base &rarr; Generating with Groq Llama-3.3-70B &rarr; Building PDF
+      </p>
+      <p class="text-muted small">(Usually takes 10–20 seconds)</p>
+    </div>
+
+    <!-- ── ERROR PANEL ─────────────────────────────────────────────────── -->
+    <div id="errorPanel" class="d-none">
+      <div class="alert alert-danger d-flex align-items-start" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+        <div>
+          <strong>Error:</strong> <span id="errorMsg"></span>
+          <br><small>Check your API keys in <code>.env</code> and try again.</small>
+        </div>
+      </div>
+      <button class="btn btn-outline-secondary" onclick="showIntake()">
+        <i class="bi bi-arrow-left me-1"></i>Back to Form
+      </button>
+    </div>
+
+    <!-- ── EDIT & SUPPLEMENT PANEL ────────────────────────────────────── -->
+    <div id="editPanel" class="d-none">
+      <div class="intake-header mb-3">
+        <h4 class="mb-0">
+          <i class="bi bi-pencil-square me-2 text-primary"></i>Edit &amp; Supplement Analysis
+        </h4>
+        <p class="text-muted small mb-0 mt-1">
+          Edit the client's story and/or add new information, then re-run the full analysis.
+        </p>
+      </div>
+
+      <div class="card intake-card">
+        <div class="card-body">
+          <label for="editStory" class="form-label fw-semibold">
+            Client's Statement <span class="text-muted fw-normal small">(edit as needed)</span>
+          </label>
+          <textarea id="editStory" class="form-control" rows="8"></textarea>
+
+          <label for="additionalInfo" class="form-label fw-semibold mt-3">
+            Additional Information / New Facts
+          </label>
+          <textarea
+            id="additionalInfo"
+            class="form-control"
+            rows="4"
+            placeholder="Add new evidence, corrections, or clarifications here — e.g. 'Client has now obtained CCTV footage dated 12 Jan...' or 'Accused's name is actually Ramesh Sharma, not Rajesh...'"
+          ></textarea>
+
+          <!-- File attachment for edit panel (optional, collapsed by default) -->
+          <div class="mt-3">
+            <button type="button" class="attach-toggle" onclick="toggleAttach('edit')">
+              <i class="bi bi-paperclip me-1"></i>Attach Additional Evidence
+              <span class="text-muted fw-normal ms-1 small">(optional — PDF, JPG, PNG)</span>
+              <i class="bi bi-chevron-down ms-auto attach-chevron" id="editChevron"></i>
+            </button>
+            <div id="editAttachArea" style="display:none" class="mt-2">
+              <div
+                class="drop-zone"
+                id="editDropZone"
+                onclick="document.getElementById('editFileInput').click()"
+                ondragover="event.preventDefault(); this.classList.add('dz-over')"
+                ondragleave="this.classList.remove('dz-over')"
+                ondrop="handleDrop(event, 'edit')"
+              >
+                <i class="bi bi-cloud-upload fs-4 text-muted"></i>
+                <div class="small text-muted mt-1">
+                  Drag &amp; drop files here, or <strong>click to browse</strong>
+                </div>
+                <div class="dz-hint">New documents, updated medical reports, screenshots&hellip;</div>
+              </div>
+              <input type="file" id="editFileInput" multiple accept=".pdf,.jpg,.jpeg,.png"
+                     style="display:none" onchange="addFiles('edit', this.files)" />
+              <div id="editFileList" class="file-chips mt-2"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-3 d-flex gap-2 flex-wrap">
+        <button class="btn btn-outline-secondary" onclick="showPanel('resultsPanel')">
+          <i class="bi bi-arrow-left me-1"></i>Back to Results
+        </button>
+        <button class="btn btn-analyze" onclick="runSupplementAnalysis()">
+          <i class="bi bi-arrow-repeat me-2"></i>Re-run Analysis with Changes
+        </button>
+      </div>
+    </div>
+
+    <!-- ── RESULTS PANEL ───────────────────────────────────────────────── -->
+    <div id="resultsPanel" class="d-none">
+
+      <!-- Results header -->
+      <div class="results-header d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+        <div>
+          <h4 class="mb-1">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>Case Analysis Complete
+          </h4>
+          <p class="text-muted small mb-0" id="resultsDate"></p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-outline-secondary btn-sm" onclick="showIntake()">
+            <i class="bi bi-arrow-left me-1"></i>New Analysis
+          </button>
+          <button class="btn btn-outline-primary btn-sm" onclick="showEditPanel()">
+            <i class="bi bi-pencil-square me-1"></i>Edit &amp; Supplement
+          </button>
+          <a id="downloadBtn" href="#" class="btn btn-download btn-sm" target="_blank">
+            <i class="bi bi-file-earmark-pdf-fill me-1"></i>Download PDF Case Brief
+          </a>
+        </div>
+      </div>
+
+      <!-- Strength badge (injected by JS) -->
+      <div id="strengthBadge" class="mb-4"></div>
+
+      <!-- 6 Section accordion -->
+      <div class="accordion" id="resultsAccordion">
+
+        <!-- Section 1: Advisory -->
+        <div class="accordion-item section-advisory">
+          <h2 class="accordion-header">
+            <button class="accordion-button section-btn-advisory" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#sec1">
+              <i class="bi bi-shield-exclamation me-2"></i>
+              Section 1 &nbsp;&mdash;&nbsp; Immediate Client Advisory
+              <span class="badge bg-danger ms-auto me-2">ACTION REQUIRED</span>
+            </button>
+          </h2>
+          <div id="sec1" class="accordion-collapse collapse show" data-bs-parent="#resultsAccordion">
+            <div class="accordion-body section-body-advisory">
+              <div id="content_section_1" class="section-content"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Legal Analysis -->
+        <div class="accordion-item section-legal mt-2">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed section-btn-legal" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#sec2">
+              <i class="bi bi-journal-text me-2"></i>
+              Section 2 &nbsp;&mdash;&nbsp; BNS Legal Analysis
+            </button>
+          </h2>
+          <div id="sec2" class="accordion-collapse collapse" data-bs-parent="#resultsAccordion">
+            <div class="accordion-body section-body-legal">
+              <div id="content_section_2" class="section-content"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Strategy -->
+        <div class="accordion-item section-strategy mt-2">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed section-btn-strategy" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#sec3">
+              <i class="bi bi-diagram-3 me-2"></i>
+              Section 3 &nbsp;&mdash;&nbsp; Case Strategy &amp; Strength Assessment
+            </button>
+          </h2>
+          <div id="sec3" class="accordion-collapse collapse" data-bs-parent="#resultsAccordion">
+            <div class="accordion-body section-body-strategy">
+              <div id="content_section_3" class="section-content"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: FIR -->
+        <div class="accordion-item section-fir mt-2">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed section-btn-fir" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#sec4">
+              <i class="bi bi-file-text me-2"></i>
+              Section 4 &nbsp;&mdash;&nbsp; Draft First Information Report (FIR)
+            </button>
+          </h2>
+          <div id="sec4" class="accordion-collapse collapse" data-bs-parent="#resultsAccordion">
+            <div class="accordion-body section-body-fir">
+              <div id="content_section_4" class="section-content fir-text"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 5: Legal Notice -->
+        <div class="accordion-item section-notice mt-2">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed section-btn-notice" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#sec5">
+              <i class="bi bi-envelope-paper me-2"></i>
+              Section 5 &nbsp;&mdash;&nbsp; Draft Legal Notice
+            </button>
+          </h2>
+          <div id="sec5" class="accordion-collapse collapse" data-bs-parent="#resultsAccordion">
+            <div class="accordion-body section-body-notice">
+              <div id="content_section_5" class="section-content"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 6: Police Report -->
+        <div class="accordion-item section-police mt-2 mb-4">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed section-btn-police" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#sec6">
+              <i class="bi bi-person-badge me-2"></i>
+              Section 6 &nbsp;&mdash;&nbsp; Police Help Report
+            </button>
+          </h2>
+          <div id="sec6" class="accordion-collapse collapse" data-bs-parent="#resultsAccordion">
+            <div class="accordion-body section-body-police">
+              <div id="content_section_6" class="section-content"></div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /accordion -->
+
+      <!-- Find Help Near You -->
+      <div class="find-help-card mt-3">
+        <div class="find-help-title">
+          <i class="bi bi-geo-alt-fill me-1"></i>Find Help Near You
+        </div>
+        <div class="find-help-body">
+          <button class="btn-find-resource" onclick="findPoliceStation()">
+            <i class="bi bi-shield-fill me-1"></i>Nearest Police Station
+          </button>
+          <button class="btn-find-resource btn-find-lawyer" onclick="document.getElementById('lawyerModal').classList.add('modal-show')">
+            <i class="bi bi-briefcase-fill me-1"></i>Find a Lawyer
+          </button>
+        </div>
+      </div>
+
+      <!-- Disclaimer -->
+      <div class="alert alert-warning small mt-2" role="alert">
+        <i class="bi bi-info-circle me-1"></i>
+        <strong>Important:</strong> This report was generated by AI and must be reviewed by a
+        licensed Advocate before filing. All placeholder fields in CAPS must be filled in.
+        Lex-Indic is not a law firm and this does not constitute legal advice.
+      </div>
+
+    </div><!-- /resultsPanel -->
+
+<!-- Police Station Modal -->
+<div id="policeModal" class="resource-modal-overlay" onclick="if(event.target===this)this.classList.remove('modal-show')">
+  <div class="resource-modal">
+    <div class="resource-modal-header">
+      <span><i class="bi bi-shield-fill me-2"></i>Find Nearest Police Station</span>
+      <button onclick="document.getElementById('policeModal').classList.remove('modal-show')"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="resource-modal-body" id="policeModalBody">
+      <div class="text-center py-3">
+        <div class="spinner-border text-primary" role="status"></div>
+        <div class="mt-2 text-muted small">Detecting your location…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Lawyer Finder Modal -->
+<div id="lawyerModal" class="resource-modal-overlay" onclick="if(event.target===this)this.classList.remove('modal-show')">
+  <div class="resource-modal">
+    <div class="resource-modal-header">
+      <span><i class="bi bi-briefcase-fill me-2"></i>Find a Lawyer in India</span>
+      <button onclick="document.getElementById('lawyerModal').classList.remove('modal-show')"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="resource-modal-body">
+      <p class="small text-muted mb-3">Connect with verified Indian advocates through these trusted platforms:</p>
+      <a class="lawyer-dir-item" href="https://lawrato.com" target="_blank" rel="noopener">
+        <div class="lawyer-dir-icon" style="background:#1a3c6e"><i class="bi bi-scale"></i></div>
+        <div>
+          <div class="lawyer-dir-name">LawRato</div>
+          <div class="lawyer-dir-desc">Find verified lawyers by city &amp; practice area, read reviews, consult online</div>
+        </div>
+      </a>
+      <a class="lawyer-dir-item" href="https://vakilsearch.com/advocate" target="_blank" rel="noopener">
+        <div class="lawyer-dir-icon" style="background:#006a4e"><i class="bi bi-person-badge"></i></div>
+        <div>
+          <div class="lawyer-dir-name">Vakil Search</div>
+          <div class="lawyer-dir-desc">Search advocates near you, free first consultation, all courts covered</div>
+        </div>
+      </a>
+      <a class="lawyer-dir-item" href="https://www.legistify.com/lawyers" target="_blank" rel="noopener">
+        <div class="lawyer-dir-icon" style="background:#7b2d8b"><i class="bi bi-people-fill"></i></div>
+        <div>
+          <div class="lawyer-dir-name">Legistify</div>
+          <div class="lawyer-dir-desc">AI-matched advocates for criminal, family, property &amp; corporate matters</div>
+        </div>
+      </a>
+      <a class="lawyer-dir-item" href="https://www.barcouncilofindia.org" target="_blank" rel="noopener">
+        <div class="lawyer-dir-icon" style="background:#8b1a1a"><i class="bi bi-bank"></i></div>
+        <div>
+          <div class="lawyer-dir-name">Bar Council of India</div>
+          <div class="lawyer-dir-desc">Official registry — verify any advocate's enrollment &amp; standing</div>
+        </div>
+      </a>
+      <a class="lawyer-dir-item" href="https://nalsa.gov.in" target="_blank" rel="noopener">
+        <div class="lawyer-dir-icon" style="background:#336600"><i class="bi bi-heart-fill"></i></div>
+        <div>
+          <div class="lawyer-dir-name">NALSA — Free Legal Aid</div>
+          <div class="lawyer-dir-desc">Government free legal services for SC/ST, women, children &amp; economically weaker sections</div>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
+
+  </main>
+</div><!-- /d-flex -->
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     HELP ASSISTANT CHAT WIDGET
+═══════════════════════════════════════════════════════════════════════════ -->
+
+<!-- Floating bubble -->
+<div id="chatBubble" onclick="toggleChat()" title="Ask LEXI — Legal Help Assistant">
+  <i class="bi bi-chat-dots-fill"></i>
+  <span class="chat-badge">LEXI</span>
+</div>
+
+<!-- Chat panel -->
+<div id="chatPanel" class="chat-hidden">
+  <div class="chat-header">
+    <div>
+      <div class="chat-header-title"><i class="bi bi-robot me-1"></i>LEXI — Legal Help Assistant</div>
+      <div class="chat-header-sub">Ask about any BNS section or describe your situation</div>
+    </div>
+    <div class="d-flex align-items-center gap-1">
+      <button class="voice-toggle-btn" id="voiceToggleBtn" onclick="toggleVoiceOutput()"
+              title="Toggle voice replies" aria-label="Toggle voice output on or off">
+        <i class="bi bi-volume-up-fill me-1"></i>Voice On
+      </button>
+      <button class="chat-close-btn" onclick="toggleChat()"><i class="bi bi-x-lg"></i></button>
+    </div>
+  </div>
+
+  <div class="chat-messages" id="chatMessages">
+    <!-- Welcome message -->
+    <div class="chat-msg bot">
+      Hi! I'm LEXI, your BNS Legal Assistant.<br><br>
+      You can ask me:<br>
+      &bull; "What is BNS Section 85?"<br>
+      &bull; "My husband is demanding dowry — which law applies?"<br>
+      &bull; "What replaced IPC 498A?"<br><br>
+      <i class="bi bi-mic-fill" style="color:var(--gold)"></i> <strong>Voice enabled</strong> — click the mic to speak your question!
+    </div>
+  </div>
+
+  <div class="chat-input-row">
+    <button class="chat-mic-btn" id="chatMicBtn"
+            onclick="toggleVoiceInput('chatInput','chatMicBtn')"
+            title="Speak your question"
+            aria-label="Click to ask a question using your voice">
+      <i class="bi bi-mic-fill"></i>
+    </button>
+    <input
+      type="text"
+      id="chatInput"
+      placeholder="Ask a question about BNS law..."
+      onkeydown="if(event.key==='Enter') sendChat()"
+      autocomplete="off"
+      aria-label="Type or speak your question about BNS law"
+    />
+    <button class="chat-send-btn" onclick="sendChat()" title="Send"
+            aria-label="Send message">
+      <i class="bi bi-send-fill" style="font-size:0.85rem;"></i>
+    </button>
+  </div>
+  <div class="chat-voice-status" id="chatVoiceStatus"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+
+// ── Sample test cases ────────────────────────────────────────────────────────
+const SAMPLES = {
+  1: `Client is a 28-year-old married woman. She says that since the first month of marriage, her husband and his mother have been demanding a car as additional dowry, threatening that they will throw her out if she doesn't comply. Three days ago, her husband physically assaulted her, breaking her wrist, and then locked her out of the house at midnight with no money or phone. A neighbour helped her contact us. She has WhatsApp messages showing the dowry demands and photos of her injuries taken at the hospital. Her husband is a government employee. She is currently staying at her parents home and is scared he will come there. She wants to file a case and ensure she is not forced to return.`,
+
+  2: `Client is a 35-year-old male software engineer. He says his former business partner has been sending threatening messages on WhatsApp saying he will destroy his life and make sure he never works again. The partner has also been posting false statements on LinkedIn claiming the client committed fraud during their partnership. The client has all the WhatsApp screenshots and LinkedIn post URLs. He wants to know what criminal cases he can file and also wants to send a legal notice.`,
+
+  3: `Client is a 22-year-old college student. A male classmate has been following her home every day for the past two months, sending her over 100 messages daily despite her clearly telling him to stop, and recently installed a hidden camera in the college bathroom which she discovered accidentally. She has reported it to the college but they have taken no action. She is terrified for her safety. She has screenshots of all the messages and the location of the camera.`
+};
+
+function loadSample(n) {
+  document.getElementById('clientStory').value = SAMPLES[n];
+  updateCharCount();
+}
+
+// ── Character counter ────────────────────────────────────────────────────────
+document.getElementById('clientStory').addEventListener('input', updateCharCount);
+function updateCharCount() {
+  const n = document.getElementById('clientStory').value.length;
+  const el = document.getElementById('charCount');
+  el.textContent = n + ' characters';
+  el.className = n < 50 ? 'text-warning small' : 'text-muted small';
+}
+
+// ── Panel visibility helpers ─────────────────────────────────────────────────
+function showPanel(id) {
+  ['intakePanel','loadingPanel','errorPanel','resultsPanel','editPanel']
+    .forEach(p => document.getElementById(p).classList.add('d-none'));
+  document.getElementById(id).classList.remove('d-none');
+}
+
+function showIntake() {
+  clearFiles('main');
+  showPanel('intakePanel');
+}
+
+function newCase() {
+  document.getElementById('clientStory').value = '';
+  updateCharCount();
+  clearFiles('main');
+  showIntake();
+}
+
+function showEditPanel() {
+  // Pre-fill edit textarea with the current story
+  document.getElementById('editStory').value = lastStory;
+  document.getElementById('additionalInfo').value = '';
+  clearFiles('edit');
+  showPanel('editPanel');
+}
+
+// ── Toggle attach section ────────────────────────────────────────────────────
+function toggleAttach(scope) {
+  const area    = document.getElementById(scope + 'AttachArea');
+  const chevron = document.getElementById(scope + 'Chevron');
+  const open    = area.style.display === 'none';
+  area.style.display   = open ? 'block' : 'none';
+  chevron.style.transform = open ? 'rotate(180deg)' : '';
+}
+
+// ── File management ──────────────────────────────────────────────────────────
+// fileStore['main'] and fileStore['edit'] hold DataTransfer objects (file lists)
+const fileStore = { main: new DataTransfer(), edit: new DataTransfer() };
+
+function addFiles(scope, fileList) {
+  for (const f of fileList) {
+    // Avoid duplicates by name
+    const existing = Array.from(fileStore[scope].files).map(x => x.name);
+    if (!existing.includes(f.name)) fileStore[scope].items.add(f);
+  }
+  renderFileChips(scope);
+}
+
+function removeFile(scope, name) {
+  const dt = new DataTransfer();
+  for (const f of fileStore[scope].files) {
+    if (f.name !== name) dt.items.add(f);
+  }
+  fileStore[scope] = dt;
+  renderFileChips(scope);
+}
+
+function clearFiles(scope) {
+  fileStore[scope] = new DataTransfer();
+  renderFileChips(scope);
+}
+
+function renderFileChips(scope) {
+  const el = document.getElementById(scope + 'FileList');
+  const files = Array.from(fileStore[scope].files);
+  if (!files.length) { el.innerHTML = ''; return; }
+  el.innerHTML = files.map(f => {
+    const ext = f.name.split('.').pop().toLowerCase();
+    const icon = ext === 'pdf' ? 'bi-file-earmark-pdf-fill text-danger'
+                               : 'bi-file-earmark-image-fill text-info';
+    const size = f.size > 1024*1024 ? (f.size/(1024*1024)).toFixed(1)+'MB'
+                                    : Math.round(f.size/1024)+'KB';
+    return `<span class="file-chip">
+      <i class="bi ${icon} me-1"></i>${escapeHtml(f.name)}
+      <span class="file-chip-size">${size}</span>
+      <button onclick="removeFile('${scope}','${escapeHtml(f.name)}')">&times;</button>
+    </span>`;
+  }).join('');
+}
+
+function handleDrop(event, scope) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('dz-over');
+  addFiles(scope, event.dataTransfer.files);
+}
+
+// ── Build FormData and call /analyze ─────────────────────────────────────────
+async function _doAnalyze(story, additionalInfo, scope) {
+  const fd = new FormData();
+  fd.append('client_story', story);
+  if (additionalInfo) fd.append('additional_info', additionalInfo);
+  for (const f of fileStore[scope].files) fd.append('attachments', f);
+
+  showPanel('loadingPanel');
+  try {
+    const resp = await fetch('/analyze', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (data.error) {
+      document.getElementById('errorMsg').textContent = data.error;
+      showPanel('errorPanel');
+      return;
+    }
+    renderResults(data);
+    loadHistory();
+  } catch (err) {
+    document.getElementById('errorMsg').textContent = err.message || 'Network error.';
+    showPanel('errorPanel');
+  }
+}
+
+// ── Main analysis function ───────────────────────────────────────────────────
+async function runAnalysis() {
+  const story = document.getElementById('clientStory').value.trim();
+  if (!story || story.length < 30) {
+    alert('Please enter the client\'s story (at least a few sentences).');
+    return;
+  }
+  await _doAnalyze(story, '', 'main');
+}
+
+// ── Supplement / re-run analysis ─────────────────────────────────────────────
+async function runSupplementAnalysis() {
+  const story = document.getElementById('editStory').value.trim();
+  const extra = document.getElementById('additionalInfo').value.trim();
+  if (!story || story.length < 30) {
+    alert('Please keep the client\'s statement (it must be at least a few sentences).');
+    return;
+  }
+  await _doAnalyze(story, extra, 'edit');
+}
+
+// ── Render results into the DOM ──────────────────────────────────────────────
+let lastStory = '';
+
+function renderResults(data) {
+  lastStory = data.client_statement || '';
+  // Date
+  document.getElementById('resultsDate').textContent = 'Generated: ' + (data.generated || '');
+
+  // PDF download link
+  if (data.pdf_filename) {
+    document.getElementById('downloadBtn').href = '/download/' + data.pdf_filename;
+    document.getElementById('downloadBtn').classList.remove('d-none');
+  } else {
+    document.getElementById('downloadBtn').classList.add('d-none');
+  }
+
+  // Strength badge
+  const strategyText = (data.sections.section_3 || '').toUpperCase();
+  let strength = 'UNKNOWN', badgeClass = 'bg-secondary';
+  if (strategyText.includes('STRONG'))        { strength = 'STRONG';   badgeClass = 'bg-success'; }
+  else if (strategyText.includes('MODERATE')) { strength = 'MODERATE'; badgeClass = 'bg-warning text-dark'; }
+  else if (strategyText.includes('WEAK'))     { strength = 'WEAK';     badgeClass = 'bg-danger'; }
+
+  document.getElementById('strengthBadge').innerHTML =
+    `<span class="badge ${badgeClass} fs-6 px-3 py-2">
+       <i class="bi bi-bar-chart-fill me-1"></i> Case Strength: ${strength}
+     </span>`;
+
+  // Section content — convert plain text newlines to <br> for display
+  const sectionMap = {
+    section_1: 'content_section_1',
+    section_2: 'content_section_2',
+    section_3: 'content_section_3',
+    section_4: 'content_section_4',
+    section_5: 'content_section_5',
+    section_6: 'content_section_6',
+  };
+
+  for (const [key, elId] of Object.entries(sectionMap)) {
+    const raw = data.sections[key] || '';
+    // Already has <strong> from server; convert newlines to <br>
+    const html = raw.replace(/\n/g, '<br>');
+    document.getElementById(elId).innerHTML = html;
+  }
+
+  showPanel('resultsPanel');
+  window.scrollTo(0, 0);
+}
+
+// ── Case history sidebar ─────────────────────────────────────────────────────
+async function loadHistory() {
+  try {
+    const resp = await fetch('/history');
+    const cases = await resp.json();
+    const list = document.getElementById('historyList');
+
+    if (!cases || cases.length === 0) {
+      list.innerHTML = '<div class="text-muted small px-3 py-2">No past cases yet.</div>';
+      return;
+    }
+
+    list.innerHTML = cases.map(c => `
+      <div class="history-item" onclick="loadCase('${c.txt_file}', '${c.pdf_file || ''}')">
+        <div class="history-date"><i class="bi bi-clock me-1"></i>${c.date}</div>
+        <div class="history-snippet">${escapeHtml(c.snippet)}</div>
+        ${c.pdf_file
+          ? `<a href="/download/${c.pdf_file}" class="history-pdf-link" target="_blank"
+               onclick="event.stopPropagation()">
+               <i class="bi bi-file-earmark-pdf"></i> PDF
+             </a>`
+          : ''}
+      </div>
+    `).join('');
+  } catch (e) {
+    console.error('History load failed:', e);
+  }
+}
+
+async function loadCase(txtFile, pdfFile) {
+  showPanel('loadingPanel');
+  try {
+    const resp = await fetch('/load/' + txtFile);
+    const data = await resp.json();
+    if (data.error) {
+      document.getElementById('errorMsg').textContent = data.error;
+      showPanel('errorPanel');
+      return;
+    }
+    if (pdfFile) data.pdf_filename = pdfFile;
+    renderResults(data);
+  } catch (e) {
+    document.getElementById('errorMsg').textContent = e.message;
+    showPanel('errorPanel');
+  }
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Initialise on page load ──────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadHistory();
+  updateCharCount();
+
+  // Allow Ctrl+Enter to submit
+  document.getElementById('clientStory').addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'Enter') runAnalysis();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELP ASSISTANT CHAT
+// ─────────────────────────────────────────────────────────────────────────────
+let chatOpen = false;
+
+function toggleChat() {
+  chatOpen = !chatOpen;
+  const panel = document.getElementById('chatPanel');
+  if (chatOpen) {
+    panel.classList.remove('chat-hidden');
+    document.getElementById('chatInput').focus();
+  } else {
+    panel.classList.add('chat-hidden');
+  }
+}
+
+function appendChatMsg(text, role, isHtml = false) {
+  const container = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + role;
+  if (isHtml) div.innerHTML = text;
+  else div.textContent = text;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return div;
+}
+
+function appendRedirectBanner(story) {
+  const container = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'chat-redirect-banner';
+  div.innerHTML = `
+    <strong>Want a full case analysis?</strong><br>
+    Click below to run a complete BNS analysis with draft FIR, Legal Notice, and PDF report.
+    <br>
+    <button onclick="redirectToIntake(${JSON.stringify(story)})">
+      Open Case Analysis Form &rarr;
+    </button>
+  `;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function redirectToIntake(story) {
+  // Pre-fill the intake form with the situation described in chat
+  if (story) document.getElementById('clientStory').value = story;
+  updateCharCount();
+  showPanel('intakePanel');
+  toggleChat();
+  window.scrollTo(0, 0);
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  // Show user message
+  appendChatMsg(msg, 'user');
+  input.value = '';
+
+  // Show typing indicator
+  const loadingDiv = appendChatMsg('LEXI is thinking...', 'bot loading');
+
+  try {
+    const resp = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg })
+    });
+    const data = await resp.json();
+
+    // Replace loading div with actual reply
+    loadingDiv.classList.remove('loading');
+    loadingDiv.textContent = data.reply;
+
+    // Read the reply aloud if voice is enabled
+    speakText(data.reply);
+
+    // If the AI suggests using the intake form, show a redirect banner
+    if (data.suggest_intake) {
+      // Try to use the user's message as prefill if it sounds like a situation
+      const looksLikeSituation = msg.length > 40 &&
+        /facing|husband|accused|police|case|harass|assault|threat/i.test(msg);
+      appendRedirectBanner(looksLikeSituation ? msg : '');
+    }
+
+  } catch (e) {
+    loadingDiv.classList.remove('loading');
+    loadingDiv.textContent = 'Sorry, something went wrong. Please try again.';
+  }
+}
+
+// ── Find Nearest Police Station ───────────────────────────────────────────────
+function findPoliceStation() {
+  const modal = document.getElementById('policeModal');
+  const body  = document.getElementById('policeModalBody');
+  modal.classList.add('modal-show');
+  body.innerHTML = `
+    <div class="text-center py-3">
+      <div class="spinner-border text-primary" role="status"></div>
+      <div class="mt-2 text-muted small">Detecting your location…</div>
+    </div>`;
+
+  if (!navigator.geolocation) {
+    body.innerHTML = '<div class="text-danger p-3">Geolocation is not supported by your browser. Please search manually.</div>';
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const mapsUrl = `https://www.google.com/maps/search/police+station/@${lat},${lng},15z`;
+      const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=police+station&origin=${lat},${lng}`;
+      body.innerHTML = `
+        <div class="p-2">
+          <p class="small text-muted mb-3">Location detected. Choose an option below:</p>
+          <a class="police-action-btn" href="${mapsUrl}" target="_blank" rel="noopener">
+            <i class="bi bi-map-fill me-2"></i>Show Police Stations on Map
+          </a>
+          <a class="police-action-btn" href="${directionsUrl}" target="_blank" rel="noopener">
+            <i class="bi bi-signpost-split-fill me-2"></i>Get Directions to Nearest Station
+          </a>
+          <div class="mt-3 p-2 bg-light rounded small text-muted">
+            <i class="bi bi-telephone-fill me-1"></i>
+            <strong>Emergency Numbers:</strong><br>
+            Police: <strong>100</strong> &nbsp;|&nbsp; Women Helpline: <strong>1091</strong>
+            &nbsp;|&nbsp; Emergency: <strong>112</strong>
+          </div>
+        </div>`;
+    },
+    err => {
+      const mapsUrl = 'https://www.google.com/maps/search/police+station+near+me';
+      body.innerHTML = `
+        <div class="p-2">
+          <div class="alert alert-warning small">${err.message || 'Could not get location.'} Using general search instead.</div>
+          <a class="police-action-btn" href="${mapsUrl}" target="_blank" rel="noopener">
+            <i class="bi bi-map-fill me-2"></i>Search Police Stations on Google Maps
+          </a>
+          <div class="mt-3 p-2 bg-light rounded small text-muted">
+            <i class="bi bi-telephone-fill me-1"></i>
+            <strong>Emergency Numbers:</strong><br>
+            Police: <strong>100</strong> &nbsp;|&nbsp; Women Helpline: <strong>1091</strong>
+            &nbsp;|&nbsp; Emergency: <strong>112</strong>
+          </div>
+        </div>`;
+    },
+    { timeout: 10000 }
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VOICE SUPPORT — Speech-to-Text + Text-to-Speech
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── Speech-to-Text (voice input) ─────────────────────────────────────────────
+let activeRecognition = null;   // only one mic at a time
+
+function toggleVoiceInput(targetId, btnId) {
+  // If already recording on THIS target, stop
+  if (activeRecognition && activeRecognition._targetId === targetId) {
+    activeRecognition.stop();
+    return;
+  }
+  // If recording on another target, stop that first
+  if (activeRecognition) activeRecognition.stop();
+
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) {
+    alert('Voice input is not supported in this browser. Please use Chrome or Edge.');
+    return;
+  }
+
+  const rec = new SpeechRec();
+  rec.lang = 'en-IN';            // Indian English — also understands Hindi mixed
+  rec.interimResults = true;      // Show words as they come
+  rec.continuous = true;          // Keep listening until user stops
+  rec.maxAlternatives = 1;
+  rec._targetId = targetId;
+
+  const btn    = document.getElementById(btnId);
+  const target = document.getElementById(targetId);
+
+  btn.classList.add('voice-active');
+  if (btnId === 'chatMicBtn') {
+    document.getElementById('chatVoiceStatus').textContent = 'Listening... Speak now';
+  }
+
+  let finalTranscript = target.value ? target.value + ' ' : '';
+
+  rec.onresult = (e) => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) {
+        finalTranscript += e.results[i][0].transcript + ' ';
+      } else {
+        interim += e.results[i][0].transcript;
+      }
+    }
+    target.value = finalTranscript + interim;
+    if (targetId === 'clientStory') updateCharCount();
+  };
+
+  rec.onerror = (e) => {
+    console.warn('Speech error:', e.error);
+    stopVoiceUI(btn, btnId);
+    activeRecognition = null;
+    if (e.error === 'not-allowed') {
+      alert('Microphone access denied. Please allow microphone in your browser settings.');
+    }
+  };
+
+  rec.onend = () => {
+    // Finalize the text
+    target.value = finalTranscript.trim();
+    if (targetId === 'clientStory') updateCharCount();
+    stopVoiceUI(btn, btnId);
+    activeRecognition = null;
+  };
+
+  activeRecognition = rec;
+  rec.start();
+}
+
+function stopVoiceUI(btn, btnId) {
+  btn.classList.remove('voice-active');
+  if (btnId === 'chatMicBtn') {
+    document.getElementById('chatVoiceStatus').textContent = '';
+  }
+}
+
+// ── Text-to-Speech (voice output — LEXI reads replies aloud) ────────────────
+let voiceEnabled = true;  // user can toggle
+
+function speakText(text) {
+  if (!voiceEnabled || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+
+  // Clean text: strip HTML, markdown, fix pronunciation
+  let clean = text.replace(/<[^>]+>/g, '').replace(/\*\*/g, '');
+  if (!clean || clean.length < 3) return;
+
+  // Fix "AI" being read as "I" — spell it out for TTS
+  clean = clean.replace(/\bAI\b/g, 'A.I.');
+  clean = clean.replace(/\bBNS\b/g, 'B.N.S.');
+  clean = clean.replace(/\bIPC\b/g, 'I.P.C.');
+  clean = clean.replace(/\bFIR\b/g, 'F.I.R.');
+
+  const utter = new SpeechSynthesisUtterance(clean);
+  utter.lang = 'en-IN';
+  utter.rate = 0.93;
+  utter.pitch = 1.2;
+
+  // Pick a female voice — explicit list of known female voices
+  const voices = window.speechSynthesis.getVoices();
+  const n = v => (v.name || '').toLowerCase();
+
+  // Male voices to EXCLUDE
+  const maleNames = ['rishi', 'daniel', 'alex', 'fred', 'tom', 'ralph',
+                     'albert', 'bruce', 'junior', 'aaron', 'david', 'gordon'];
+  const isMale = v => maleNames.some(m => n(v).includes(m));
+
+  // Known female voice names (macOS, iOS, Windows, Chrome)
+  const femaleNames = ['samantha', 'veena', 'lekha', 'karen', 'moira',
+                       'fiona', 'tessa', 'kate', 'zira', 'susan', 'hazel',
+                       'ava', 'allison', 'victoria', 'nicky', 'sandy',
+                       'shelley', 'serena', 'princess', 'kathy'];
+  const isFemale = v => femaleNames.some(f => n(v).includes(f))
+                     || (/female/i.test(v.name) && !isMale(v));
+
+  // Priority: 1) Samantha (best macOS female), 2) any female en-*, 3) any non-male en-*
+  const pick = voices.find(v => n(v).includes('samantha'))
+            || voices.find(v => v.lang.startsWith('en') && isFemale(v))
+            || voices.find(v => v.lang === 'en-IN' && !isMale(v))
+            || voices.find(v => v.lang.startsWith('en') && !isMale(v));
+  if (pick) utter.voice = pick;
+
+  window.speechSynthesis.speak(utter);
+}
+
+function stopSpeaking() {
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+}
+
+function toggleVoiceOutput() {
+  voiceEnabled = !voiceEnabled;
+  const btn = document.getElementById('voiceToggleBtn');
+  if (voiceEnabled) {
+    btn.innerHTML = '<i class="bi bi-volume-up-fill me-1"></i>Voice On';
+    btn.classList.remove('voice-off');
+  } else {
+    btn.innerHTML = '<i class="bi bi-volume-mute-fill me-1"></i>Voice Off';
+    btn.classList.add('voice-off');
+    stopSpeaking();
+  }
+}
+
+// Load voices (they load async in some browsers)
+if (window.speechSynthesis) {
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+}
+
+</script>
+</body>
+</html>

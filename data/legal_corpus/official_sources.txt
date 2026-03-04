@@ -1,0 +1,30 @@
+LEX-INDIC: OFFICIAL LEGAL DOCUMENT SOURCES
+============================================================
+Download these PDFs manually and place in data/legal_corpus/
+============================================================
+
+DOCUMENT: BNS 2023 (Full Text) — India Code
+URL:      https://www.indiacode.nic.in/handle/123456789/20062
+NOTE:     Visit this URL to download the official PDF from India Code
+------------------------------------------------------------
+
+DOCUMENT: IPC 1860 (Full Text) — India Code
+URL:      https://www.indiacode.nic.in/handle/123456789/2263
+NOTE:     Visit this URL to download IPC PDF from India Code
+------------------------------------------------------------
+
+DOCUMENT: Dowry Prohibition Act 1961 — India Code
+URL:      https://www.indiacode.nic.in/handle/123456789/1687
+NOTE:     Dowry Prohibition Act 1961 official source
+------------------------------------------------------------
+
+DOCUMENT: Protection of Women from DV Act 2005
+URL:      https://www.indiacode.nic.in/handle/123456789/2020
+NOTE:     Protection of Women from Domestic Violence Act 2005
+------------------------------------------------------------
+
+DOCUMENT: IT Act 2000 (Cybercrime Sections)
+URL:      https://www.indiacode.nic.in/handle/123456789/1999
+NOTE:     Information Technology Act 2000 — for cyber offence sections
+------------------------------------------------------------
+
