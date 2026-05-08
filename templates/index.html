@@ -256,6 +256,27 @@
       <!-- Strength badge (injected by JS) -->
       <div id="strengthBadge" class="mb-4"></div>
 
+      <!-- Verified Sources panel (citation provenance) -->
+      <div id="sourcesPanel" class="sources-panel d-none mb-4">
+        <div class="sources-header">
+          <i class="bi bi-shield-check me-2"></i>
+          <strong>Verified Sources</strong>
+          <span class="text-muted ms-2 small">— every section cited below was retrieved from this curated knowledge base. Click any card to view the verified text.</span>
+        </div>
+        <div id="sourcesList" class="sources-list"></div>
+      </div>
+
+      <!-- Source detail modal -->
+      <div id="sourceModal" class="resource-modal-overlay" onclick="if(event.target===this)this.classList.remove('modal-show')">
+        <div class="resource-modal" style="max-width: 720px;">
+          <div class="resource-modal-header">
+            <h5 id="sourceModalTitle"><i class="bi bi-file-earmark-text me-2"></i>Source</h5>
+            <button onclick="document.getElementById('sourceModal').classList.remove('modal-show')"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div id="sourceModalBody" class="resource-modal-body"></div>
+        </div>
+      </div>
+
       <!-- 6 Section accordion -->
       <div class="accordion" id="resultsAccordion">
 
@@ -700,6 +721,11 @@ function renderResults(data) {
        <i class="bi bi-bar-chart-fill me-1"></i> Case Strength: ${strength}
      </span>`;
 
+  // Render the Verified Sources panel BEFORE the section content, so the
+  // citation linkifier can use the source list to wrap "BNS Section XXX"
+  // mentions in inline badges.
+  renderSources(data.sources || []);
+
   // Section content — convert plain text newlines to <br> for display
   const sectionMap = {
     section_1: 'content_section_1',
@@ -713,12 +739,154 @@ function renderResults(data) {
   for (const [key, elId] of Object.entries(sectionMap)) {
     const raw = data.sections[key] || '';
     // Already has <strong> from server; convert newlines to <br>
-    const html = raw.replace(/\n/g, '<br>');
+    let html = raw.replace(/\n/g, '<br>');
+    // Wrap each "BNS Section NN" / "BNS Section NN(N)" mention in a clickable badge
+    // that opens the verified KB entry. This is what makes the output trustworthy.
+    html = linkifyCitations(html);
     document.getElementById(elId).innerHTML = html;
   }
 
   showPanel('resultsPanel');
   window.scrollTo(0, 0);
+}
+
+// ── Sources panel + citation provenance ─────────────────────────────────────
+// Map of citation key (e.g. "BNS_103" or "BNS_103_2") -> source object.
+// Populated by renderSources(); read by linkifyCitations() and the badge click handler.
+let citationIndex = {};
+
+function _citationKey(sectionLabel) {
+  // "BNS Section 103" -> "BNS_103"; "BNS Section 103(2)" -> "BNS_103_2"
+  const m = (sectionLabel || '').match(/BNS\s*Section\s*(\d+)(?:\(([^)]+)\))?/i);
+  if (!m) return null;
+  return m[2] ? `BNS_${m[1]}_${m[2]}` : `BNS_${m[1]}`;
+}
+
+function renderSources(sources) {
+  const panel = document.getElementById('sourcesPanel');
+  const list  = document.getElementById('sourcesList');
+  citationIndex = {};
+
+  if (!sources || sources.length === 0) {
+    panel.classList.add('d-none');
+    list.innerHTML = '';
+    return;
+  }
+
+  // Build the citation index (keyed by section label) for inline linkification
+  sources.forEach(s => {
+    const key = _citationKey(s.section);
+    if (key) citationIndex[key] = s;
+  });
+
+  list.innerHTML = sources.map((s, i) => {
+    const kindClass = `source-kind-${s.kind || 'unknown'}`;
+    const kindLabel = ({
+      bns_section:    'BNS',
+      case_summary:   'Case',
+      circular:       'Circular',
+      ipc_bns_mapping:'Mapping',
+    })[s.kind] || 'Source';
+
+    let metaLine = '';
+    if (s.kind === 'bns_section') {
+      metaLine = `${escapeHtml(s.old_ipc || '')}${s.punishment ? ' · ' + escapeHtml(s.punishment) : ''}`;
+    } else if (s.kind === 'case_summary') {
+      metaLine = `${escapeHtml(s.court || '')} ${s.year || ''}`;
+    } else if (s.kind === 'circular') {
+      metaLine = escapeHtml(s.issuer || '');
+    } else if (s.kind === 'ipc_bns_mapping') {
+      metaLine = `${escapeHtml(s.ipc_section || '')} → ${escapeHtml(s.bns_section || '')}`;
+    }
+
+    return `
+      <div class="source-card" onclick="openSourceDetail(${i})" role="button" tabindex="0"
+           onkeydown="if(event.key==='Enter')openSourceDetail(${i})">
+        <div>
+          <span class="source-card-rank">#${s.rank}</span>
+          <span class="source-card-kind ${kindClass}">${kindLabel}</span>
+        </div>
+        <div class="source-card-label">${escapeHtml(s.label || '')}</div>
+        <div class="source-card-meta">${metaLine}</div>
+        <div class="source-card-relevance">
+          <span>Relevance</span>
+          <div class="source-relevance-bar"><div class="source-relevance-fill" style="width:${Math.max(2, Math.min(100, s.relevance))}%"></div></div>
+          <span>${s.relevance.toFixed(0)}%</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Stash sources on the panel element so the modal handler can read them
+  panel.dataset.sourcesJson = JSON.stringify(sources);
+  panel.classList.remove('d-none');
+}
+
+function openSourceDetail(idx) {
+  const panel = document.getElementById('sourcesPanel');
+  const sources = JSON.parse(panel.dataset.sourcesJson || '[]');
+  const s = sources[idx];
+  if (!s) return;
+
+  const titleEl = document.getElementById('sourceModalTitle');
+  const bodyEl  = document.getElementById('sourceModalBody');
+
+  titleEl.innerHTML = `<i class="bi bi-file-earmark-text me-2"></i>${escapeHtml(s.label || 'Source')}`;
+
+  let metaRow = '';
+  if (s.kind === 'bns_section') {
+    metaRow = `
+      ${s.old_ipc      ? `<span><strong>Replaces:</strong> ${escapeHtml(s.old_ipc)}</span>` : ''}
+      ${s.punishment   ? `<span><strong>Punishment:</strong> ${escapeHtml(s.punishment)}</span>` : ''}
+      ${s.bailable     ? `<span><strong>Bailable:</strong> ${escapeHtml(s.bailable)}</span>` : ''}
+      ${s.cognizable   ? `<span><strong>Cognizable:</strong> ${escapeHtml(s.cognizable)}</span>` : ''}
+    `;
+  } else if (s.kind === 'case_summary') {
+    metaRow = `
+      <span><strong>Court:</strong> ${escapeHtml(s.court || '')}</span>
+      <span><strong>Year:</strong> ${escapeHtml(s.year || '')}</span>
+    `;
+  } else if (s.kind === 'circular') {
+    metaRow = `
+      <span><strong>Issued by:</strong> ${escapeHtml(s.issuer || '')}</span>
+      ${s.date ? `<span><strong>Date:</strong> ${escapeHtml(s.date)}</span>` : ''}
+    `;
+  } else if (s.kind === 'ipc_bns_mapping') {
+    metaRow = `
+      <span><strong>${escapeHtml(s.ipc_section || '')}</strong></span>
+      <span>→ <strong>${escapeHtml(s.bns_section || '')}</strong></span>
+    `;
+  }
+
+  bodyEl.innerHTML = `
+    <div class="source-meta-row">
+      <span><strong>Relevance:</strong> ${s.relevance.toFixed(1)}%</span>
+      ${metaRow}
+    </div>
+    <pre class="source-raw">${escapeHtml(s.raw_text || '')}</pre>
+    <a href="https://www.indiacode.nic.in/handle/123456789/20063" target="_blank" rel="noopener"
+       class="source-bareact-link">
+      <i class="bi bi-box-arrow-up-right me-1"></i>Verify against the official BNS bare act on indiacode.nic.in
+    </a>
+  `;
+  document.getElementById('sourceModal').classList.add('modal-show');
+}
+
+// Wrap "BNS Section NN" / "BNS Section NN(M)" mentions in clickable verification badges.
+// Only sections we actually retrieved get linked — unknown numbers stay plain text
+// (those would represent a model deviation worth investigating, not a citation).
+function linkifyCitations(html) {
+  return html.replace(
+    /BNS\s*Section\s*(\d+)(?:\(([^)]+)\))?/g,
+    (match, num, sub) => {
+      const key = sub ? `BNS_${num}_${sub}` : `BNS_${num}`;
+      if (!citationIndex[key]) return match; // not in our retrieved set — don't linkify
+      const idx = citationIndex[key].rank - 1;
+      return `<a href="javascript:void(0)" class="citation-badge"
+                 title="Click to view verified KB entry"
+                 onclick="openSourceDetail(${idx})">${match}</a>`;
+    }
+  );
 }
 
 // ── Case history sidebar ─────────────────────────────────────────────────────
@@ -858,6 +1026,25 @@ async function sendChat() {
     // Replace loading div with actual reply
     loadingDiv.classList.remove('loading');
     loadingDiv.textContent = data.reply;
+
+    // Append a small sources strip so the user can see which BNS entries
+    // LEXI consulted. Click any chip to view the verified KB text.
+    if (data.sources && data.sources.length) {
+      // Reuse the same source modal as /analyze. Stash the chat sources on the
+      // panel element so openSourceDetail() finds them — this overwrites any
+      // analyze-time sources, but that's fine because the modal is one-at-a-time.
+      const panel = document.getElementById('sourcesPanel');
+      panel.dataset.sourcesJson = JSON.stringify(data.sources);
+
+      const stripDiv = document.createElement('div');
+      stripDiv.className = 'chat-sources';
+      stripDiv.innerHTML = '<i class="bi bi-shield-check me-1"></i>Sources: ' +
+        data.sources.map((s, i) => `
+          <span class="chat-source-chip" onclick="openSourceDetail(${i})">${escapeHtml(s.label || ('Source ' + s.rank))} · ${s.relevance.toFixed(0)}%</span>
+        `).join('');
+      loadingDiv.appendChild(stripDiv);
+      document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+    }
 
     // Read the reply aloud if voice is enabled
     speakText(data.reply);

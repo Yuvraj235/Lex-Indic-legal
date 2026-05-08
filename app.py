@@ -37,6 +37,7 @@ from main import (
     configure_groq,
     build_rag_knowledge_base,
     retrieve_relevant_sections,
+    retrieve_relevant_sections_structured,
     build_legal_prompt,
     LEXI_SYSTEM_PROMPT,
     save_raw_output,
@@ -162,7 +163,11 @@ def analyze():
             )
 
         # ── Step 1: RAG search for relevant BNS sections ──────────────────────
-        retrieved_context = retrieve_relevant_sections(rag_collection, client_story)
+        # Use the structured variant so we can return sources to the frontend
+        # for citation provenance (the user can verify every section we cited).
+        retrieved_context, sources = retrieve_relevant_sections_structured(
+            rag_collection, client_story
+        )
 
         # ── Step 2: Build prompt and call Groq ────────────────────────────────
         prompt = build_legal_prompt(client_story, retrieved_context)
@@ -213,6 +218,7 @@ def analyze():
             "client_statement":  client_story,
             "pdf_filename":      pdf_filename,
             "generated":         sections.get("generated", datetime.now().strftime("%d %B %Y, %H:%M:%S")),
+            "sources":           sources,
             "error":             None,
         })
 
@@ -386,30 +392,15 @@ Style rules:
 - Keep responses short and friendly — not lecture-length."""
 
 
-def _retrieve_for_chat(user_msg: str, n_results: int = 4) -> str:
+def _retrieve_for_chat(user_msg: str, n_results: int = 4):
     """
     Run a RAG query against the same BNS collection /analyze uses, but tuned for
-    short Q&A: fewer hits, formatted compactly. Returns the context block to
-    inject into the LEXI system message.
+    short Q&A: fewer hits, formatted compactly.
+
+    Returns: (context_string, sources_list) — sources are surfaced to the chat
+    UI so the user can see which KB entries LEXI consulted.
     """
-    cache = _load_embedding_cache()
-    query_embedding = _get_embedding_with_cache(user_msg, "retrieval_query", cache)
-    results = rag_collection.query(
-        query_embeddings=[query_embedding],
-        n_results=n_results,
-        include=["documents", "metadatas", "distances"],
-    )
-
-    docs = results.get("documents", [[]])[0]
-    dists = results.get("distances", [[]])[0]
-    if not docs:
-        return "=== RETRIEVED BNS CONTEXT ===\n(no matches found)"
-
-    parts = ["=== RETRIEVED BNS CONTEXT (use ONLY these sections in your reply) ==="]
-    for i, (doc, dist) in enumerate(zip(docs, dists)):
-        relevance = round((1 - dist) * 100, 1)
-        parts.append(f"\n[Match {i+1} — Relevance: {relevance}%]\n{doc}")
-    return "\n".join(parts)
+    return retrieve_relevant_sections_structured(rag_collection, user_msg, n_results)
 
 
 @app.route("/chat", methods=["POST"])
@@ -426,7 +417,7 @@ def chat():
         return jsonify({"reply": "Please type a question.", "suggest_intake": False})
 
     try:
-        retrieved_context = _retrieve_for_chat(user_msg, n_results=4)
+        retrieved_context, sources = _retrieve_for_chat(user_msg, n_results=4)
 
         completion = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
@@ -445,12 +436,17 @@ def chat():
             "analyze", "detailed analysis"
         ])
 
-        return jsonify({"reply": reply, "suggest_intake": suggest_intake})
+        return jsonify({
+            "reply": reply,
+            "suggest_intake": suggest_intake,
+            "sources": sources,
+        })
 
     except Exception as e:
         return jsonify({
             "reply": f"Sorry, I couldn't process that right now. ({str(e)[:80]})",
-            "suggest_intake": False
+            "suggest_intake": False,
+            "sources": [],
         })
 
 

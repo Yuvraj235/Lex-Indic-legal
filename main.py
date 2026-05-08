@@ -286,6 +286,95 @@ def build_rag_knowledge_base() -> chromadb.Collection:
 # ══════════════════════════════════════════════════════════════════════════════
 # STEP 3: RETRIEVE RELEVANT LAWS (The RAG Search)
 # ══════════════════════════════════════════════════════════════════════════════
+def _normalize_source(rank: int, doc_id: str, doc: str, meta: dict, relevance: float) -> dict:
+    """
+    Convert ChromaDB hit metadata (which differs by document type) into a single
+    schema for the frontend Sources panel. The collection contains four kinds of
+    documents — BNS sections, case summaries, legal circulars, and IPC→BNS mappings —
+    each with its own metadata fields.
+    """
+    kind = (meta or {}).get("type")
+    if kind is None and doc_id.startswith("bns_"):
+        kind = "bns_section"
+    elif kind is None:
+        kind = "unknown"
+
+    label = ""
+    if kind == "bns_section":
+        label = f"{meta.get('section', 'BNS')} — {meta.get('title', '')}"
+    elif kind == "case_summary":
+        label = f"{meta.get('case_name', '')} ({meta.get('year', '')})"
+    elif kind == "circular":
+        label = f"{meta.get('title', '')} — {meta.get('issuer', '')}"
+    elif kind == "ipc_bns_mapping":
+        label = f"{meta.get('ipc_section', '')} → {meta.get('bns_section', '')}"
+    else:
+        label = doc_id
+
+    return {
+        "rank": rank,
+        "id": doc_id,
+        "kind": kind,
+        "label": label,
+        "section": meta.get("section"),
+        "old_ipc": meta.get("old_ipc"),
+        "title": meta.get("title"),
+        "punishment": meta.get("punishment"),
+        "bailable": meta.get("bailable"),
+        "cognizable": meta.get("cognizable"),
+        "transition_note": meta.get("transition_note"),
+        # case-specific
+        "case_name": meta.get("case_name"),
+        "court": meta.get("court"),
+        "year": meta.get("year"),
+        # circular-specific
+        "issuer": meta.get("issuer"),
+        "date": meta.get("date"),
+        # mapping-specific
+        "ipc_section": meta.get("ipc_section"),
+        "bns_section": meta.get("bns_section"),
+        "relevance": relevance,
+        "raw_text": doc,
+    }
+
+
+def retrieve_relevant_sections_structured(
+    collection: chromadb.Collection, client_story: str, n_results: int = 6
+):
+    """
+    Same retrieval as ``retrieve_relevant_sections``, but also returns a list of
+    structured ``source`` dicts so the frontend can show citation provenance.
+
+    Returns: (context_string, sources_list)
+    """
+    cache = _load_embedding_cache()
+    query_embedding = _get_embedding_with_cache(client_story, "retrieval_query", cache)
+
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=n_results,
+        include=["documents", "metadatas", "distances"],
+    )
+
+    context_parts = ["=== RETRIEVED BNS LEGAL SECTIONS (USE ONLY THESE) ===\n"]
+    sources = []
+    for i, (doc, meta, dist, doc_id) in enumerate(
+        zip(
+            results["documents"][0],
+            results["metadatas"][0],
+            results["distances"][0],
+            results["ids"][0],
+        )
+    ):
+        relevance = round((1 - dist) * 100, 1)
+        context_parts.append(
+            f"\n[SECTION {i+1} — Relevance: {relevance}%]\n{doc}\n"
+        )
+        sources.append(_normalize_source(i + 1, doc_id, doc, meta, relevance))
+
+    return "\n".join(context_parts), sources
+
+
 def retrieve_relevant_sections(
     collection: chromadb.Collection, client_story: str, n_results: int = 6
 ) -> str:
@@ -293,33 +382,11 @@ def retrieve_relevant_sections(
     Performs a semantic search on the knowledge base to find the most relevant
     BNS sections for the client's specific situation.
 
-    This is the 'R' in RAG (Retrieval). The retrieved sections become the
-    'context' for the AI, ensuring it only uses real, correct law sections.
+    Backwards-compatible wrapper that returns just the context string. New code
+    should prefer ``retrieve_relevant_sections_structured`` to also get the
+    sources list for citation provenance in the UI.
     """
-    # Convert the client's story into a Gemini embedding vector for search
-    # Queries are NOT cached (every client story is unique)
-    cache = _load_embedding_cache()
-    query_embedding = _get_embedding_with_cache(client_story, "retrieval_query", cache)
-
-    # Query the vector database using the embedding (not raw text)
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=n_results,
-        include=["documents", "metadatas", "distances"],
-    )
-
-    # Format the retrieved sections into a clean context block for the AI prompt
-    context_parts = ["=== RETRIEVED BNS LEGAL SECTIONS (USE ONLY THESE) ===\n"]
-
-    for i, (doc, meta, dist) in enumerate(
-        zip(results["documents"][0], results["metadatas"][0], results["distances"][0])
-    ):
-        relevance = round((1 - dist) * 100, 1)  # Convert distance to relevance %
-        context_parts.append(
-            f"\n[SECTION {i+1} — Relevance: {relevance}%]\n{doc}\n"
-        )
-
-    return "\n".join(context_parts)
+    return retrieve_relevant_sections_structured(collection, client_story, n_results)[0]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
