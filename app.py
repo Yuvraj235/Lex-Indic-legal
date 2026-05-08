@@ -41,6 +41,8 @@ from main import (
     LEXI_SYSTEM_PROMPT,
     save_raw_output,
 )
+# Used by the RAG-grounded /chat endpoint to search the same KB as /analyze
+from main import _get_embedding_with_cache, _load_embedding_cache
 from pdf_generator import generate_pdf, parse_sections
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -356,7 +358,7 @@ def download(filename):
 # ROUTE 6: Help Assistant chat
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# System prompt for the Help Assistant — different from LEXI (shorter, friendlier)
+# System prompt for the Help Assistant — RAG-grounded, must cite retrieved sections only.
 ASSISTANT_SYSTEM_PROMPT = """You are LEXI, a friendly AI Legal Assistant for Indian law.
 Your job is to help lawyers and clients understand Indian criminal law under the
 Bharatiya Nyaya Sanhita (BNS) 2023, which replaced the IPC from 1 July 2024.
@@ -364,21 +366,56 @@ Bharatiya Nyaya Sanhita (BNS) 2023, which replaced the IPC from 1 July 2024.
 You answer two types of questions:
 1. "What section covers X?" — Explain the BNS section clearly (number, punishment, bailable/non-bailable)
 2. "I am facing this situation..." — Briefly say which BNS sections might apply and recommend
-   using the full Case Analysis tool (say "Use the intake form on the left to get a full analysis").
+   using the full Case Analysis tool.
 
-Rules:
-- Be concise (3-5 sentences max per response)
-- Always mention both BNS section AND the old IPC section it replaced
-- End situation-related answers by suggesting: "For a detailed FIR, legal notice, and full analysis, use the Case Analysis form."
-- Never give advice that requires filing documents — only explain the law
-- If you don't know, say so and suggest consulting a licensed Advocate
-- Keep responses short and friendly — not lecture-length"""
+CRITICAL ACCURACY RULES — these prevent legal misinformation:
+- You will be given a RETRIEVED CONTEXT block containing real BNS sections from our verified
+  knowledge base. ONLY cite sections, punishments, and bailable status from that block.
+- NEVER invent a BNS section number or punishment from memory. If the retrieved context does
+  not cover the user's question, reply: "I don't have a verified entry for that section in my
+  knowledge base. Please consult a licensed Advocate or the official BNS bare act on
+  indiacode.nic.in." — and stop.
+- ALWAYS mention both the BNS section number AND the old IPC section it replaced (from the
+  retrieved context).
+
+Style rules:
+- Be concise (3-5 sentences max per response).
+- End situation-related answers by suggesting: "For a detailed FIR, legal notice, and full
+  analysis, use the Case Analysis form."
+- Never give advice that requires filing documents — only explain the law.
+- Keep responses short and friendly — not lecture-length."""
+
+
+def _retrieve_for_chat(user_msg: str, n_results: int = 4) -> str:
+    """
+    Run a RAG query against the same BNS collection /analyze uses, but tuned for
+    short Q&A: fewer hits, formatted compactly. Returns the context block to
+    inject into the LEXI system message.
+    """
+    cache = _load_embedding_cache()
+    query_embedding = _get_embedding_with_cache(user_msg, "retrieval_query", cache)
+    results = rag_collection.query(
+        query_embeddings=[query_embedding],
+        n_results=n_results,
+        include=["documents", "metadatas", "distances"],
+    )
+
+    docs = results.get("documents", [[]])[0]
+    dists = results.get("distances", [[]])[0]
+    if not docs:
+        return "=== RETRIEVED BNS CONTEXT ===\n(no matches found)"
+
+    parts = ["=== RETRIEVED BNS CONTEXT (use ONLY these sections in your reply) ==="]
+    for i, (doc, dist) in enumerate(zip(docs, dists)):
+        relevance = round((1 - dist) * 100, 1)
+        parts.append(f"\n[Match {i+1} — Relevance: {relevance}%]\n{doc}")
+    return "\n".join(parts)
 
 
 @app.route("/chat", methods=["POST"])
 def chat():
     """
-    Help Assistant endpoint.
+    Help Assistant endpoint — RAG-grounded.
     Accepts: { "message": "What is BNS 85?" }
     Returns: { "reply": "...", "suggest_intake": true/false }
     """
@@ -389,18 +426,20 @@ def chat():
         return jsonify({"reply": "Please type a question.", "suggest_intake": False})
 
     try:
+        retrieved_context = _retrieve_for_chat(user_msg, n_results=4)
+
         completion = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": ASSISTANT_SYSTEM_PROMPT},
+                {"role": "system", "content": retrieved_context},
                 {"role": "user",   "content": user_msg},
             ],
-            temperature=0.3,
-            max_tokens=400,   # Keep replies short
+            temperature=0.2,
+            max_tokens=400,
         )
         reply = completion.choices[0].message.content.strip()
 
-        # Detect if the reply suggests using the intake form
         suggest_intake = any(kw in reply.lower() for kw in [
             "intake form", "case analysis", "full analysis", "use the form",
             "analyze", "detailed analysis"
