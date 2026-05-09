@@ -339,11 +339,17 @@ def _normalize_source(rank: int, doc_id: str, doc: str, meta: dict, relevance: f
 
 
 def retrieve_relevant_sections_structured(
-    collection: chromadb.Collection, client_story: str, n_results: int = 6
+    collection: chromadb.Collection, client_story: str, n_results: int = 8
 ):
     """
     Same retrieval as ``retrieve_relevant_sections``, but also returns a list of
     structured ``source`` dicts so the frontend can show citation provenance.
+
+    Why n_results=8: bumped from 6 to catch sections that previously just missed
+    the cutoff (e.g. BNS 115 grievous hurt for an injury fact pattern). Capped at
+    8 because Groq's free-tier per-request TPM is 12,000 and 10 sections push the
+    prompt to ~12,200. If you upgrade Groq, raise this to 12-15 — there is real
+    accuracy headroom above 8.
 
     Returns: (context_string, sources_list)
     """
@@ -376,7 +382,7 @@ def retrieve_relevant_sections_structured(
 
 
 def retrieve_relevant_sections(
-    collection: chromadb.Collection, client_story: str, n_results: int = 6
+    collection: chromadb.Collection, client_story: str, n_results: int = 8
 ) -> str:
     """
     Performs a semantic search on the knowledge base to find the most relevant
