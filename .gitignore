@@ -1,6 +1,8 @@
 # Environment & secrets
 .env
 .env.*
+# but DO commit the template (no secrets in it)
+!.env.example
 
 # Python
 __pycache__/
