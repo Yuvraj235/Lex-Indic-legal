@@ -99,10 +99,20 @@ def extract_image_text(file_bytes: bytes, mime_type: str) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ROUTE 1: Main page
+# ROUTE 1: Marketing landing page (3D hero, scroll animations, sales pitch)
 # ═══════════════════════════════════════════════════════════════════════════════
 @app.route("/")
-def index():
+def landing():
+    """Marketing landing page — sells the product. Links to /app for the tool."""
+    return render_template("landing.html")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTE 1b: The actual legal-triage intake form (formerly at /)
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.route("/app")
+def app_page():
+    """The intake form + results UI — what was previously the home page."""
     return render_template("index.html")
 
 
