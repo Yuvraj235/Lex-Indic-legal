@@ -44,6 +44,9 @@ from main import (
 )
 # Used by the RAG-grounded /chat endpoint to search the same KB as /analyze
 from main import _get_embedding_with_cache, _load_embedding_cache
+
+# Audit trail (DPDP Act 2023 compliance) — never breaks the request path
+import audit
 from pdf_generator import generate_pdf, parse_sections
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -115,9 +118,15 @@ def analyze():
         "client_statement": "...",
         "pdf_filename": "CaseBrief_TIMESTAMP.pdf",
         "generated": "04 March 2026, 21:15:00",
+        "request_id": "uuid for audit trace",
         "error": null
     }
     """
+    # Capture audit context up-front so it's available on every code path
+    t_start    = time.monotonic()
+    client_ip  = (request.headers.get("X-Forwarded-For") or request.remote_addr or "")
+    user_agent = request.headers.get("User-Agent", "")
+
     # Accept multipart/form-data (with files) OR plain JSON
     ct = request.content_type or ""
     if "multipart" in ct or "form" in ct:
@@ -131,10 +140,21 @@ def analyze():
         uploaded_files  = []
 
     if not client_story:
-        return jsonify({"error": "Please enter the client's story."}), 400
+        rid = audit.log_request(
+            endpoint="/analyze", client_ip=client_ip, user_agent=user_agent,
+            story="", status="error", duration_ms=int((time.monotonic() - t_start) * 1000),
+            error="empty client_story",
+        )
+        return jsonify({"error": "Please enter the client's story.", "request_id": rid}), 400
 
     if len(client_story) < 30:
-        return jsonify({"error": "Please provide more details about the client's situation."}), 400
+        rid = audit.log_request(
+            endpoint="/analyze", client_ip=client_ip, user_agent=user_agent,
+            story=client_story, status="error",
+            duration_ms=int((time.monotonic() - t_start) * 1000),
+            error="story too short",
+        )
+        return jsonify({"error": "Please provide more details about the client's situation.", "request_id": rid}), 400
 
     try:
         # ── Step 0: Process any attached files ────────────────────────────────
@@ -213,17 +233,44 @@ def analyze():
             if isinstance(sections[key], str):
                 sections[key] = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", sections[key])
 
+        # ── Audit log: success ────────────────────────────────────────────────
+        request_id = audit.log_request(
+            endpoint="/analyze",
+            client_ip=client_ip,
+            user_agent=user_agent,
+            story=client_story,
+            sources=sources,
+            status="ok",
+            duration_ms=int((time.monotonic() - t_start) * 1000),
+            response_chars=len(ai_response or ""),
+            pdf_filename=pdf_filename,
+        )
+
         return jsonify({
             "sections":          sections,
             "client_statement":  client_story,
             "pdf_filename":      pdf_filename,
             "generated":         sections.get("generated", datetime.now().strftime("%d %B %Y, %H:%M:%S")),
             "sources":           sources,
+            "request_id":        request_id,
             "error":             None,
         })
 
     except Exception as e:
-        return jsonify({"error": f"Analysis failed: {str(e)[:300]}"}), 500
+        # ── Audit log: error path — preserves the failure for forensics ───────
+        request_id = audit.log_request(
+            endpoint="/analyze",
+            client_ip=client_ip,
+            user_agent=user_agent,
+            story=client_story,
+            status="error",
+            duration_ms=int((time.monotonic() - t_start) * 1000),
+            error=str(e),
+        )
+        return jsonify({
+            "error": f"Analysis failed: {str(e)[:300]}",
+            "request_id": request_id,
+        }), 500
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -408,8 +455,12 @@ def chat():
     """
     Help Assistant endpoint — RAG-grounded.
     Accepts: { "message": "What is BNS 85?" }
-    Returns: { "reply": "...", "suggest_intake": true/false }
+    Returns: { "reply": "...", "suggest_intake": true/false, "request_id": "..." }
     """
+    t_start    = time.monotonic()
+    client_ip  = (request.headers.get("X-Forwarded-For") or request.remote_addr or "")
+    user_agent = request.headers.get("User-Agent", "")
+
     data = request.get_json()
     user_msg = (data or {}).get("message", "").strip()
 
@@ -436,17 +487,39 @@ def chat():
             "analyze", "detailed analysis"
         ])
 
+        request_id = audit.log_request(
+            endpoint="/chat",
+            client_ip=client_ip,
+            user_agent=user_agent,
+            story=user_msg,
+            sources=sources,
+            status="ok",
+            duration_ms=int((time.monotonic() - t_start) * 1000),
+            response_chars=len(reply or ""),
+        )
+
         return jsonify({
             "reply": reply,
             "suggest_intake": suggest_intake,
             "sources": sources,
+            "request_id": request_id,
         })
 
     except Exception as e:
+        request_id = audit.log_request(
+            endpoint="/chat",
+            client_ip=client_ip,
+            user_agent=user_agent,
+            story=user_msg,
+            status="error",
+            duration_ms=int((time.monotonic() - t_start) * 1000),
+            error=str(e),
+        )
         return jsonify({
             "reply": f"Sorry, I couldn't process that right now. ({str(e)[:80]})",
             "suggest_intake": False,
             "sources": [],
+            "request_id": request_id,
         })
 
 
