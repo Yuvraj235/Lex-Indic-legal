@@ -883,16 +883,40 @@ function openSourceDetail(idx) {
     `;
   }
 
+  // Day-8: deep-link bundle (curated per-BNS-section URLs + page hint)
+  let deepLinkHTML = '';
+  if (s.deep_link) {
+    const dl = s.deep_link;
+    const pageNote = dl.page_hint ? ` (PDF p. ${dl.page_hint})` : '';
+    deepLinkHTML += `
+      <a href="${dl.primary_url}" target="_blank" rel="noopener" class="source-bareact-link">
+        <i class="bi bi-box-arrow-up-right me-1"></i>${escapeHtml(dl.primary_label)}${pageNote}
+      </a>
+    `;
+    if (dl.secondary_url) {
+      deepLinkHTML += `
+        <a href="${dl.secondary_url}" target="_blank" rel="noopener"
+           class="source-bareact-link" style="margin-left:14px">
+          <i class="bi bi-box-arrow-up-right me-1"></i>${escapeHtml(dl.secondary_label)}
+        </a>
+      `;
+    }
+  } else {
+    deepLinkHTML = `
+      <a href="https://www.indiacode.nic.in/handle/123456789/20063" target="_blank" rel="noopener"
+         class="source-bareact-link">
+        <i class="bi bi-box-arrow-up-right me-1"></i>BNS 2023 (indiacode.nic.in)
+      </a>
+    `;
+  }
+
   bodyEl.innerHTML = `
     <div class="source-meta-row">
       <span><strong>Relevance:</strong> ${s.relevance.toFixed(1)}%</span>
       ${metaRow}
     </div>
     <pre class="source-raw">${escapeHtml(s.raw_text || '')}</pre>
-    <a href="https://www.indiacode.nic.in/handle/123456789/20063" target="_blank" rel="noopener"
-       class="source-bareact-link">
-      <i class="bi bi-box-arrow-up-right me-1"></i>Verify against the official BNS bare act on indiacode.nic.in
-    </a>
+    ${deepLinkHTML}
   `;
   document.getElementById('sourceModal').classList.add('modal-show');
 }

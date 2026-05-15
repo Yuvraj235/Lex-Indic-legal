@@ -286,6 +286,13 @@ def build_rag_knowledge_base() -> chromadb.Collection:
 # ══════════════════════════════════════════════════════════════════════════════
 # STEP 3: RETRIEVE RELEVANT LAWS (The RAG Search)
 # ══════════════════════════════════════════════════════════════════════════════
+try:
+    from data.bns_bare_act_urls import deep_link_summary as _bns_deep_link
+except ImportError:
+    def _bns_deep_link(_):  # type: ignore
+        return None
+
+
 def _normalize_source(rank: int, doc_id: str, doc: str, meta: dict, relevance: float) -> dict:
     """
     Convert ChromaDB hit metadata (which differs by document type) into a single
@@ -333,6 +340,9 @@ def _normalize_source(rank: int, doc_id: str, doc: str, meta: dict, relevance: f
         # mapping-specific
         "ipc_section": meta.get("ipc_section"),
         "bns_section": meta.get("bns_section"),
+        # Day-8: deep-link bundle (primary URL + page hint + optional Kanoon)
+        # so the source modal can show a proper "Verify against bare act" link.
+        "deep_link": _bns_deep_link(meta.get("section", "")) if kind == "bns_section" else None,
         "relevance": relevance,
         "raw_text": doc,
     }
