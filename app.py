@@ -208,6 +208,7 @@ def convert_download(filename):
 # Lawyers register matter areas; daily digest surfaces matching SC rulings.
 # ═══════════════════════════════════════════════════════════════════════════════
 import monitors as monitors_module
+import i18n as i18n_module
 
 
 @app.route("/monitors")
@@ -262,6 +263,19 @@ def monitors_digest_text():
     response = make_response(monitors_module.format_digest_text(d))
     response.headers["Content-Type"] = "text/plain; charset=utf-8"
     return response
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — i18n (Day-4 from the Legora teardown).
+# /i18n/strings.json     — full English+Hindi strings dict, fetched by frontend
+# /i18n/strings.json?lang=hi  — pre-flattened to one language
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.route("/i18n/strings.json")
+def i18n_strings():
+    lang = (request.args.get("lang") or "").lower()
+    if lang in ("en", "hi"):
+        return jsonify(i18n_module.get_strings(lang))
+    return jsonify(i18n_module.get_all())
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -368,11 +382,17 @@ def analyze():
         client_story    = request.form.get("client_story", "").strip()
         additional_info = request.form.get("additional_info", "").strip()
         uploaded_files  = request.files.getlist("attachments")
+        # Day-4: optional output-language flag.  Accepted values: 'en', 'hi'.
+        # Anything else falls back to English silently.
+        language        = (request.form.get("language") or "en").lower()
     else:
         data            = request.get_json() or {}
         client_story    = data.get("client_story", "").strip()
         additional_info = data.get("additional_info", "").strip()
         uploaded_files  = []
+        language        = (data.get("language") or "en").lower()
+    if language not in ("en", "hi"):
+        language = "en"
 
     if not client_story:
         rid = audit.log_request(
@@ -420,22 +440,31 @@ def analyze():
         # ── Step 1: RAG search for relevant BNS sections ──────────────────────
         # Use the structured variant so we can return sources to the frontend
         # for citation provenance (the user can verify every section we cited).
+        # Day-4: drop one retrieval slot when Hindi is requested, because the
+        # Hindi system instruction adds ~700 tokens and we'd otherwise blow
+        # past Groq's free-tier 12K TPM per request.
+        n_results = 7 if language == "hi" else 8
         retrieved_context, sources = retrieve_relevant_sections_structured(
-            rag_collection, client_story
+            rag_collection, client_story, n_results=n_results
         )
 
         # ── Step 2: Build prompt and call Groq ────────────────────────────────
         prompt = build_legal_prompt(client_story, retrieved_context)
+
+        # Day-4: if Hindi requested, append the Hindi system instruction.
+        # We layer it as a separate system message so the original LEXI prompt
+        # stays untouched and we can A/B the Hindi tail in isolation.
+        messages = [{"role": "system", "content": LEXI_SYSTEM_PROMPT}]
+        if language == "hi":
+            messages.append({"role": "system", "content": i18n_module.HINDI_SYSTEM_INSTRUCTION})
+        messages.append({"role": "user", "content": prompt})
 
         ai_response = None
         for attempt in range(4):
             try:
                 completion = groq_client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
-                    messages=[
-                        {"role": "system", "content": LEXI_SYSTEM_PROMPT},
-                        {"role": "user",   "content": prompt},
-                    ],
+                    messages=messages,
                     temperature=0.2,
                     max_tokens=8192,
                 )
@@ -487,6 +516,7 @@ def analyze():
             "pdf_filename":      pdf_filename,
             "generated":         sections.get("generated", datetime.now().strftime("%d %B %Y, %H:%M:%S")),
             "sources":           sources,
+            "language":          language,
             "request_id":        request_id,
             "error":             None,
         })

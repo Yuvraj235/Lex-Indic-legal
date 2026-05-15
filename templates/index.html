@@ -20,12 +20,22 @@
   <div class="container-fluid px-3">
     <span class="navbar-brand mb-0 h1">
       <span class="brand-lex">LEX</span><span class="brand-indic">-INDIC</span>
-      <span class="brand-sub ms-2">BNS Transition Engine</span>
+      <span class="brand-sub ms-2" data-i18n="app.header.title">BNS Transition Engine</span>
     </span>
-    <span class="text-light small opacity-75">
-      <i class="bi bi-shield-check me-1"></i>
-      AI-Powered Junior Associate &nbsp;|&nbsp; Bharatiya Nyaya Sanhita 2023
-    </span>
+    <div class="d-flex align-items-center" style="gap:14px">
+      <!-- Day-4: language toggle on the top bar. Reads/writes localStorage so
+           the choice persists across page loads. -->
+      <div class="btn-group btn-group-sm" role="group" aria-label="Interface language">
+        <button type="button" class="btn btn-outline-light" id="uiLangEn"
+                onclick="setUiLang('en')">EN</button>
+        <button type="button" class="btn btn-outline-light" id="uiLangHi"
+                onclick="setUiLang('hi')">हिन्दी</button>
+      </div>
+      <span class="text-light small opacity-75 d-none d-md-inline">
+        <i class="bi bi-shield-check me-1"></i>
+        <span data-i18n="app.header.sub">AI-Powered Junior Associate</span> &nbsp;|&nbsp; Bharatiya Nyaya Sanhita 2023
+      </span>
+    </div>
   </div>
 </nav>
 
@@ -113,10 +123,22 @@
             </div>
           </div>
 
+          <!-- Day-4: output language selector. Default English; Hindi sends a
+               separate system instruction to Groq for full Devanagari output. -->
+          <div class="d-flex align-items-center mt-3" style="gap:14px; flex-wrap:wrap">
+            <span class="text-muted small" data-i18n="app.intake.lang_label">Output language</span>
+            <div class="btn-group" role="group" aria-label="Output language">
+              <input type="radio" class="btn-check" name="analyzeLanguage" id="langEn" value="en" checked>
+              <label class="btn btn-sm btn-outline-secondary" for="langEn" data-i18n="app.intake.lang.en">English</label>
+              <input type="radio" class="btn-check" name="analyzeLanguage" id="langHi" value="hi">
+              <label class="btn btn-sm btn-outline-secondary" for="langHi" data-i18n="app.intake.lang.hi">Hindi (हिन्दी)</label>
+            </div>
+          </div>
+
           <div class="d-flex justify-content-between align-items-center mt-3">
             <span id="charCount" class="text-muted small">0 characters</span>
             <button id="analyzeBtn" class="btn btn-analyze" onclick="runAnalysis()">
-              <i class="bi bi-lightning-charge-fill me-2"></i>Run Legal Analysis
+              <i class="bi bi-lightning-charge-fill me-2"></i><span data-i18n="app.intake.run">Run Legal Analysis</span>
             </button>
           </div>
         </div>
@@ -654,6 +676,9 @@ async function _doAnalyze(story, additionalInfo, scope) {
   fd.append('client_story', story);
   if (additionalInfo) fd.append('additional_info', additionalInfo);
   for (const f of fileStore[scope].files) fd.append('attachments', f);
+  // Day-4: include chosen output language (defaults to 'en' if user hasn't touched the toggle).
+  const langInput = document.querySelector('input[name="analyzeLanguage"]:checked');
+  fd.append('language', langInput ? langInput.value : 'en');
 
   showPanel('loadingPanel');
   try {
@@ -940,10 +965,73 @@ function escapeHtml(text) {
   return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// ── Day-4: i18n runtime ─────────────────────────────────────────────────────
+let _i18nStrings = null;
+async function loadI18n(){
+  if (_i18nStrings) return _i18nStrings;
+  try {
+    const resp = await fetch('/i18n/strings.json');
+    _i18nStrings = await resp.json();
+  } catch (e) {
+    console.warn('i18n load failed', e);
+    _i18nStrings = {};
+  }
+  return _i18nStrings;
+}
+
+async function setUiLang(lang){
+  if (lang !== 'en' && lang !== 'hi') lang = 'en';
+  localStorage.setItem('lexindic.lang', lang);
+  document.documentElement.lang = lang;
+
+  // Toggle the active button
+  const enBtn = document.getElementById('uiLangEn');
+  const hiBtn = document.getElementById('uiLangHi');
+  if (enBtn && hiBtn) {
+    enBtn.classList.toggle('active', lang === 'en');
+    hiBtn.classList.toggle('active', lang === 'hi');
+  }
+
+  // Mirror the analysis-output toggle to the UI choice unless the user has
+  // already overridden it.  (We don't force; just default the radio to match.)
+  const langRadio = document.getElementById('lang' + (lang === 'hi' ? 'Hi' : 'En'));
+  if (langRadio && !langRadio.dataset.userTouched) langRadio.checked = true;
+
+  // Apply strings
+  const strings = await loadI18n();
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    const entry = strings[key];
+    if (!entry) return;
+    const value = (typeof entry === 'object') ? (entry[lang] || entry.en) : entry;
+    if (value) el.textContent = value;
+  });
+
+  // Apply to placeholder/title attributes via data-i18n-attr
+  document.querySelectorAll('[data-i18n-attr]').forEach(el => {
+    const [attr, key] = el.dataset.i18nAttr.split('|');
+    const entry = strings[key];
+    if (!entry) return;
+    const value = (typeof entry === 'object') ? (entry[lang] || entry.en) : entry;
+    if (value) el.setAttribute(attr, value);
+  });
+}
+
+// Mark the analyze-output radio as user-touched so we stop auto-syncing
+document.addEventListener('change', e => {
+  if (e.target && e.target.name === 'analyzeLanguage') {
+    e.target.dataset.userTouched = '1';
+  }
+});
+
 // ── Initialise on page load ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   loadHistory();
   updateCharCount();
+
+  // Day-4: restore the user's language choice from localStorage
+  const savedLang = localStorage.getItem('lexindic.lang') || 'en';
+  setUiLang(savedLang);
 
   // Allow Ctrl+Enter to submit
   document.getElementById('clientStory').addEventListener('keydown', e => {
