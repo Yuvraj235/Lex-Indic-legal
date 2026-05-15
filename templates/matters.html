@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matter Intake — Lex-Indic</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0f2850; --navy-deep:#0a1a35;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --green:#146432; --green-light:#e8f7ed;
+    --red:#b41e1e; --red-light:#fff0f0;
+    --amber:#fff7d6; --amber-text:#7a5a00;
+    --grey-100:#f6f7fb; --grey-200:#ecf0f7; --grey-300:#d9dde6;
+    --grey-500:#6b7280; --grey-700:#2d3748;
+    --shadow-md:0 10px 30px -8px rgba(15,40,80,.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,-apple-system,sans-serif;color:var(--navy);
+       background:var(--grey-100);line-height:1.6;min-height:100vh;
+       -webkit-font-smoothing:antialiased}
+  .top{background:linear-gradient(135deg,var(--navy-deep),var(--navy));color:#fff;
+       padding:18px clamp(20px,4vw,40px);border-bottom:3px solid var(--gold)}
+  .top-inner{max-width:1280px;margin:0 auto;display:flex;justify-content:space-between;
+             align-items:center;gap:20px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff}
+  .brand-mark{width:34px;height:34px;background:linear-gradient(135deg,var(--gold),var(--gold-glow));
+              border-radius:8px;display:grid;place-items:center;color:var(--navy-deep);
+              font-weight:900;font-size:18px}
+  .brand-name{font-weight:800;font-size:18px}
+  .nav{display:flex;gap:18px;font-size:14px}
+  .nav a{color:rgba(255,255,255,.78);text-decoration:none}
+  .nav a:hover{color:var(--gold-glow)}
+
+  main{max-width:1280px;margin:30px auto;padding:0 24px}
+  h1{font-family:'Playfair Display',serif;font-size:clamp(28px,3.5vw,38px);
+     line-height:1.15;font-weight:700;margin-bottom:8px}
+  .lead{color:var(--grey-700);font-size:15px;max-width:740px;margin-bottom:30px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr 1.5fr;gap:18px}
+  @media (max-width:1080px){.grid{grid-template-columns:1fr}}
+  .card{background:#fff;border:1px solid var(--grey-300);border-radius:12px;
+        padding:20px 22px;box-shadow:var(--shadow-md)}
+  .card h2{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:14px;
+           display:flex;align-items:center;gap:10px}
+  .card-num{background:linear-gradient(135deg,var(--navy),var(--navy-deep));
+            color:var(--gold-glow);width:24px;height:24px;border-radius:6px;
+            display:grid;place-items:center;font-size:11px;font-weight:700}
+
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--navy);margin:10px 0 4px}
+  input,select,textarea{width:100%;padding:9px 11px;border:1px solid var(--grey-300);
+                        border-radius:7px;background:#fff;font-family:inherit;
+                        font-size:13.5px;color:var(--navy);transition:border-color .2s}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold);
+                                          box-shadow:0 0 0 3px rgba(180,140,40,.12)}
+  textarea{min-height:60px;resize:vertical}
+
+  .btn{display:inline-flex;align-items:center;gap:6px;
+       padding:9px 16px;font-family:inherit;font-size:13px;font-weight:600;
+       border:none;border-radius:7px;cursor:pointer;transition:all .2s;
+       text-decoration:none}
+  .btn-primary{background:linear-gradient(135deg,var(--gold),var(--gold-light));
+               color:var(--navy-deep);box-shadow:0 3px 10px rgba(180,140,40,.20)}
+  .btn-primary:hover{transform:translateY(-1px)}
+  .btn-row{margin-top:14px}
+
+  .list-item{padding:10px 12px;border:1px solid var(--grey-300);border-radius:7px;
+             background:var(--grey-100);margin-bottom:8px;font-size:13px}
+  .list-item .label{font-weight:600;color:var(--navy)}
+  .list-item .meta{font-size:11px;color:var(--grey-500);margin-top:2px;
+                   font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .list-item .badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;
+                    text-transform:uppercase;letter-spacing:.3px;margin-left:8px}
+  .badge-open{background:var(--green-light);color:var(--green)}
+  .badge-filed{background:var(--amber);color:var(--amber-text)}
+  .badge-settled{background:var(--grey-200);color:var(--grey-700)}
+  .badge-closed{background:var(--red-light);color:var(--red)}
+
+  .empty{color:var(--grey-500);font-style:italic;text-align:center;padding:14px;font-size:13px}
+
+  .msg{margin-top:10px;padding:9px 12px;border-radius:6px;font-size:12.5px}
+  .msg.ok{background:var(--green-light);color:var(--green);border:1px solid #c8e8d0}
+  .msg.err{background:var(--red-light);color:var(--red);border:1px solid #f0c8c8}
+  .msg.warn{background:var(--amber);color:var(--amber-text);border:1px solid #f5e0a0}
+
+  .conflict-list{margin-top:8px;font-size:12.5px}
+  .conflict-list li{margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <a href="/" class="brand">
+      <div class="brand-mark">L</div>
+      <span class="brand-name">Lex-Indic</span>
+    </a>
+    <nav class="nav">
+      <a href="/">Landing</a>
+      <a href="/app">Analyze a case</a>
+      <a href="/matters" style="color:var(--gold-glow)">Matters</a>
+      <a href="/trust">Trust</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <h1>Matter Intake</h1>
+  <p class="lead">
+    Register your firm once, then your lawyers, then each new matter you take.
+    Every matter gets a unique ID like <code>SINGHANIA/2026/0042</code>.
+    Conflict-of-interest check runs automatically before each new matter is
+    created.  Future <code>/analyze</code> calls can be tagged with a
+    <code>matter_id</code> to file them under the case folder.
+  </p>
+
+  <div class="grid">
+    <!-- Firm -->
+    <div class="card">
+      <h2><span class="card-num">1</span> Firms</h2>
+      <label>Firm name</label>
+      <input id="firmName" placeholder="Singhania & Partners">
+      <label>Address (optional)</label>
+      <input id="firmAddress" placeholder="Mumbai · Delhi · Bengaluru">
+      <div class="btn-row"><button class="btn btn-primary" onclick="addFirm()">+ Add firm</button></div>
+      <div id="firmMsg"></div>
+      <div id="firmList" style="margin-top:14px"></div>
+    </div>
+
+    <!-- Lawyer -->
+    <div class="card">
+      <h2><span class="card-num">2</span> Lawyers</h2>
+      <label>Firm</label>
+      <select id="lawyerFirm"><option value="">— select —</option></select>
+      <label>Full name</label>
+      <input id="lawyerName" placeholder="Adv. Priya Sharma">
+      <label>Bar Council number</label>
+      <input id="lawyerBCI" placeholder="MAH/4521/2018">
+      <label>Email</label>
+      <input id="lawyerEmail" type="email" placeholder="priya@firm.example">
+      <label>Role</label>
+      <select id="lawyerRole">
+        <option value="associate">Associate</option>
+        <option value="senior_associate">Senior associate</option>
+        <option value="partner">Partner</option>
+        <option value="paralegal">Paralegal</option>
+      </select>
+      <div class="btn-row"><button class="btn btn-primary" onclick="addLawyer()">+ Add lawyer</button></div>
+      <div id="lawyerMsg"></div>
+      <div id="lawyerList" style="margin-top:14px"></div>
+    </div>
+
+    <!-- Matter -->
+    <div class="card">
+      <h2><span class="card-num">3</span> Matters</h2>
+      <label>Firm</label>
+      <select id="matterFirm" onchange="filterLawyers()"><option value="">— select —</option></select>
+      <label>Assigned lawyer</label>
+      <select id="matterLawyer"><option value="">— select firm first —</option></select>
+      <label>Client name</label>
+      <input id="matterClient" placeholder="e.g. Ramesh Kulkarni">
+      <label>Opposing party (for conflict check)</label>
+      <input id="matterOpposing" placeholder="e.g. Suresh Patil" onblur="conflictCheck()">
+      <label>Matter type</label>
+      <input id="matterType" placeholder="criminal / matrimonial / bail / POCSO">
+      <label>Brief description</label>
+      <textarea id="matterDesc" placeholder="One-line summary of the case"></textarea>
+      <div class="btn-row"><button class="btn btn-primary" onclick="addMatter()">+ Create matter</button></div>
+      <div id="matterMsg"></div>
+      <div id="matterList" style="margin-top:14px"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const escapeHtml = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  // ─── Firms ─────────────────────────────────────────────────────────────
+  async function loadFirms(){
+    const data = await (await fetch('/matters/api/firms')).json();
+    const list = $('firmList');
+    if (!data.firms.length){
+      list.innerHTML = '<div class="empty">No firms registered yet.</div>';
+    } else {
+      list.innerHTML = data.firms.map(f => `
+        <div class="list-item">
+          <div class="label">${escapeHtml(f.name)}</div>
+          <div class="meta">${escapeHtml(f.id)} · ${escapeHtml(f.address || '')}</div>
+        </div>`).join('');
+    }
+    // Populate firm dropdowns
+    const opts = '<option value="">— select —</option>' +
+                 data.firms.map(f => `<option value="${f.id}">${escapeHtml(f.name)}</option>`).join('');
+    $('lawyerFirm').innerHTML = opts;
+    $('matterFirm').innerHTML = opts;
+  }
+
+  async function addFirm(){
+    const msg = $('firmMsg'); msg.innerHTML = '';
+    const r = await fetch('/matters/api/firms', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name:$('firmName').value, address:$('firmAddress').value}),
+    });
+    const d = await r.json();
+    if (d.error){ msg.innerHTML = `<div class="msg err">${escapeHtml(d.error)}</div>`; return; }
+    msg.innerHTML = `<div class="msg ok">✓ ${escapeHtml(d.firm.name)} added.</div>`;
+    $('firmName').value = ''; $('firmAddress').value = '';
+    loadFirms();
+  }
+
+  // ─── Lawyers ───────────────────────────────────────────────────────────
+  let _lawyers = [];
+  async function loadLawyers(){
+    const data = await (await fetch('/matters/api/lawyers')).json();
+    _lawyers = data.lawyers;
+    const list = $('lawyerList');
+    if (!_lawyers.length){
+      list.innerHTML = '<div class="empty">No lawyers added yet.</div>';
+    } else {
+      list.innerHTML = _lawyers.map(l => `
+        <div class="list-item">
+          <div class="label">${escapeHtml(l.full_name)}</div>
+          <div class="meta">${escapeHtml(l.role)} · ${escapeHtml(l.bar_council_no || 'no BCI')} · ${escapeHtml(l.email || '')}</div>
+        </div>`).join('');
+    }
+  }
+
+  async function addLawyer(){
+    const msg = $('lawyerMsg'); msg.innerHTML = '';
+    const r = await fetch('/matters/api/lawyers', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        firm_id: $('lawyerFirm').value,
+        full_name: $('lawyerName').value,
+        bar_council_no: $('lawyerBCI').value,
+        email: $('lawyerEmail').value,
+        role: $('lawyerRole').value,
+      }),
+    });
+    const d = await r.json();
+    if (d.error){ msg.innerHTML = `<div class="msg err">${escapeHtml(d.error)}</div>`; return; }
+    msg.innerHTML = `<div class="msg ok">✓ ${escapeHtml(d.lawyer.full_name)} added.</div>`;
+    $('lawyerName').value = ''; $('lawyerBCI').value = ''; $('lawyerEmail').value = '';
+    loadLawyers();
+  }
+
+  function filterLawyers(){
+    const firmId = $('matterFirm').value;
+    const opts = _lawyers.filter(l => l.firm_id === firmId)
+                         .map(l => `<option value="${l.id}">${escapeHtml(l.full_name)} (${escapeHtml(l.role)})</option>`);
+    $('matterLawyer').innerHTML = opts.length
+        ? '<option value="">— select —</option>' + opts.join('')
+        : '<option value="">— no lawyers in that firm —</option>';
+  }
+
+  // ─── Matters ───────────────────────────────────────────────────────────
+  async function loadMatters(){
+    const data = await (await fetch('/matters/api/matters')).json();
+    const list = $('matterList');
+    if (!data.matters.length){
+      list.innerHTML = '<div class="empty">No matters yet.</div>';
+      return;
+    }
+    list.innerHTML = data.matters.slice().reverse().map(m => `
+      <div class="list-item">
+        <div class="label">
+          ${escapeHtml(m.id)}
+          <span class="badge badge-${escapeHtml(m.status)}">${escapeHtml(m.status)}</span>
+        </div>
+        <div class="meta">${escapeHtml(m.client_name)} v. ${escapeHtml(m.opposing_party || '—')} · ${escapeHtml(m.matter_type || 'general')}</div>
+      </div>`).join('');
+  }
+
+  async function conflictCheck(){
+    const firmId = $('matterFirm').value;
+    if (!firmId) return;
+    const msg = $('matterMsg');
+    const r = await fetch('/matters/api/conflict-check', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        firm_id: firmId,
+        client_name: $('matterClient').value,
+        opposing_party: $('matterOpposing').value,
+      }),
+    });
+    const d = await r.json();
+    if (d.conflicts && d.conflicts.length){
+      msg.innerHTML = `<div class="msg warn">
+        <strong>⚠ Possible conflict of interest:</strong>
+        <ul class="conflict-list">
+          ${d.conflicts.map(c => `<li><code>${escapeHtml(c.matter_id)}</code> — ${escapeHtml(c.reason)}</li>`).join('')}
+        </ul>
+        Review with the partner before accepting this instruction.
+      </div>`;
+    } else if (msg.innerHTML.includes('conflict')) {
+      msg.innerHTML = '';
+    }
+  }
+
+  async function addMatter(){
+    const msg = $('matterMsg');
+    const r = await fetch('/matters/api/matters', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        firm_id: $('matterFirm').value,
+        lawyer_id: $('matterLawyer').value,
+        client_name: $('matterClient').value,
+        opposing_party: $('matterOpposing').value,
+        matter_type: $('matterType').value,
+        description: $('matterDesc').value,
+      }),
+    });
+    const d = await r.json();
+    if (d.error){ msg.innerHTML = `<div class="msg err">${escapeHtml(d.error)}</div>`; return; }
+    const conflictNote = d.conflicts && d.conflicts.length
+      ? `<br><strong>⚠ Conflicts persisted:</strong> ${d.conflicts.map(c => escapeHtml(c.matter_id)).join(', ')}`
+      : '';
+    msg.innerHTML = `<div class="msg ok">✓ Matter <strong>${escapeHtml(d.matter.id)}</strong> created.${conflictNote}</div>`;
+    $('matterClient').value = ''; $('matterOpposing').value = '';
+    $('matterType').value = ''; $('matterDesc').value = '';
+    loadMatters();
+  }
+
+  // Boot
+  (async () => { await loadFirms(); await loadLawyers(); await loadMatters(); })();
+</script>
+</body>
+</html>

@@ -211,6 +211,7 @@ import monitors as monitors_module
 import i18n as i18n_module
 import nalsa as nalsa_module
 import compliance as compliance_module
+import matters as matters_module
 
 
 @app.route("/monitors")
@@ -349,6 +350,93 @@ def trust_posture_json():
     """Machine-readable version of the posture — for any procurement tool that
     can ingest JSON instead of asking 28 questions by hand."""
     return jsonify(compliance_module.to_dict())
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — Matter intake registry (Day-9).
+# Firm -> Lawyer -> Matter triple with optional analyze-tagging.
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.route("/matters")
+def matters_page():
+    return render_template("matters.html")
+
+
+@app.route("/matters/api/firms", methods=["GET", "POST"])
+def matters_firms():
+    if request.method == "GET":
+        return jsonify({"firms": matters_module.list_firms()})
+    data = request.get_json() or {}
+    try:
+        firm = matters_module.add_firm(data.get("name", ""), data.get("address", ""))
+        return jsonify({"firm": firm})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/matters/api/lawyers", methods=["GET", "POST"])
+def matters_lawyers():
+    if request.method == "GET":
+        return jsonify({"lawyers": matters_module.list_lawyers()})
+    data = request.get_json() or {}
+    try:
+        lwy = matters_module.add_lawyer(
+            firm_id=data.get("firm_id", ""),
+            full_name=data.get("full_name", ""),
+            bar_council_no=data.get("bar_council_no", ""),
+            email=data.get("email", ""),
+            role=data.get("role", "associate"),
+        )
+        return jsonify({"lawyer": lwy})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/matters/api/matters", methods=["GET", "POST"])
+def matters_matters():
+    if request.method == "GET":
+        return jsonify({"matters": matters_module.list_matters()})
+    data = request.get_json() or {}
+    try:
+        m = matters_module.add_matter(
+            firm_id=data.get("firm_id", ""),
+            lawyer_id=data.get("lawyer_id", ""),
+            client_name=data.get("client_name", ""),
+            opposing_party=data.get("opposing_party", ""),
+            matter_type=data.get("matter_type", ""),
+            description=data.get("description", ""),
+        )
+        # Conflict check is informational, not blocking
+        conflicts = matters_module.check_conflict(
+            firm_id=data.get("firm_id", ""),
+            client_name=data.get("client_name", ""),
+            opposing_party=data.get("opposing_party", ""),
+        )
+        return jsonify({"matter": m, "conflicts": conflicts})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/matters/api/conflict-check", methods=["POST"])
+def matters_conflict_check():
+    """Pre-create conflict check — call before adding a matter."""
+    data = request.get_json() or {}
+    hits = matters_module.check_conflict(
+        firm_id=data.get("firm_id", ""),
+        client_name=data.get("client_name", ""),
+        opposing_party=data.get("opposing_party", ""),
+    )
+    return jsonify({"conflicts": hits})
+
+
+@app.route("/matters/api/<matter_id>/status", methods=["PATCH"])
+def matters_status(matter_id):
+    if not re.match(r"^[A-Z]+/\d{4}/\d{4}$", matter_id):
+        return jsonify({"error": "Invalid matter ID."}), 400
+    data = request.get_json() or {}
+    ok = matters_module.update_matter_status(matter_id, data.get("status", ""))
+    if not ok:
+        return jsonify({"error": "Matter not found or invalid status."}), 400
+    return jsonify({"ok": True})
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
