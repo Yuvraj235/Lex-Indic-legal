@@ -22,7 +22,7 @@ import time
 import json
 import base64
 import textwrap
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from io import BytesIO
 
@@ -216,6 +216,7 @@ import auth as auth_module
 import ecourts as ecourts_module
 import llm_provider as llm_provider_module
 import tabular as tabular_module
+import webhooks as webhooks_module
 
 
 @app.route("/monitors")
@@ -978,6 +979,18 @@ def analyze():
             pdf_filename=pdf_filename,
         )
 
+        # Day 15: fire the analysis.completed webhook (fire-and-forget)
+        try:
+            webhooks_module.emit("analysis.completed", {
+                "request_id": request_id,
+                "language":   language,
+                "pdf_filename": pdf_filename,
+                "sources":    [s.get("id") for s in sources],
+                "duration_ms": int((time.monotonic() - t_start) * 1000),
+            })
+        except Exception:
+            pass  # webhooks must not affect the user response
+
         return jsonify({
             "sections":          sections,
             "client_statement":  client_story,
@@ -1254,6 +1267,194 @@ def chat():
             "sources": [],
             "request_id": request_id,
         })
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — Public status page + JSON (Day-15).
+# A firm IT team opens /status to verify the deployment is healthy without
+# asking us for a demo.  Audited endpoints, real-time KB count, SOC 2 view.
+# ═══════════════════════════════════════════════════════════════════════════════
+_SERVER_STARTED_AT = datetime.now(timezone.utc)
+
+
+def _read_recent_audit(n: int = 5) -> list[dict]:
+    """Best-effort: read last N records from today's audit log."""
+    audit_dir = Path("outputs/audit")
+    if not audit_dir.exists():
+        return []
+    files = sorted(audit_dir.glob("audit-*.log"), reverse=True)[:2]
+    records = []
+    for f in files:
+        try:
+            for line in f.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    records.append(json.loads(line))
+                except Exception:
+                    continue
+        except Exception:
+            continue
+    return list(reversed(records))[:n]
+
+
+import urllib.request as _urllib_req
+
+
+def _self_probe(paths: list[tuple[str, int]]) -> list[dict]:
+    """Probe a list of internal paths over loopback and report status/latency.
+    Errors are caught — the status page must never crash."""
+    results = []
+    for path, expected in paths:
+        start = time.monotonic()
+        try:
+            req = _urllib_req.Request(f"http://127.0.0.1:{_LISTEN_PORT}{path}")
+            with _urllib_req.urlopen(req, timeout=2.5) as resp:
+                ok = (resp.status == expected)
+                results.append({
+                    "path": path, "status": resp.status, "ok": ok,
+                    "latency_ms": int((time.monotonic() - start) * 1000),
+                })
+        except Exception as e:
+            results.append({
+                "path": path, "status": 0, "ok": False,
+                "latency_ms": int((time.monotonic() - start) * 1000),
+                "error": str(e)[:80],
+            })
+    return results
+
+
+@app.route("/status")
+def status_page():
+    return render_template("status.html")
+
+
+@app.route("/status.json")
+def status_json():
+    # KB sizes
+    try:
+        kb_total = rag_collection.count()
+    except Exception:
+        kb_total = 0
+    # Count by kind by looking at metadata in a small sample
+    bns_n, bnss_bsa_n, corpus_n = 0, 0, 0
+    try:
+        ids = rag_collection.get(include=[])["ids"]
+        for did in ids:
+            if did.startswith("bnss_") or did.startswith("bsa_"):
+                bnss_bsa_n += 1
+            elif did.startswith("bns_"):
+                bns_n += 1
+            else:
+                corpus_n += 1
+    except Exception:
+        pass
+
+    # Audit summary (last 24h)
+    recent = _read_recent_audit(50)
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=24)
+    recent_24h = [r for r in recent if r.get("ts", "") >= cutoff.isoformat(timespec="seconds")]
+    errors_24h = sum(1 for r in recent_24h if r.get("status") == "error")
+
+    # SOC 2 — best effort, soc2 module may not be importable
+    soc2_data = {"total": 0, "passed": 0, "failed": 0}
+    try:
+        s = soc2_module.summary()
+        soc2_data = {"total": s["total"], "passed": s["passed"], "failed": s["failed"]}
+    except Exception:
+        pass
+
+    # Endpoints to probe (read-only, no side-effects)
+    endpoints = _self_probe([
+        ("/", 200),
+        ("/app", 200),
+        ("/i18n/strings.json", 200),
+        ("/monitors", 200),
+        ("/llm/status", 200),
+        ("/trust/posture.json", 200),
+    ])
+    failed = sum(1 for e in endpoints if not e["ok"])
+
+    # Git SHA — best effort
+    git_sha = ""
+    try:
+        import subprocess
+        git_sha = subprocess.run(
+            ["git", "-C", str(Path(__file__).parent), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=2,
+        ).stdout.strip()
+    except Exception:
+        pass
+
+    uptime_s = (now - _SERVER_STARTED_AT).total_seconds()
+
+    return jsonify({
+        "version":  "v1.4",
+        "git_sha":  git_sha,
+        "uptime": {
+            "seconds": int(uptime_s),
+            "hours":   uptime_s / 3600.0,
+            "started_at": _SERVER_STARTED_AT.isoformat(timespec="seconds"),
+        },
+        "kb": {
+            "total":    kb_total,
+            "bns":      bns_n,
+            "bnss_bsa": bnss_bsa_n,
+            "corpus":   corpus_n,
+        },
+        "llm": llm_provider_module.status(),
+        "audit": {
+            "requests_24h": len(recent_24h),
+            "errors_24h":   errors_24h,
+            "recent":       recent_24h[-10:][::-1],
+        },
+        "soc2": soc2_data,
+        "endpoints": endpoints,
+        "health": {
+            "checked_at":         now.isoformat(timespec="seconds"),
+            "total_endpoints":    len(endpoints),
+            "failed_endpoints":   failed,
+        },
+    })
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — Webhooks (Day-15).
+# Outbound HTTP POSTs to subscriber URLs when events happen.
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.route("/webhooks/api/subscriptions", methods=["GET", "POST"])
+def webhooks_subscriptions():
+    if request.method == "GET":
+        return jsonify({"subscriptions": webhooks_module.list_subs()})
+    data = request.get_json() or {}
+    try:
+        sub = webhooks_module.add_sub(
+            url=data.get("url", ""),
+            events=data.get("events", []),
+            description=data.get("description", ""),
+        )
+        return jsonify({"subscription": sub})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/webhooks/api/subscriptions/<sub_id>", methods=["DELETE"])
+def webhooks_remove(sub_id):
+    if not re.match(r"^wh_[a-z0-9]+$", sub_id):
+        return jsonify({"error": "Invalid subscription id."}), 400
+    if not webhooks_module.remove_sub(sub_id):
+        return jsonify({"error": "Not found."}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/webhooks/api/deliveries")
+def webhooks_deliveries():
+    return jsonify({"deliveries": webhooks_module.recent_deliveries(20)})
+
+
+# Need this for the self-probe latency measurement; track the port we boot on.
+_LISTEN_PORT = 8080
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

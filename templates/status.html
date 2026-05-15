@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Status — Lex-Indic</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0f2850; --navy-deep:#0a1a35;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --green:#146432; --green-light:#e8f7ed;
+    --red:#b41e1e; --red-light:#fff0f0;
+    --amber:#fff7d6; --amber-text:#7a5a00;
+    --grey-100:#f6f7fb; --grey-200:#ecf0f7; --grey-300:#d9dde6;
+    --grey-500:#6b7280; --grey-700:#2d3748;
+    --shadow-md:0 10px 30px -8px rgba(15,40,80,.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,-apple-system,sans-serif;color:var(--navy);
+       background:var(--grey-100);line-height:1.6;min-height:100vh;
+       -webkit-font-smoothing:antialiased}
+  .top{background:linear-gradient(135deg,var(--navy-deep),var(--navy));color:#fff;
+       padding:18px clamp(20px,4vw,40px);border-bottom:3px solid var(--gold)}
+  .top-inner{max-width:1200px;margin:0 auto;display:flex;justify-content:space-between;
+             align-items:center;gap:20px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff}
+  .brand-mark{width:34px;height:34px;background:linear-gradient(135deg,var(--gold),var(--gold-glow));
+              border-radius:8px;display:grid;place-items:center;color:var(--navy-deep);
+              font-weight:900;font-size:18px}
+  .brand-name{font-weight:800;font-size:18px}
+  .nav{display:flex;gap:18px;font-size:14px}
+  .nav a{color:rgba(255,255,255,.78);text-decoration:none}
+  .nav a:hover{color:var(--gold-glow)}
+
+  main{max-width:1200px;margin:30px auto;padding:0 clamp(20px,4vw,40px)}
+  .hero{
+    display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:24px;
+  }
+  .status-pill{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:8px 18px;border-radius:99px;font-size:13px;font-weight:700;
+    background:var(--green-light);color:var(--green);border:1px solid #c8e8d0;
+  }
+  .status-pill.degraded{background:var(--amber);color:var(--amber-text);border-color:#f5e0a0}
+  .status-pill.down{background:var(--red-light);color:var(--red);border-color:#f0c8c8}
+  .status-pill::before{content:'';width:10px;height:10px;border-radius:50%;
+                       background:currentColor;animation:pulse 2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  h1{font-family:'Playfair Display',serif;font-size:clamp(26px,3vw,34px);font-weight:700}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:14px;margin-bottom:24px}
+  .tile{
+    background:#fff;border:1px solid var(--grey-300);border-radius:12px;
+    padding:18px 20px;box-shadow:var(--shadow-md);
+  }
+  .tile-label{font-size:11px;font-weight:700;color:var(--grey-500);
+              text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+  .tile-value{font-family:'Playfair Display',serif;font-size:24px;font-weight:700;color:var(--navy);line-height:1.1}
+  .tile-sub{font-size:12px;color:var(--grey-500);margin-top:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
+  @media (max-width:880px){.row{grid-template-columns:1fr}}
+  .card{background:#fff;border:1px solid var(--grey-300);border-radius:12px;
+        padding:22px 24px;box-shadow:var(--shadow-md)}
+  .card h2{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:14px;
+           display:flex;align-items:center;gap:10px}
+  .card-icon{
+    background:linear-gradient(135deg,var(--navy),var(--navy-deep));
+    color:var(--gold-glow);width:24px;height:24px;border-radius:6px;
+    display:grid;place-items:center;font-size:11px;
+  }
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--grey-200)}
+  th{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--grey-500)}
+  .endpoint-ok{color:var(--green);font-weight:700}
+  .endpoint-fail{color:var(--red);font-weight:700}
+  code{background:var(--grey-200);padding:1px 6px;border-radius:3px;
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px}
+  .stamp{font-size:11.5px;color:var(--grey-500);text-align:right;margin-top:10px}
+
+  /* Webhooks subscription form */
+  .field{margin:10px 0}
+  .field label{display:block;font-size:12px;font-weight:600;color:var(--navy);margin-bottom:5px}
+  .field input{width:100%;padding:9px 11px;border:1px solid var(--grey-300);
+               border-radius:7px;background:#fff;font-family:inherit;font-size:13px;color:var(--navy)}
+  .field input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(180,140,40,.12)}
+  .events-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px}
+  .event-chip{cursor:pointer;background:var(--grey-100);border:1px solid var(--grey-300);
+              border-radius:99px;padding:4px 10px;font-size:11px;color:var(--grey-700);
+              user-select:none;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .event-chip.active{background:var(--green-light);color:var(--green);border-color:var(--green);font-weight:600}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;
+       font-family:inherit;font-size:12.5px;font-weight:600;
+       border:none;border-radius:7px;cursor:pointer}
+  .btn-primary{background:linear-gradient(135deg,var(--gold),var(--gold-light));
+               color:var(--navy-deep);box-shadow:0 3px 10px rgba(180,140,40,.20)}
+  .btn-primary:hover{transform:translateY(-1px)}
+  .btn-mini{font-size:11px;padding:4px 9px;background:var(--grey-100);
+            border:1px solid var(--grey-300);color:var(--navy);cursor:pointer;border-radius:5px}
+
+  .sub-item{padding:9px 12px;border:1px solid var(--grey-300);border-radius:7px;
+            background:var(--grey-100);margin-bottom:6px;font-size:12px}
+  .sub-item .url{font-family:ui-monospace,Menlo;color:var(--navy);font-weight:600}
+  .sub-item .events{margin-top:4px;font-size:10.5px;color:var(--grey-500)}
+
+  .err{padding:9px 12px;border-radius:6px;font-size:12.5px;
+       background:var(--red-light);color:var(--red);border:1px solid #f0c8c8;margin-top:8px}
+  .ok{padding:9px 12px;border-radius:6px;font-size:12.5px;
+      background:var(--green-light);color:var(--green);border:1px solid #c8e8d0;margin-top:8px}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <a href="/" class="brand">
+      <div class="brand-mark">L</div>
+      <span class="brand-name">Lex-Indic</span>
+    </a>
+    <nav class="nav">
+      <a href="/">Landing</a>
+      <a href="/app">Analyze</a>
+      <a href="/trust">Trust</a>
+      <a href="/status" style="color:var(--gold-glow)">Status</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>Lex-Indic Status</h1>
+    <span class="status-pill" id="statusPill">All systems operational</span>
+  </div>
+
+  <div class="grid" id="tiles"></div>
+
+  <div class="row">
+    <!-- Endpoints -->
+    <div class="card">
+      <h2><span class="card-icon">✓</span> Endpoints</h2>
+      <table id="endpointTable">
+        <thead><tr><th>URL</th><th>Status</th><th>Latency</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="stamp" id="endpointStamp"></div>
+    </div>
+
+    <!-- Recent activity -->
+    <div class="card">
+      <h2><span class="card-icon">⏱</span> Recent activity</h2>
+      <table id="auditTable">
+        <thead><tr><th>Time</th><th>Endpoint</th><th>Status</th><th>Sources</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Webhooks -->
+  <div class="card" style="margin-top:6px">
+    <h2><span class="card-icon">↗</span> Webhooks</h2>
+    <p style="font-size:12.5px;color:var(--grey-500);margin-bottom:12px">
+      Register a URL to receive signed HTTP POSTs when events happen.
+      Signature header: <code>X-Lex-Signature</code> (HMAC-SHA256, salt
+      derived from <code>AUDIT_HASH_SALT</code>). Verify it before processing.
+    </p>
+
+    <div class="field">
+      <label for="whUrl">Callback URL</label>
+      <input id="whUrl" placeholder="https://your.system.example/lex-indic-webhook">
+    </div>
+    <div class="field">
+      <label>Events</label>
+      <div class="events-row" id="whEvents">
+        <span class="event-chip" data-event="analysis.completed">analysis.completed</span>
+        <span class="event-chip" data-event="monitor.digest.ready">monitor.digest.ready</span>
+        <span class="event-chip" data-event="matter.created">matter.created</span>
+        <span class="event-chip" data-event="nalsa.registered">nalsa.registered</span>
+      </div>
+    </div>
+    <div class="field">
+      <label for="whDesc">Description (optional)</label>
+      <input id="whDesc" placeholder="e.g. Slack #legal-alerts channel">
+    </div>
+    <button class="btn btn-primary" onclick="addWebhook()">+ Subscribe</button>
+    <div id="whMsg"></div>
+
+    <h2 style="margin-top:20px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--gold)">Active subscriptions</h2>
+    <div id="whList"></div>
+
+    <h2 style="margin-top:20px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--gold)">Recent deliveries</h2>
+    <div id="whDeliveries"></div>
+  </div>
+
+  <p class="stamp">
+    Updated automatically every 30 seconds. JSON feed:
+    <code>GET /status.json</code>
+  </p>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const escapeHtml = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  async function refresh(){
+    try {
+      const data = await (await fetch('/status.json')).json();
+      renderTiles(data);
+      renderEndpoints(data);
+      renderAudit(data);
+      renderPill(data);
+    } catch (e) {
+      console.error('status refresh failed', e);
+    }
+    await refreshWebhooks();
+  }
+
+  function renderPill(d){
+    const p = $('statusPill');
+    if (d.health.failed_endpoints === 0){
+      p.className = 'status-pill';
+      p.textContent = 'All systems operational';
+    } else if (d.health.failed_endpoints < d.health.total_endpoints / 2){
+      p.className = 'status-pill degraded';
+      p.textContent = `Degraded — ${d.health.failed_endpoints} endpoint failing`;
+    } else {
+      p.className = 'status-pill down';
+      p.textContent = 'Down';
+    }
+  }
+
+  function renderTiles(d){
+    $('tiles').innerHTML = `
+      <div class="tile"><div class="tile-label">KB documents</div>
+        <div class="tile-value">${d.kb.total}</div>
+        <div class="tile-sub">${d.kb.bns} BNS · ${d.kb.bnss_bsa} BNSS+BSA · ${d.kb.corpus} corpus</div>
+      </div>
+      <div class="tile"><div class="tile-label">LLM provider</div>
+        <div class="tile-value">${escapeHtml(d.llm.provider)}</div>
+        <div class="tile-sub">${escapeHtml(d.llm.model || '—')}</div>
+      </div>
+      <div class="tile"><div class="tile-label">Audit volume (24h)</div>
+        <div class="tile-value">${d.audit.requests_24h}</div>
+        <div class="tile-sub">${d.audit.errors_24h} errors</div>
+      </div>
+      <div class="tile"><div class="tile-label">SOC 2 controls</div>
+        <div class="tile-value">${d.soc2.passed}/${d.soc2.total}</div>
+        <div class="tile-sub">${d.soc2.failed} failing</div>
+      </div>
+      <div class="tile"><div class="tile-label">Uptime</div>
+        <div class="tile-value">${d.uptime.hours.toFixed(1)}h</div>
+        <div class="tile-sub">since ${escapeHtml(d.uptime.started_at)}</div>
+      </div>
+      <div class="tile"><div class="tile-label">Version</div>
+        <div class="tile-value">${escapeHtml(d.version)}</div>
+        <div class="tile-sub">${escapeHtml(d.git_sha.slice(0,7) || 'n/a')}</div>
+      </div>
+    `;
+  }
+
+  function renderEndpoints(d){
+    const rows = d.endpoints.map(e => `
+      <tr>
+        <td><code>${escapeHtml(e.path)}</code></td>
+        <td class="${e.ok ? 'endpoint-ok' : 'endpoint-fail'}">${e.ok ? 'OK '+e.status : 'FAIL '+(e.status||'')}</td>
+        <td>${e.latency_ms}ms</td>
+      </tr>
+    `).join('');
+    $('endpointTable').querySelector('tbody').innerHTML = rows;
+    $('endpointStamp').textContent = `Checked ${d.health.checked_at.replace('T',' ').slice(0,19)}`;
+  }
+
+  function renderAudit(d){
+    const rows = d.audit.recent.map(r => `
+      <tr>
+        <td>${escapeHtml((r.ts||'').replace('T',' ').slice(11,19))}</td>
+        <td><code>${escapeHtml(r.endpoint||'')}</code></td>
+        <td class="${r.status==='ok' ? 'endpoint-ok' : 'endpoint-fail'}">${escapeHtml(r.status||'')}</td>
+        <td>${(r.sources||[]).length}</td>
+      </tr>
+    `).join('');
+    $('auditTable').querySelector('tbody').innerHTML = rows;
+  }
+
+  // ─── Webhooks ──────────────────────────────────────────────────────────
+  document.querySelectorAll('.event-chip').forEach(chip => chip.addEventListener('click', () => chip.classList.toggle('active')));
+
+  async function refreshWebhooks(){
+    const subs = await (await fetch('/webhooks/api/subscriptions')).json();
+    $('whList').innerHTML = subs.subscriptions.length === 0
+      ? '<div style="font-size:12px;color:var(--grey-500);font-style:italic">No subscriptions yet.</div>'
+      : subs.subscriptions.map(s => `
+        <div class="sub-item">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+            <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              <span class="url">${escapeHtml(s.url)}</span>
+              ${s.description ? ` <span style="color:var(--grey-500);font-size:11px">— ${escapeHtml(s.description)}</span>` : ''}
+            </div>
+            <button class="btn-mini" onclick="removeSub('${s.id}')">Remove</button>
+          </div>
+          <div class="events">${s.events.join(' · ')}</div>
+        </div>
+      `).join('');
+
+    const dels = await (await fetch('/webhooks/api/deliveries')).json();
+    $('whDeliveries').innerHTML = dels.deliveries.length === 0
+      ? '<div style="font-size:12px;color:var(--grey-500);font-style:italic">No deliveries yet.</div>'
+      : '<table style="margin-top:6px"><thead><tr><th>Time</th><th>URL</th><th>Status</th><th>Latency</th></tr></thead><tbody>' +
+        dels.deliveries.map(r => `
+          <tr>
+            <td>${escapeHtml((r.ts||'').replace('T',' ').slice(11,19))}</td>
+            <td><code>${escapeHtml((r.url||'').slice(0,40))}…</code></td>
+            <td class="${r.status>=200&&r.status<300 ? 'endpoint-ok' : 'endpoint-fail'}">${r.status||'ERR'}</td>
+            <td>${r.duration_ms||0}ms</td>
+          </tr>
+        `).join('') + '</tbody></table>';
+  }
+
+  async function addWebhook(){
+    const url    = $('whUrl').value.trim();
+    const events = [...document.querySelectorAll('.event-chip.active')].map(c => c.dataset.event);
+    const desc   = $('whDesc').value.trim();
+    const msg = $('whMsg'); msg.innerHTML = '';
+    if (!url){ msg.innerHTML = '<div class="err">Enter a callback URL.</div>'; return; }
+    if (!events.length){ msg.innerHTML = '<div class="err">Pick at least one event.</div>'; return; }
+    const r = await fetch('/webhooks/api/subscriptions', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({url, events, description: desc})
+    });
+    const d = await r.json();
+    if (d.error){ msg.innerHTML = `<div class="err">${escapeHtml(d.error)}</div>`; return; }
+    msg.innerHTML = '<div class="ok">✓ Subscription added.</div>';
+    $('whUrl').value = ''; $('whDesc').value = '';
+    document.querySelectorAll('.event-chip.active').forEach(c => c.classList.remove('active'));
+    refreshWebhooks();
+  }
+
+  async function removeSub(id){
+    if (!confirm('Remove this subscription?')) return;
+    await fetch(`/webhooks/api/subscriptions/${id}`, {method:'DELETE'});
+    refreshWebhooks();
+  }
+
+  refresh();
+  setInterval(refresh, 30_000);
+</script>
+</body>
+</html>
