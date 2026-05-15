@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in — Lex-Indic</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0f2850; --navy-deep:#0a1a35;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --grey-100:#f6f7fb; --grey-300:#d9dde6; --grey-500:#6b7280; --grey-700:#2d3748;
+    --green:#146432; --green-light:#e8f7ed;
+    --red:#b41e1e; --red-light:#fff0f0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Inter',system-ui,-apple-system,sans-serif;color:var(--navy);
+    background:
+      radial-gradient(ellipse at 80% 20%, rgba(240,196,79,.10), transparent 50%),
+      linear-gradient(135deg,var(--navy-deep) 0%,var(--navy) 60%,var(--navy-deep) 100%);
+    min-height:100vh;display:grid;place-items:center;padding:20px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .card{
+    background:#fff;border-radius:16px;padding:40px clamp(28px,5vw,48px);
+    width:100%;max-width:420px;box-shadow:0 25px 60px -12px rgba(0,0,0,.4);
+  }
+  .brand-mark{
+    width:48px;height:48px;background:linear-gradient(135deg,var(--gold),var(--gold-glow));
+    color:var(--navy-deep);border-radius:12px;display:grid;place-items:center;
+    font-weight:900;font-size:24px;margin-bottom:20px;
+  }
+  h1{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;
+     margin-bottom:6px;letter-spacing:-.01em}
+  .lead{color:var(--grey-700);font-size:14px;margin-bottom:24px;line-height:1.55}
+
+  label{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}
+  input{width:100%;padding:12px 14px;border:1px solid var(--grey-300);
+        border-radius:8px;background:#fff;font-family:inherit;font-size:15px;
+        color:var(--navy);transition:all .2s}
+  input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(180,140,40,.12)}
+  .btn{
+    width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+    padding:13px;font-family:inherit;font-size:14px;font-weight:600;
+    border:none;border-radius:10px;cursor:pointer;
+    background:linear-gradient(135deg,var(--gold),var(--gold-light));
+    color:var(--navy-deep);box-shadow:0 5px 16px rgba(180,140,40,.30);
+    transition:all .25s;
+  }
+  .btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 22px rgba(180,140,40,.45)}
+  .btn:disabled{opacity:.6;cursor:not-allowed}
+  .msg{padding:10px 13px;border-radius:8px;font-size:13px;margin-top:14px;line-height:1.5}
+  .msg.ok{background:var(--green-light);color:var(--green);border:1px solid #c8e8d0}
+  .msg.err{background:var(--red-light);color:var(--red);border:1px solid #f0c8c8}
+  .footer{margin-top:24px;text-align:center;font-size:12px;color:var(--grey-500)}
+  .footer a{color:var(--gold);text-decoration:none}
+  .footer a:hover{text-decoration:underline}
+  .dev-banner{
+    background:#fff7d6;border:1px solid #f5e0a0;color:#7a5a00;
+    border-radius:8px;padding:9px 12px;font-size:12px;margin-top:14px;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand-mark">L</div>
+  <h1>Sign in to Lex-Indic</h1>
+  <p class="lead">Enter your firm email. We'll send you a 6-digit login code.
+                 No passwords.</p>
+
+  <div id="step1">
+    <label for="email">Firm email</label>
+    <input type="email" id="email" placeholder="you@firm.example" autocomplete="email">
+    <div style="margin-top:18px">
+      <button class="btn" id="sendBtn">Send login code →</button>
+    </div>
+  </div>
+
+  <div id="step2" style="display:none">
+    <label for="code">6-digit code we sent to <strong id="emailEcho"></strong></label>
+    <input type="text" id="code" inputmode="numeric" pattern="\d{6}" maxlength="6"
+           placeholder="123456" autocomplete="one-time-code">
+    <div style="margin-top:18px">
+      <button class="btn" id="verifyBtn">Verify &amp; sign in →</button>
+    </div>
+    <div class="footer">
+      <a href="#" onclick="event.preventDefault();document.getElementById('step1').style.display='block';document.getElementById('step2').style.display='none';">← Use a different email</a>
+    </div>
+  </div>
+
+  <div id="msg"></div>
+
+  {% if dev_mode %}
+  <div class="dev-banner">
+    <strong>Dev mode:</strong> the login code is also printed to the Flask server log.
+    Set <code>AUDIT_HASH_SALT</code> + a real email-sender to disable this notice.
+  </div>
+  {% endif %}
+
+  <div class="footer">
+    Back to <a href="/">landing</a>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const escapeHtml = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  $('sendBtn').addEventListener('click', async () => {
+    const email = $('email').value.trim();
+    const msg = $('msg'); msg.innerHTML = '';
+    if (!email || !email.includes('@')){
+      msg.innerHTML = '<div class="msg err">Please enter a valid email.</div>';
+      return;
+    }
+    $('sendBtn').disabled = true; $('sendBtn').textContent = 'Sending…';
+    try {
+      const r = await fetch('/auth/code', {method:'POST', headers:{'Content-Type':'application/json'},
+                                            body: JSON.stringify({email})});
+      const d = await r.json();
+      $('sendBtn').disabled = false; $('sendBtn').textContent = 'Send login code →';
+      if (d.error){ msg.innerHTML = `<div class="msg err">${escapeHtml(d.error)}</div>`; return; }
+      $('step1').style.display = 'none';
+      $('step2').style.display = 'block';
+      $('emailEcho').textContent = email;
+      $('code').focus();
+      if (d.dev_code){
+        msg.innerHTML = `<div class="msg ok">Dev mode — your code is <strong>${d.dev_code}</strong></div>`;
+      } else {
+        msg.innerHTML = `<div class="msg ok">✓ Code sent. Check your inbox.</div>`;
+      }
+    } catch (e) {
+      $('sendBtn').disabled = false; $('sendBtn').textContent = 'Send login code →';
+      msg.innerHTML = `<div class="msg err">Network error: ${escapeHtml(e.message)}</div>`;
+    }
+  });
+
+  $('verifyBtn').addEventListener('click', async () => {
+    const email = $('email').value.trim();
+    const code  = $('code').value.trim();
+    const msg = $('msg'); msg.innerHTML = '';
+    if (!/^\d{6}$/.test(code)){
+      msg.innerHTML = '<div class="msg err">Please enter the 6-digit code.</div>';
+      return;
+    }
+    $('verifyBtn').disabled = true; $('verifyBtn').textContent = 'Verifying…';
+    try {
+      const r = await fetch('/auth/verify', {method:'POST', headers:{'Content-Type':'application/json'},
+                                              body: JSON.stringify({email, code})});
+      const d = await r.json();
+      $('verifyBtn').disabled = false; $('verifyBtn').textContent = 'Verify & sign in →';
+      if (d.error){ msg.innerHTML = `<div class="msg err">${escapeHtml(d.error)}</div>`; return; }
+      msg.innerHTML = '<div class="msg ok">✓ Signed in. Redirecting…</div>';
+      setTimeout(() => { window.location.href = '/app'; }, 600);
+    } catch (e) {
+      $('verifyBtn').disabled = false; $('verifyBtn').textContent = 'Verify & sign in →';
+      msg.innerHTML = `<div class="msg err">Network error: ${escapeHtml(e.message)}</div>`;
+    }
+  });
+
+  // Enter key submits
+  $('email').addEventListener('keydown', e => { if (e.key === 'Enter') $('sendBtn').click(); });
+  $('code').addEventListener('keydown', e => { if (e.key === 'Enter') $('verifyBtn').click(); });
+</script>
+</body>
+</html>

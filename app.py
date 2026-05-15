@@ -212,6 +212,7 @@ import i18n as i18n_module
 import nalsa as nalsa_module
 import compliance as compliance_module
 import matters as matters_module
+import auth as auth_module
 
 
 @app.route("/monitors")
@@ -437,6 +438,105 @@ def matters_status(matter_id):
     if not ok:
         return jsonify({"error": "Matter not found or invalid status."}), 400
     return jsonify({"ok": True})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — Multi-tenant auth (Day-10).
+# Magic-link login: POST /auth/code, POST /auth/verify, GET /auth/me, /auth/logout.
+# ═══════════════════════════════════════════════════════════════════════════════
+from flask import make_response  # already imported earlier; harmless re-import
+
+_DEV_MODE_AUTH = not os.getenv("AUDIT_HASH_SALT")  # dev iff salt unset
+
+
+@app.route("/login")
+def login_page():
+    return render_template("login.html", dev_mode=_DEV_MODE_AUTH)
+
+
+@app.route("/auth/code", methods=["POST"])
+def auth_code():
+    data = request.get_json() or {}
+    email = (data.get("email") or "").strip().lower()
+    try:
+        code = auth_module.issue_code(email)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    # In dev we expose the code in the response for easy testing.  In prod
+    # (AUDIT_HASH_SALT set) we hide it and the operator's email provider
+    # delivers the code.
+    resp = {"ok": True}
+    if _DEV_MODE_AUTH:
+        resp["dev_code"] = code
+    return jsonify(resp)
+
+
+@app.route("/auth/verify", methods=["POST"])
+def auth_verify():
+    data = request.get_json() or {}
+    email = (data.get("email") or "").strip().lower()
+    code  = (data.get("code")  or "").strip()
+    user_id = auth_module.verify_code(email, code)
+    if not user_id:
+        return jsonify({"error": "Invalid or expired code."}), 401
+    token = auth_module.make_session_token(user_id)
+    response = make_response(jsonify({"ok": True, "user_id": user_id}))
+    secure = request.scheme == "https"
+    response.set_cookie(
+        "lex_session", token,
+        max_age=60 * 60 * 24 * 14,  # 14 days
+        httponly=True,
+        secure=secure,
+        samesite="Lax",
+    )
+    return response
+
+
+@app.route("/auth/me")
+def auth_me():
+    token = request.cookies.get("lex_session", "")
+    user_id = auth_module.verify_session_token(token)
+    if not user_id:
+        return jsonify({"authenticated": False}), 401
+    user = auth_module.get_user_by_id(user_id)
+    if not user:
+        return jsonify({"authenticated": False}), 401
+    return jsonify({"authenticated": True, "user": user})
+
+
+@app.route("/auth/logout", methods=["POST"])
+def auth_logout():
+    response = make_response(jsonify({"ok": True}))
+    response.set_cookie("lex_session", "", expires=0)
+    return response
+
+
+@app.route("/auth/bind-firm", methods=["POST"])
+def auth_bind_firm():
+    """Bind the currently-authenticated user to a firm_id.  Caller pre-creates
+    the firm via /matters/api/firms.  Idempotent."""
+    token = request.cookies.get("lex_session", "")
+    user_id = auth_module.verify_session_token(token)
+    if not user_id:
+        return jsonify({"error": "Not signed in."}), 401
+    data = request.get_json() or {}
+    firm_id = (data.get("firm_id") or "").strip()
+    role    = (data.get("role") or "associate").strip()
+    if not firm_id:
+        return jsonify({"error": "firm_id is required."}), 400
+    ok = auth_module.bind_user_to_firm(user_id, firm_id, role=role)
+    return jsonify({"ok": ok})
+
+
+# ─── Helper: current_user() used by any route that wants the firm tag ─────
+def _current_user() -> dict | None:
+    token = request.cookies.get("lex_session", "")
+    if not token:
+        return None
+    user_id = auth_module.verify_session_token(token)
+    if not user_id:
+        return None
+    return auth_module.get_user_by_id(user_id)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
