@@ -256,9 +256,19 @@ AUDIT_LOG_DIR=outputs/audit          # default; override to ship logs elsewhere
 
 ### 4. Run the web server
 ```bash
-python3 app.py
+python3 app.py                    # HTTP on :8080 (default)
+python3 app.py --https            # HTTPS on :8443 (required for the Word add-in)
 ```
-Then open: **http://localhost:8080**
+Then open: **http://localhost:8080** (or **https://localhost:8443** for the add-in)
+
+The Word add-in install instructions live at `/addin/install` once the
+HTTPS server is up.  Generate the self-signed dev cert once with:
+```bash
+openssl req -x509 -newkey rsa:2048 -nodes \
+  -keyout certs/dev-key.pem -out certs/dev-cert.pem \
+  -days 365 -subj "/CN=localhost" \
+  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+```
 
 **First startup:** ~30 seconds (generates and caches embeddings for 99 documents)
 **Subsequent startups:** ~10 seconds (embeddings loaded from disk cache)
@@ -408,6 +418,14 @@ deliberate. It disclaims AI authorship and protects the firm legally.
 | `/history` | GET | List of past case analyses |
 | `/load/<filename>` | GET | Load a saved case by filename |
 | `/download/<filename>` | GET | Download a generated PDF |
+| `/convert` | GET | IPC → BNS converter UI (drag-drop) |
+| `/convert/text` | POST | Convert pasted text (also called by the Word add-in) |
+| `/convert/upload` | POST | Convert an uploaded `.docx`, returns a converted filename |
+| `/convert/download/<filename>` | GET | Download a converted `.docx` |
+| `/addin/install` | GET | Word add-in sideload instructions |
+| `/addin/manifest.xml` | GET | OfficeApp manifest (download into Word) |
+| `/addin/taskpane` | GET | Task pane HTML loaded inside Word |
+| `/addin/commands` | GET | Required Office commands stub |
 
 Every successful and every error response carries an `X-Request-Id`-like
 field in the JSON body, so users can quote it in support tickets and ops
@@ -453,7 +471,8 @@ circulars (MHA, SC, NHRC) — all retrievable via the same RAG pipeline.
 | **Phase 3** | Web UI, voice, file attachments, edit/supplement | Done |
 | **v1.1** | RAG-grounded LEXI chat, KB expansion (18 → 38 sections) | Done |
 | **v1.2** | Citation provenance UI, audit log, white-label PDFs, 3D landing page | Done |
-| **v1.3** | Per-section bare-act deep-links, matter-intake form (firm/lawyer/matter) | Planned |
+| **v1.3** | IPC→BNS converter (web + Word add-in) — the Legora wedge | Done |
+| **v1.4** | Per-section bare-act deep-links, matter-intake form (firm/lawyer/matter) | Planned |
 | **v2.0** | Postgres + multi-tenant auth, India-region deployment guide, BNSS + BSA corpora | Planned |
 | **v2.1** | Hindi + regional language support, on-prem Llama-3.3-70B via Ollama | Planned |
 

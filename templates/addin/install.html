@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Install the Lex-Indic Word Add-in</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0f2850; --navy-deep:#0a1a35;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --cream:#f5f1e8; --grey-100:#f6f7fb; --grey-200:#ecf0f7;
+    --grey-300:#d9dde6; --grey-500:#6b7280; --grey-700:#2d3748;
+    --green:#146432; --green-light:#e8f7ed;
+    --red:#b41e1e; --red-light:#fff0f0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    color:var(--navy); background:linear-gradient(180deg,var(--grey-100) 0%,#fff 60%);
+    line-height:1.65; min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .top{
+    background:linear-gradient(135deg,var(--navy-deep),var(--navy));
+    color:#fff;
+    padding:18px clamp(20px,4vw,40px);
+    border-bottom:3px solid var(--gold);
+  }
+  .top-inner{
+    max-width:980px;margin:0 auto;
+    display:flex;justify-content:space-between;align-items:center;
+    gap:20px;flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff}
+  .brand-mark{
+    width:34px;height:34px;
+    background:linear-gradient(135deg,var(--gold),var(--gold-glow));
+    border-radius:8px;display:grid;place-items:center;
+    color:var(--navy-deep);font-weight:900;font-size:18px;
+  }
+  .brand-name{font-weight:800;font-size:18px}
+  .nav{display:flex;gap:18px;font-size:14px}
+  .nav a{color:rgba(255,255,255,.78);text-decoration:none}
+  .nav a:hover{color:var(--gold-glow)}
+  main{max-width:840px;margin:48px auto;padding:0 clamp(20px,4vw,40px)}
+  .eyebrow{
+    display:inline-block;font-size:12px;font-weight:700;
+    color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;
+    margin-bottom:10px;
+  }
+  h1{font-family:'Playfair Display',serif;font-size:clamp(28px,4vw,42px);line-height:1.15;margin-bottom:14px;font-weight:700}
+  .lead{font-size:16px;color:var(--grey-700);margin-bottom:38px}
+
+  .step{
+    background:#fff;
+    border:1px solid var(--grey-300);
+    border-radius:14px;
+    padding:24px 26px;
+    margin-bottom:18px;
+    box-shadow:0 6px 20px -10px rgba(15,40,80,.10);
+  }
+  .step h3{
+    display:flex;align-items:center;gap:12px;
+    font-size:17px;font-weight:700;color:var(--navy);
+    margin-bottom:10px;
+  }
+  .step-num{
+    width:30px;height:30px;
+    background:linear-gradient(135deg,var(--navy),var(--navy-deep));
+    color:var(--gold-glow);
+    border-radius:8px;display:grid;place-items:center;
+    font-weight:700;font-size:13px;
+  }
+  .step p{font-size:14.5px;color:var(--grey-700);margin-bottom:8px}
+
+  code, pre{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:12.5px;
+  }
+  code.inline{
+    background:var(--grey-200);
+    padding:2px 7px;border-radius:4px;
+    color:var(--navy);
+  }
+  pre{
+    background:var(--navy-deep);color:#e6e9f0;
+    padding:14px 16px;border-radius:10px;
+    overflow-x:auto;line-height:1.55;
+    margin:8px 0;
+  }
+  pre .cmt{color:#8a9bc0}
+  pre .key{color:var(--gold-glow)}
+
+  .download-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:11px 20px;
+    font-family:inherit;font-size:14px;font-weight:600;
+    text-decoration:none;cursor:pointer;
+    border:none;border-radius:10px;transition:all .2s;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg,var(--gold),var(--gold-light));
+    color:var(--navy-deep);
+    box-shadow:0 4px 16px rgba(180,140,40,.25);
+  }
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(180,140,40,.45)}
+  .btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--grey-300)}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+
+  .callout{
+    background:linear-gradient(135deg,rgba(180,140,40,.06),rgba(180,140,40,.02));
+    border:1px solid rgba(180,140,40,.25);
+    border-radius:12px;padding:18px 22px;
+    color:var(--grey-700);font-size:14px;
+    margin:10px 0 28px;
+  }
+  .callout strong{color:var(--navy)}
+  .ok-callout{background:var(--green-light);border-color:#c8e8d0;color:var(--green)}
+  .warn-callout{background:var(--red-light);border-color:#f0c8c8;color:var(--red)}
+
+  ul{margin:8px 0 4px 20px}
+  li{margin-bottom:6px;font-size:14.5px;color:var(--grey-700)}
+
+  .footer{
+    margin-top:50px;text-align:center;
+    color:var(--grey-500);font-size:13px;
+    padding:30px 0;
+    border-top:1px solid var(--grey-300);
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <a href="/" class="brand">
+      <div class="brand-mark">L</div>
+      <span class="brand-name">Lex-Indic</span>
+    </a>
+    <nav class="nav">
+      <a href="/">Landing</a>
+      <a href="/app">Analyze a case</a>
+      <a href="/convert">Convert IPC → BNS</a>
+      <a href="/addin/install" style="color:var(--gold-glow)">Word add-in</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="eyebrow">Day-2 wedge feature</div>
+  <h1>Install the Lex-Indic Word add-in</h1>
+  <p class="lead">
+    Convert IPC pleadings to BNS without leaving Microsoft Word. The add-in
+    lives in Word's task pane: select any text, click <strong>Convert IPC → BNS</strong>,
+    and every IPC reference gets highlighted yellow with the BNS equivalent
+    inserted right next to it. Original formatting preserved. Ctrl+Z undoes
+    the whole conversion in one step.
+  </p>
+
+  <!-- ════════════════════════════════════════════════════════════════════ -->
+  <div class="step">
+    <h3><span class="step-num">1</span> Download the manifest</h3>
+    <p>This XML file tells Word where to load the add-in from. Save it
+       somewhere you can find again (e.g. <code class="inline">~/lexindic-addin/</code>).</p>
+    <div class="download-row">
+      <a href="/addin/manifest.xml" download="lexindic-manifest.xml" class="btn btn-primary">
+        ⬇ Download manifest.xml
+      </a>
+      <a href="/addin/manifest.xml" target="_blank" class="btn btn-ghost">
+        Open in browser
+      </a>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════ -->
+  <div class="step">
+    <h3><span class="step-num">2</span> Start the Lex-Indic backend with HTTPS</h3>
+    <p>Office Add-ins require HTTPS for every URL they load. We've generated
+       a self-signed dev certificate at <code class="inline">certs/dev-cert.pem</code>
+       so you can run locally without any cloud setup.</p>
+    <pre><span class="cmt"># From the project root</span>
+python3 app.py <span class="key">--https</span>
+
+<span class="cmt"># The server now serves at:</span>
+https://localhost:8443</pre>
+    <p>The first time you open <code class="inline">https://localhost:8443</code>
+       in a browser, you'll see a certificate warning — click "Advanced" then
+       "Proceed to localhost". You only need to do this once per browser.
+       Word will accept the cert automatically after that.</p>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════ -->
+  <div class="step">
+    <h3><span class="step-num">3</span> Sideload the add-in into Word</h3>
+    <p><strong>Word for Mac:</strong></p>
+    <ul>
+      <li>Open Word.</li>
+      <li>Insert menu → Add-ins → <strong>My Add-ins</strong>.</li>
+      <li>Click the gear/settings icon → <strong>Upload My Add-in</strong>.</li>
+      <li>Pick the <code class="inline">lexindic-manifest.xml</code> from step 1.</li>
+    </ul>
+    <p style="margin-top:14px"><strong>Word for Windows:</strong></p>
+    <ul>
+      <li>Open Word.</li>
+      <li>Insert tab → <strong>Add-ins</strong> → <strong>My Add-ins</strong>.</li>
+      <li>Click <strong>Upload My Add-in</strong> at the bottom.</li>
+      <li>Pick the <code class="inline">lexindic-manifest.xml</code> from step 1.</li>
+    </ul>
+    <p style="margin-top:14px"><strong>Word for the web (Microsoft 365):</strong></p>
+    <ul>
+      <li>Open any doc on word.office.com.</li>
+      <li>Home tab → <strong>Add-ins</strong> → <strong>More add-ins</strong>.</li>
+      <li>Switch to <strong>My Add-ins</strong> → <strong>Manage My Add-ins</strong>
+          → <strong>Upload My Add-in</strong>.</li>
+    </ul>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════ -->
+  <div class="step">
+    <h3><span class="step-num">4</span> Use it</h3>
+    <p>You should now see a <strong>Lex-Indic</strong> group on Word's Home ribbon,
+       with a <strong>Convert IPC → BNS</strong> button. Click it.</p>
+    <ul>
+      <li>The task pane opens on the right.</li>
+      <li>Pick <strong>Whole document</strong> or <strong>Current selection</strong>.</li>
+      <li>Click <strong>Convert →</strong>.</li>
+      <li>Every IPC reference in the active range is highlighted yellow and
+          the BNS equivalent inserted in bold red right after it.</li>
+      <li>Sections we don't have a verified mapping for stay plain text —
+          your visual signal that the converter has not silently invented.</li>
+      <li>Press <strong>Ctrl + Z</strong> (Cmd + Z on Mac) to undo the entire
+          conversion in one step.</li>
+    </ul>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════ -->
+  <div class="callout ok-callout">
+    <strong>Your document never leaves your machine.</strong>
+    The add-in calls <code class="inline">https://localhost:8443/convert/text</code>
+    — the Flask backend running on this computer. No Lex-Indic cloud, no third
+    parties.  Air-gap deployments are supported with the
+    <code class="inline">--host 127.0.0.1</code> flag.
+  </div>
+
+  <div class="callout warn-callout">
+    <strong>Troubleshooting:</strong> If the task pane fails to load with a
+    blank window or "We couldn't load this add-in":
+    <ul style="margin-top:6px">
+      <li>Make sure <code class="inline">python3 app.py --https</code> is running
+          and <code class="inline">https://localhost:8443/addin/taskpane</code>
+          opens in your browser without errors.</li>
+      <li>Trust the self-signed cert in your browser first (step 2).</li>
+      <li>On macOS Word, also trust the cert in Keychain Access:
+          double-click <code class="inline">certs/dev-cert.pem</code> →
+          set "When using this certificate" to "Always Trust".</li>
+      <li>Restart Word after trusting the cert.</li>
+    </ul>
+  </div>
+
+  <div class="footer">
+    Lex-Indic v1.2 · Word Add-in v1.0 ·
+    <a href="https://github.com/Yuvraj235/Lex-Indic-legal" target="_blank" style="color:var(--gold)">Source on GitHub</a>
+  </div>
+</main>
+
+</body>
+</html>

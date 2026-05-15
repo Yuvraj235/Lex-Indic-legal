@@ -28,7 +28,7 @@ from io import BytesIO
 
 import pdfplumber
 import google.generativeai as genai
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, make_response
 from dotenv import load_dotenv
 
 # ── Import pipeline functions from main.py ────────────────────────────────────
@@ -201,6 +201,83 @@ def convert_download(filename):
         as_attachment=True,
         download_name=filename,
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES 1d-h: Microsoft Word Add-in (Day-2 from the Legora teardown).
+# Office Add-ins load HTML/JS in an iframe inside Word's task pane.  We serve:
+#   /addin/install      → human-facing sideload instructions
+#   /addin/manifest.xml → the OfficeApp manifest Word reads
+#   /addin/taskpane     → the iframe UI loaded inside Word
+#   /addin/commands     → required no-op shell for ribbon command actions
+#   /static/addin/*     → icons (served by Flask's static handler already)
+# Office requires HTTPS — run `python3 app.py --https` to enable port 8443.
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.route("/addin/install")
+def addin_install_page():
+    """User-facing instructions for sideloading the manifest into Word."""
+    return render_template("addin/install.html")
+
+
+@app.route("/addin/manifest.xml")
+def addin_manifest():
+    """Serve the OfficeApp manifest XML with the correct MIME type."""
+    body = render_template("addin/manifest.xml")
+    response = make_response(body)
+    response.headers["Content-Type"] = "application/xml; charset=utf-8"
+    # Always allow Word to fetch this without a CORS preflight.
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
+
+
+@app.route("/addin/taskpane")
+def addin_taskpane():
+    """The iframe HTML Word loads inside its task pane."""
+    response = make_response(render_template("addin/taskpane.html"))
+    # Office's iframe lives in an https://word-edit.officeapps.live.com origin
+    # (or the desktop app's webview).  Allow framing + cross-origin XHR back to
+    # this server.
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    # Don't deny framing — Office WILL frame us; setting X-Frame-Options=DENY
+    # would break the add-in entirely.
+    response.headers.pop("X-Frame-Options", None)
+    return response
+
+
+@app.route("/addin/commands")
+def addin_commands():
+    """
+    Required by the manifest's <FunctionFile resid="Commands.Url"/>.  We don't
+    register any custom ribbon commands beyond the button that just opens the
+    task pane, so this is intentionally a tiny stub.  Office still expects
+    the URL to exist and return 200.
+    """
+    return """<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+</head><body>
+<!-- Lex-Indic Word add-in commands stub. Required by Office; intentionally
+     empty because all commands open the task pane via the manifest. -->
+</body></html>"""
+
+
+# ─── CORS for the /convert/text endpoint (the task pane calls it from an
+#     iframe whose origin differs from our server's).  We only allow the
+#     two endpoints the add-in actually needs.
+@app.after_request
+def _allow_addin_xhr(response):
+    if request.path.startswith("/convert/") or request.path.startswith("/addin/"):
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    return response
+
+
+@app.route("/convert/text", methods=["OPTIONS"])
+@app.route("/convert/upload", methods=["OPTIONS"])
+def _convert_preflight():
+    """Handle CORS preflight for the task pane's XHR calls."""
+    return ("", 204)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -624,5 +701,50 @@ def chat():
 # ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
-    print("  Open your browser at: http://localhost:8080\n")
-    app.run(debug=False, host="0.0.0.0", port=8080)
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="lex-indic",
+        description="Lex-Indic — BNS Transition Engine. Run with --https for the Word add-in.",
+    )
+    parser.add_argument(
+        "--https",
+        action="store_true",
+        help="Run with TLS on port 8443 using certs/dev-cert.pem (required for "
+             "the Microsoft Word add-in, which only loads HTTPS URLs).",
+    )
+    parser.add_argument(
+        "--host", default="0.0.0.0",
+        help="Bind host (default 0.0.0.0; use 127.0.0.1 for air-gapped).",
+    )
+    parser.add_argument(
+        "--port", type=int, default=None,
+        help="Port to listen on (defaults to 8080 for HTTP, 8443 for HTTPS).",
+    )
+    args = parser.parse_args()
+
+    if args.https:
+        cert = Path("certs/dev-cert.pem")
+        key = Path("certs/dev-key.pem")
+        if not (cert.exists() and key.exists()):
+            print(
+                "ERROR: certs/dev-cert.pem or certs/dev-key.pem not found.\n"
+                "Generate them with:\n"
+                "  openssl req -x509 -newkey rsa:2048 -nodes \\\n"
+                "    -keyout certs/dev-key.pem -out certs/dev-cert.pem \\\n"
+                '    -days 365 -subj "/CN=localhost" \\\n'
+                '    -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"\n'
+            )
+            sys.exit(1)
+
+        port = args.port or 8443
+        print(f"  Open your browser at: https://localhost:{port}")
+        print(f"  Word add-in install:  https://localhost:{port}/addin/install\n")
+        app.run(
+            debug=False, host=args.host, port=port,
+            ssl_context=(str(cert), str(key)),
+        )
+    else:
+        port = args.port or 8080
+        print(f"  Open your browser at: http://localhost:{port}\n")
+        app.run(debug=False, host=args.host, port=port)

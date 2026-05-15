@@ -33,3 +33,8 @@ data/legal_corpus/embedding_cache.json
 
 # Claude Code
 .claude/
+
+# Self-signed dev TLS certs (used by --https for the Word add-in)
+# Each clone generates its own. See templates/addin/install.html.
+certs/*.pem
+certs/*.key

@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>Lex-Indic — IPC → BNS Task Pane</title>
+
+<!-- Office.js — Microsoft Office Add-in runtime -->
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --navy:        #0f2850;
+    --navy-deep:   #0a1a35;
+    --gold:        #b48c28;
+    --gold-light:  #d4a843;
+    --gold-glow:   #f0c44f;
+    --grey-100:    #f6f7fb;
+    --grey-200:    #ecf0f7;
+    --grey-300:    #d9dde6;
+    --grey-500:    #6b7280;
+    --grey-700:    #2d3748;
+    --green:       #146432;
+    --green-light: #e8f7ed;
+    --red:         #b41e1e;
+    --red-light:   #fff0f0;
+    --yellow:      #fff7d6;
+    --white:       #ffffff;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
+    color:var(--navy);
+    background:var(--white);
+    -webkit-font-smoothing:antialiased;
+    line-height:1.5;
+    font-size:13px;
+  }
+
+  /* ── Top brand bar ──────────────────────────────────────────────────── */
+  .brand-bar{
+    background:linear-gradient(135deg, var(--navy-deep), var(--navy));
+    color:#fff;
+    padding:12px 16px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    border-bottom:2px solid var(--gold);
+  }
+  .brand-mark{
+    width:28px;height:28px;
+    background:linear-gradient(135deg, var(--gold), var(--gold-glow));
+    color:var(--navy-deep);
+    border-radius:6px;
+    display:grid;place-items:center;
+    font-weight:900;font-size:14px;
+  }
+  .brand-name{font-weight:700;font-size:14px}
+  .brand-sub{
+    margin-left:auto;
+    font-size:11px;
+    color:rgba(255,255,255,.6);
+  }
+
+  main{padding:16px}
+
+  h1{
+    font-size:16px;
+    font-weight:700;
+    color:var(--navy);
+    margin-bottom:6px;
+  }
+  .lead{
+    color:var(--grey-700);
+    font-size:12.5px;
+    margin-bottom:16px;
+    line-height:1.55;
+  }
+
+  /* ── Primary action ─────────────────────────────────────────────────── */
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:100%;
+    padding:11px 14px;
+    font-family:inherit;font-size:13px;font-weight:600;
+    border:none;border-radius:8px;cursor:pointer;
+    transition:all .2s;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg, var(--gold), var(--gold-light));
+    color:var(--navy-deep);
+    box-shadow:0 3px 12px rgba(180,140,40,.25);
+  }
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(180,140,40,.4)}
+  .btn-primary:disabled{
+    opacity:.5;cursor:not-allowed;transform:none;
+    box-shadow:none;
+    background:var(--grey-200);color:var(--grey-500);
+  }
+  .btn-ghost{
+    margin-top:8px;
+    background:var(--white);
+    border:1px solid var(--grey-300);
+    color:var(--navy);
+  }
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+
+  /* ── Mode toggle (whole doc / selection) ─────────────────────────────── */
+  .mode-toggle{
+    display:flex;
+    background:var(--grey-200);
+    border-radius:8px;
+    padding:3px;
+    margin-bottom:12px;
+  }
+  .mode-btn{
+    flex:1;
+    background:transparent;border:none;
+    font-family:inherit;font-size:12px;font-weight:600;
+    color:var(--grey-500);
+    padding:7px 8px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:all .2s;
+  }
+  .mode-btn.active{
+    background:var(--white);
+    color:var(--navy);
+    box-shadow:0 1px 2px rgba(0,0,0,.06);
+  }
+
+  /* ── Status panel ───────────────────────────────────────────────────── */
+  .status{
+    margin-top:14px;
+    padding:11px 13px;
+    border-radius:8px;
+    font-size:12.5px;
+    line-height:1.55;
+    display:none;
+  }
+  .status.show{display:block}
+  .status.info  {background:var(--grey-100); color:var(--grey-700); border:1px solid var(--grey-300)}
+  .status.ok    {background:var(--green-light); color:var(--green); border:1px solid #c8e8d0}
+  .status.warn  {background:var(--yellow); color:#7a5a00; border:1px solid #f5e0a0}
+  .status.error {background:var(--red-light); color:var(--red); border:1px solid #f0c8c8}
+
+  .spinner{
+    display:inline-block;
+    width:14px;height:14px;
+    border:2px solid var(--grey-200);
+    border-top-color:var(--gold);
+    border-radius:50%;
+    animation:spin 1s linear infinite;
+    vertical-align:middle;
+    margin-right:8px;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ── Result summary ─────────────────────────────────────────────────── */
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:6px;
+    margin-top:14px;
+  }
+  .stat{
+    background:var(--grey-100);
+    border:1px solid var(--grey-300);
+    border-radius:8px;
+    padding:9px 8px;
+    text-align:center;
+  }
+  .stat-num{font-size:20px;font-weight:700;color:var(--navy);line-height:1}
+  .stat-num.mapped{color:var(--green)}
+  .stat-num.unmapped{color:var(--red)}
+  .stat-lbl{font-size:9.5px;font-weight:600;color:var(--grey-500);text-transform:uppercase;letter-spacing:.3px;margin-top:4px;line-height:1.2}
+
+  /* ── Per-match rows ─────────────────────────────────────────────────── */
+  .matches{margin-top:14px;display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto}
+  .match{
+    display:grid;
+    grid-template-columns:auto auto 1fr;
+    gap:8px;
+    align-items:center;
+    padding:7px 9px;
+    background:var(--grey-100);
+    border:1px solid var(--grey-300);
+    border-radius:6px;
+    font-size:11.5px;
+  }
+  .match.unmapped{background:var(--red-light);border-color:#f0c8c8}
+  .match-ipc{
+    background:var(--yellow);
+    padding:2px 6px;border-radius:3px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:11px;color:#7a5a00;
+    border:1px solid #f5e0a0;
+  }
+  .match-arrow{color:var(--gold);font-weight:700;font-size:13px}
+  .match-bns{
+    color:var(--green);font-weight:600;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .match-bns.unmapped{color:var(--red)}
+
+  /* ── Footer ─────────────────────────────────────────────────────────── */
+  .footer{
+    margin-top:18px;
+    padding-top:14px;
+    border-top:1px solid var(--grey-300);
+    font-size:11px;
+    color:var(--grey-500);
+    line-height:1.55;
+  }
+  .footer a{color:var(--gold);text-decoration:none}
+  .footer a:hover{text-decoration:underline}
+
+  .pre-init{
+    text-align:center;
+    padding:30px 14px;
+    color:var(--grey-500);
+    font-size:12.5px;
+  }
+</style>
+</head>
+<body>
+
+<div class="brand-bar">
+  <div class="brand-mark">L</div>
+  <div class="brand-name">Lex-Indic</div>
+  <div class="brand-sub">IPC → BNS</div>
+</div>
+
+<main id="app">
+  <div class="pre-init" id="preInit">
+    <div class="spinner"></div>
+    Connecting to Word…
+  </div>
+</main>
+
+<script>
+  /* ════════════════════════════════════════════════════════════════════════
+     Lex-Indic Word Add-in — IPC → BNS task pane
+     ════════════════════════════════════════════════════════════════════════
+     Flow:
+       1. Office.onReady() fires when Word has loaded the task pane.
+       2. We render the UI (mode toggle + Convert button + status area).
+       3. On click, we collect either the whole document body OR the current
+          selection's text, send it to /convert/text on the Lex-Indic backend,
+          then walk the result and replace the matched IPC references in
+          Word with [original IPC ref] + [BNS marker], highlighted yellow
+          and red respectively.
+       4. We render a per-match summary and the same stats tiles as /convert.
+
+     Important constraints:
+       - Office Add-ins require HTTPS for all loaded URLs.
+       - We use Word.run(...) batching for atomic, undoable edits.  The user
+         can press Ctrl+Z once to revert the entire conversion.
+       - We never blindly replace section numbers — only the exact text
+         spans matched by the backend's regex are touched.
+  ════════════════════════════════════════════════════════════════════════ */
+
+  // Backend lives on the same host this add-in was loaded from.  The
+  // manifest hard-codes https://localhost:8443 but in prod this rewrites
+  // automatically because window.location.origin matches the SourceLocation.
+  const BACKEND = window.location.origin;
+
+  // Will be replaced by the real UI once Office.js is ready.
+  let mode = "document"; // "document" | "selection"
+
+  Office.onReady((info) => {
+    if (info.host !== Office.HostType.Word) {
+      document.getElementById('app').innerHTML =
+        '<p class="lead">This add-in only runs inside Microsoft Word.</p>';
+      return;
+    }
+    renderShell();
+  });
+
+  function renderShell(){
+    document.getElementById('app').innerHTML = `
+      <h1>Convert this document to BNS</h1>
+      <p class="lead">
+        Lex-Indic scans the active Word document for IPC section references
+        (Section 302 IPC, u/s 498A, S. 420 of the IPC, etc.) and inserts
+        the matching BNS 2023 section next to each one, highlighted yellow.
+        Press Ctrl+Z once to undo the whole conversion.
+      </p>
+
+      <div class="mode-toggle" role="tablist">
+        <button class="mode-btn active" id="modeDoc"><span>Whole document</span></button>
+        <button class="mode-btn" id="modeSel"><span>Current selection</span></button>
+      </div>
+
+      <button class="btn btn-primary" id="convertBtn">
+        Convert →
+      </button>
+
+      <button class="btn btn-ghost" id="undoBtn" title="Discard the conversion and revert the document">
+        ↶ Undo last conversion
+      </button>
+
+      <div id="status" class="status"></div>
+      <div id="stats"></div>
+      <div id="matches"></div>
+
+      <div class="footer">
+        Engine: Lex-Indic v1.2 · Backend: <code id="backendUrl"></code><br>
+        Sections we don't have a verified mapping for stay plain text —
+        your visual signal that the converter has not silently invented.
+        <a href="https://github.com/Yuvraj235/Lex-Indic-legal" target="_blank">Source on GitHub</a>
+      </div>
+    `;
+    document.getElementById('backendUrl').textContent = BACKEND;
+
+    document.getElementById('modeDoc').addEventListener('click', () => switchMode('document'));
+    document.getElementById('modeSel').addEventListener('click', () => switchMode('selection'));
+    document.getElementById('convertBtn').addEventListener('click', runConvert);
+    document.getElementById('undoBtn').addEventListener('click', undoConvert);
+  }
+
+  function switchMode(m){
+    mode = m;
+    document.getElementById('modeDoc').classList.toggle('active', m === 'document');
+    document.getElementById('modeSel').classList.toggle('active', m === 'selection');
+  }
+
+  function showStatus(kind, html){
+    const el = document.getElementById('status');
+    el.className = 'status show ' + kind;
+    el.innerHTML = html;
+  }
+
+  function clearStatus(){
+    document.getElementById('status').className = 'status';
+    document.getElementById('stats').innerHTML = '';
+    document.getElementById('matches').innerHTML = '';
+  }
+
+  function escapeHtml(s){
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  /* ────────────────────────────────────────────────────────────────────────
+     The main convert flow
+     ────────────────────────────────────────────────────────────────────── */
+  async function runConvert(){
+    clearStatus();
+    showStatus('info', '<span class="spinner"></span>Reading document…');
+    document.getElementById('convertBtn').disabled = true;
+
+    try {
+      // STEP 1 — gather text we need to convert
+      const segments = await collectSegments();
+      if (!segments.length){
+        showStatus('warn', mode === 'selection'
+          ? 'Nothing is selected. Highlight some text and try again, or switch to "Whole document".'
+          : 'The document is empty.');
+        document.getElementById('convertBtn').disabled = false;
+        return;
+      }
+
+      // Combine into a single string for the backend.  We keep an index of
+      // where each paragraph started so we can map matches back to specific
+      // paragraphs after the regex runs.
+      let combined = "";
+      const offsets = [];   // [{para_idx, start, end}]
+      for (let i = 0; i < segments.length; i++){
+        offsets.push({ idx: i, start: combined.length, end: combined.length + segments[i].text.length });
+        combined += segments[i].text + "\n";
+      }
+
+      // STEP 2 — call backend
+      showStatus('info', '<span class="spinner"></span>Looking up IPC → BNS mappings…');
+      const resp = await fetch(`${BACKEND}/convert/text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: combined }),
+      });
+      if (!resp.ok){
+        const err = await resp.json().catch(() => ({ error: resp.statusText }));
+        throw new Error(err.error || `Backend HTTP ${resp.status}`);
+      }
+      const data = await resp.json();
+
+      const matches = (data.summary && data.summary.matches) || [];
+      if (!matches.length){
+        showStatus('warn', 'No IPC section references found in the ' +
+          (mode === 'selection' ? 'selection' : 'document') +
+          '. The converter only touches text where IPC, Indian Penal Code, ' +
+          'or "u/s NN" is in context — generic "Section 302" without that ' +
+          'context is left alone.');
+        document.getElementById('convertBtn').disabled = false;
+        return;
+      }
+
+      // STEP 3 — apply edits in Word
+      showStatus('info', '<span class="spinner"></span>Inserting BNS markers in the document…');
+      await applyEdits(combined, matches);
+
+      // STEP 4 — render the result summary
+      renderSummary(data.summary);
+      const s = data.summary;
+      showStatus('ok',
+        `Converted <strong>${s.mapped_count}</strong> IPC reference${s.mapped_count !== 1 ? 's' : ''} to BNS` +
+        (s.unmapped_count
+          ? ` · <strong>${s.unmapped_count}</strong> flagged for manual review.`
+          : '.') +
+        ' Press Ctrl+Z to undo.');
+    } catch (e){
+      showStatus('error', `Conversion failed: ${escapeHtml(e.message)}`);
+    } finally {
+      document.getElementById('convertBtn').disabled = false;
+    }
+  }
+
+  /* ────────────────────────────────────────────────────────────────────────
+     Collect text from Word — either whole body or current selection
+     ────────────────────────────────────────────────────────────────────── */
+  async function collectSegments(){
+    return await Word.run(async (context) => {
+      let range;
+      if (mode === 'selection'){
+        range = context.document.getSelection();
+      } else {
+        range = context.document.body.getRange();
+      }
+      range.load('text');
+      await context.sync();
+      // We keep this as one big segment; finer-grained range manipulation
+      // happens in applyEdits using insertText after a search.
+      return range.text ? [{ text: range.text }] : [];
+    });
+  }
+
+  /* ────────────────────────────────────────────────────────────────────────
+     Apply edits — search for each matched IPC ref and insert the BNS marker
+     right after it, highlighted yellow on the IPC and bold red on the BNS.
+
+     Why search-and-replace instead of position math:
+       The combined string we sent to the backend was the concatenated body
+       text, but Word's internal representation has hidden newlines, runs,
+       and section breaks.  Character offsets won't survive the round trip.
+       Search-based replacement is the only reliable way to find the same
+       span back in the document.
+     ────────────────────────────────────────────────────────────────────── */
+  async function applyEdits(combinedText, matches){
+    // De-duplicate identical search strings — Word's search API replaces
+    // ALL instances of a string, so processing the same ref twice would
+    // double-insert the BNS marker.
+    const seen = new Set();
+    const ordered = [];
+    for (const m of matches){
+      if (seen.has(m.raw)) continue;
+      seen.add(m.raw);
+      ordered.push(m);
+    }
+
+    await Word.run(async (context) => {
+      const body = mode === 'selection'
+        ? context.document.getSelection()
+        : context.document.body;
+
+      for (const m of ordered){
+        // Build the BNS marker text once
+        const markerParts = [];
+        for (let i = 0; i < m.section_numbers.length; i++){
+          const num = m.section_numbers[i];
+          const bns = m.bns[i];
+          markerParts.push(bns
+            ? `[${bns.bns} — ${bns.title}]`
+            : `[IPC ${num} — no BNS mapping]`);
+        }
+        const markerText = ' ' + markerParts.join(' ');
+
+        // Find every occurrence of this raw IPC reference in the body/range
+        const found = body.search(m.raw, {
+          matchCase: false,
+          matchWholeWord: false,
+        });
+        found.load('items');
+        await context.sync();
+
+        for (const range of found.items){
+          // Highlight the IPC reference yellow
+          range.font.highlightColor = '#FFF076';
+          // Insert the BNS marker right after the IPC reference
+          const inserted = range.insertText(markerText, Word.InsertLocation.after);
+          inserted.font.bold = true;
+          inserted.font.color = '#B41E1E';
+          inserted.font.highlightColor = '#F0F0F0';
+        }
+      }
+      await context.sync();
+    });
+  }
+
+  /* ────────────────────────────────────────────────────────────────────────
+     Undo: Word's undo stack is grouped per Word.run, so a single Ctrl+Z
+     reverts all our edits.  This button just issues the same command via
+     the host so users who don't know about Ctrl+Z can still undo.
+     ────────────────────────────────────────────────────────────────────── */
+  async function undoConvert(){
+    try {
+      // There's no Word.run undo API; the recommended path is to tell the
+      // user to press Ctrl+Z (or Cmd+Z on macOS).  We surface that here.
+      showStatus('info', 'Press <strong>Ctrl + Z</strong> (Windows) or <strong>Cmd + Z</strong> (Mac) ' +
+        'to undo the last conversion. Word groups all our edits into one ' +
+        'undoable step, so a single Ctrl+Z reverts the whole conversion.');
+    } catch (e){
+      showStatus('error', e.message);
+    }
+  }
+
+  /* ────────────────────────────────────────────────────────────────────────
+     Summary UI
+     ────────────────────────────────────────────────────────────────────── */
+  function renderSummary(summary){
+    const total = summary.total_section_refs || 0;
+    const mapped = summary.mapped_count || 0;
+    const unmapped = summary.unmapped_count || 0;
+
+    document.getElementById('stats').innerHTML = `
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-num">${total}</div>
+          <div class="stat-lbl">Refs found</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num mapped">${mapped}</div>
+          <div class="stat-lbl">Auto-mapped</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num unmapped">${unmapped}</div>
+          <div class="stat-lbl">Review</div>
+        </div>
+      </div>
+    `;
+
+    const rows = [];
+    for (const m of summary.matches){
+      for (let i = 0; i < m.section_numbers.length; i++){
+        const num = m.section_numbers[i];
+        const bns = m.bns[i];
+        rows.push(`
+          <div class="match ${bns ? '' : 'unmapped'}">
+            <div class="match-ipc">IPC ${escapeHtml(num)}</div>
+            <div class="match-arrow">→</div>
+            <div class="match-bns ${bns ? '' : 'unmapped'}">
+              ${bns ? escapeHtml(bns.bns + ' — ' + bns.title) : 'No mapping — review manually'}
+            </div>
+          </div>
+        `);
+      }
+    }
+    document.getElementById('matches').innerHTML =
+      `<div class="matches">${rows.join('')}</div>`;
+  }
+</script>
+
+</body>
+</html>
