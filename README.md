@@ -2,7 +2,7 @@
 
 ### AI-Powered Junior Associate for Indian Law Firms
 
-[![Status](https://img.shields.io/badge/status-v1.4-success)]()
+[![Status](https://img.shields.io/badge/status-v1.5-success)]()
 [![Stack](https://img.shields.io/badge/stack-Flask%20%2B%20Three.js%20%2B%20ChromaDB-blue)]()
 [![SOC2](https://img.shields.io/badge/SOC2-9%2F10%20controls%20passing-success)]()
 [![License](https://img.shields.io/badge/license-Educational-lightgrey)]()
@@ -23,17 +23,25 @@ and within seconds the system produces a **complete legal case brief with 6 outp
 
 ---
 
-## What's New in v1.4 (the Legora-teardown 7-day sprint)
+## What's New in v1.5 (Legora-teardown sprint — 15 days)
 
 | Day | Feature | URL | Why it matters |
 |---|---|---|---|
-| **1** | IPC → BNS pleading converter | `/convert` | Convert any old IPC-era Word doc in one upload. Legora has no IPC→BNS corpus. |
-| **2** | Microsoft Word add-in (Office.js) | `/addin/install` | Same converter, but lives inside Word's task pane. Ctrl+Z undoes the whole conversion. |
-| **3** | Supreme Court precedent monitor | `/monitors` | Register matter areas, get daily digest of SC rulings touching them. Indian version of Legora's "Monitors". |
-| **4** | Hindi UI + Hindi analysis output | top-bar toggle | Bombay HC, MP HC, UP HC accept Hindi pleadings under Article 348(2). Legora speaks no Indian languages. |
-| **5** | NALSA panel free-tier onboarding | `/nalsa` | Free for ~70K NALSA-empanelled legal-aid advocates. The audience Legora's pricing locks out. |
-| **6** | DPDP compliance posture + downloadable .docx pack | `/trust` | The page a firm GC opens before signing. 28 questions answered, data-flow diagram, India-region-first. |
-| **7** | SOC 2 Type II readiness dashboard | `/admin/soc2` | 10 live controls across CC6.1, CC6.6, CC6.7, CC7.2, CC8.1, P3.1, P3.2. Continuous evidence trail for the auditor. |
+| **1** | IPC → BNS pleading converter | `/convert` | Drag a Word doc, every IPC reference highlighted yellow + BNS equivalent inserted in red. |
+| **2** | Microsoft Word add-in (Office.js) | `/addin/install` | Same converter, lives inside Word's task pane. |
+| **3** | Supreme Court precedent monitor | `/monitors` | Daily digest of SC rulings touching your matter areas. |
+| **4** | Hindi UI + Hindi analysis output | top-bar toggle | Bombay HC, MP HC accept Hindi pleadings under Article 348(2). |
+| **5** | NALSA panel free-tier onboarding | `/nalsa` | Free for ~70K NALSA-empanelled legal-aid advocates. |
+| **6** | DPDP compliance posture + .docx pack | `/trust` | 28 GC questions answered, India-region-first data flow. |
+| **7** | SOC 2 Type II readiness dashboard | `/admin/soc2` | 10 live controls; continuous evidence trail. |
+| **8** | Per-section bare-act deep-links | source modal | Each retrieved BNS section carries a PDF-page-hint deep-link. |
+| **9** | Matter intake registry | `/matters` | Firm → Lawyer → Matter triple + conflict-of-interest check. |
+| **10** | Multi-tenant auth (magic-link) | `/login` | Email + 6-digit code, HMAC session cookie, SQLite-backed users. |
+| **11** | BNSS (procedure) + BSA (evidence) corpora | KB | 25 new sections: arrest, bail, search, e-court, evidence rules. |
+| **12** | e-Courts CNR lookup | `/ecourts` | Look up Indian case-status by 16-char CNR; provider-pluggable. |
+| **13** | Ollama local-inference path | `/llm/status` | Zero-sub-processor mode for DPDP-strict deployments. |
+| **14** | Tabular contract review | `/tabular` | Upload N contracts → side-by-side clause matrix. Rent/employment/partnership libraries pre-baked. |
+| **15** | Public status page + webhook event bus | `/status` | Live health, KB count, 9/10 SOC 2, signed outbound webhooks. |
 
 ## What's New in v1.2
 
@@ -453,6 +461,27 @@ deliberate. It disclaims AI authorship and protects the firm legally.
 | `/admin/soc2` | GET | SOC 2 readiness dashboard (token-gated) |
 | `/admin/soc2/summary.json` | GET | JSON control results |
 | `/admin/soc2/snapshot` | POST | Save evidence snapshot to outputs/soc2_evidence/ |
+| `/matters` | GET | Firm/lawyer/matter intake registry |
+| `/matters/api/firms` | GET/POST | Firm CRUD |
+| `/matters/api/lawyers` | GET/POST | Lawyer CRUD |
+| `/matters/api/matters` | GET/POST | Matter CRUD with conflict-of-interest check |
+| `/matters/api/conflict-check` | POST | Pre-create conflict scan |
+| `/login` | GET | Magic-link login page |
+| `/auth/code` | POST | Issue 6-digit login code |
+| `/auth/verify` | POST | Consume code, set session cookie |
+| `/auth/me` | GET | Current authenticated user |
+| `/auth/logout` | POST | Clear session cookie |
+| `/auth/bind-firm` | POST | Bind user to a firm (multi-tenant boundary) |
+| `/ecourts` | GET | CNR lookup UI |
+| `/ecourts/api/lookup/<cnr>` | GET | Fetch case-status by CNR |
+| `/llm/status` | GET | Active LLM provider + reachability |
+| `/tabular` | GET | Tabular contract review UI |
+| `/tabular/api/compare` | POST | Compare N contracts × M clauses |
+| `/status` | GET | Public status page (auto-refreshes) |
+| `/status.json` | GET | Machine-readable health for monitoring |
+| `/webhooks/api/subscriptions` | GET/POST | Register webhook URLs |
+| `/webhooks/api/subscriptions/<id>` | DELETE | Remove subscription |
+| `/webhooks/api/deliveries` | GET | Recent delivery log |
 
 Every successful and every error response carries an `X-Request-Id`-like
 field in the JSON body, so users can quote it in support tickets and ops
@@ -500,8 +529,9 @@ circulars (MHA, SC, NHRC) — all retrievable via the same RAG pipeline.
 | **v1.2** | Citation provenance UI, audit log, white-label PDFs, 3D landing page | Done |
 | **v1.3** | IPC→BNS converter (web + Word add-in) — the Legora wedge | Done |
 | **v1.4** | SC precedent monitor + Hindi UI/output + NALSA tier + DPDP trust page + SOC 2 dashboard | Done |
-| **v1.5** | Per-section bare-act deep-links, matter-intake form (firm/lawyer/matter) | Planned |
-| **v2.0** | Multi-tenant auth (Postgres), formal SOC 2 Type II audit via Vanta/Drata | Planned |
+| **v1.5** | Deep-links, matter intake, multi-tenant auth, BNSS+BSA, e-Courts, Ollama, tabular review, status+webhooks | Done |
+| **v2.0** | Postgres migration, formal SOC 2 Type II audit via Vanta/Drata, BNS full-358 corpus | Planned |
+| **v2.1** | Regional languages (Marathi, Tamil, Bengali), tabular due-diligence libraries for M&A | Planned |
 | **v2.0** | Postgres + multi-tenant auth, India-region deployment guide, BNSS + BSA corpora | Planned |
 | **v2.1** | Hindi + regional language support, on-prem Llama-3.3-70B via Ollama | Planned |
 
