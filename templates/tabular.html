@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tabular Contract Review — Lex-Indic</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0f2850; --navy-deep:#0a1a35;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --green:#146432; --green-light:#e8f7ed;
+    --red:#b41e1e; --red-light:#fff0f0;
+    --amber:#fff7d6; --amber-text:#7a5a00;
+    --grey-100:#f6f7fb; --grey-200:#ecf0f7; --grey-300:#d9dde6;
+    --grey-500:#6b7280; --grey-700:#2d3748;
+    --shadow-md:0 10px 30px -8px rgba(15,40,80,.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,-apple-system,sans-serif;color:var(--navy);
+       background:var(--grey-100);line-height:1.6;min-height:100vh;
+       -webkit-font-smoothing:antialiased}
+  .top{background:linear-gradient(135deg,var(--navy-deep),var(--navy));color:#fff;
+       padding:18px clamp(20px,4vw,40px);border-bottom:3px solid var(--gold)}
+  .top-inner{max-width:1280px;margin:0 auto;display:flex;justify-content:space-between;
+             align-items:center;gap:20px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff}
+  .brand-mark{width:34px;height:34px;background:linear-gradient(135deg,var(--gold),var(--gold-glow));
+              border-radius:8px;display:grid;place-items:center;color:var(--navy-deep);
+              font-weight:900;font-size:18px}
+  .brand-name{font-weight:800;font-size:18px}
+  .nav{display:flex;gap:18px;font-size:14px}
+  .nav a{color:rgba(255,255,255,.78);text-decoration:none}
+  .nav a:hover{color:var(--gold-glow)}
+
+  main{max-width:1280px;margin:30px auto;padding:0 24px}
+  h1{font-family:'Playfair Display',serif;font-size:clamp(28px,3.5vw,40px);
+     line-height:1.15;font-weight:700;margin-bottom:8px}
+  .lead{color:var(--grey-700);font-size:15px;max-width:780px;margin-bottom:24px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px}
+  @media (max-width:880px){.grid{grid-template-columns:1fr}}
+
+  .card{background:#fff;border:1px solid var(--grey-300);border-radius:12px;
+        padding:22px 24px;box-shadow:var(--shadow-md)}
+  .card h2{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:12px;
+           display:flex;align-items:center;gap:10px}
+  .card-num{background:linear-gradient(135deg,var(--navy),var(--navy-deep));
+            color:var(--gold-glow);width:24px;height:24px;border-radius:6px;
+            display:grid;place-items:center;font-size:11px;font-weight:700}
+
+  .drop{border:2px dashed var(--grey-300);border-radius:10px;padding:24px;text-align:center;
+        cursor:pointer;transition:all .3s;color:var(--grey-500);font-size:13px}
+  .drop.dragging,.drop:hover{border-color:var(--gold);background:#fffbf0;color:var(--navy)}
+  .drop strong{color:var(--gold);font-weight:600}
+
+  .filelist{margin-top:12px}
+  .file-chip{display:inline-flex;align-items:center;gap:6px;
+             background:var(--grey-100);border:1px solid var(--grey-300);
+             border-radius:99px;padding:5px 12px;margin:3px 4px 3px 0;font-size:12px}
+  .file-chip button{background:transparent;border:none;font-size:14px;cursor:pointer;color:var(--grey-500)}
+
+  .lib-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+  .lib-btn{background:#fff;border:1px solid var(--grey-300);border-radius:7px;
+           padding:6px 12px;font-size:12px;cursor:pointer;color:var(--grey-700)}
+  .lib-btn.active{background:var(--green-light);color:var(--green);border-color:var(--green);font-weight:600}
+
+  .clause-row{display:grid;grid-template-columns:1fr 2fr auto;gap:8px;margin-bottom:6px}
+  .clause-row input{padding:8px 11px;border:1px solid var(--grey-300);border-radius:6px;
+                    font-family:inherit;font-size:12.5px;color:var(--navy);background:#fff}
+  .clause-row input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 2px rgba(180,140,40,.12)}
+  .clause-row button{background:transparent;border:none;font-size:16px;cursor:pointer;color:var(--grey-500);padding:0 6px}
+
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;
+       font-family:inherit;font-size:14px;font-weight:600;
+       border:none;border-radius:9px;cursor:pointer;transition:all .2s}
+  .btn-primary{background:linear-gradient(135deg,var(--gold),var(--gold-light));
+               color:var(--navy-deep);box-shadow:0 4px 16px rgba(180,140,40,.25)}
+  .btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 22px rgba(180,140,40,.45)}
+  .btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
+  .btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--grey-300);font-size:12.5px;padding:7px 12px}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+
+  .loading{text-align:center;padding:30px;color:var(--grey-500);font-size:14px}
+  .spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--grey-200);
+           border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite;
+           vertical-align:middle;margin-right:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .err{margin-top:14px;padding:11px 14px;border-radius:8px;font-size:13.5px;
+       background:var(--red-light);color:var(--red);border:1px solid #f0c8c8}
+
+  /* Result table */
+  .result{margin-top:20px;background:#fff;border:1px solid var(--grey-300);
+          border-radius:12px;overflow:hidden;box-shadow:var(--shadow-md)}
+  .result-head{padding:18px 22px;background:linear-gradient(135deg,var(--navy),var(--navy-deep));color:#fff}
+  .result-head h3{font-family:'Playfair Display',serif;font-size:20px;margin-bottom:4px}
+  .result-head .stats{font-size:12.5px;color:rgba(255,255,255,.7);
+                      font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .table-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--grey-200);
+        vertical-align:top}
+  thead th{background:var(--grey-100);font-size:11.5px;text-transform:uppercase;
+           letter-spacing:.4px;color:var(--grey-500);font-weight:700}
+  tbody tr:hover{background:var(--grey-100)}
+  td.clause-label{font-weight:600;color:var(--navy);background:var(--grey-100);
+                  border-right:2px solid var(--gold);width:200px;min-width:180px}
+  td.clause-q{font-size:11.5px;color:var(--grey-500);font-style:italic;display:block;margin-top:3px}
+  .cell-found{color:var(--navy)}
+  .cell-missing{color:var(--grey-500);font-style:italic}
+  .cell-error{color:var(--red);font-style:italic}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <a href="/" class="brand">
+      <div class="brand-mark">L</div>
+      <span class="brand-name">Lex-Indic</span>
+    </a>
+    <nav class="nav">
+      <a href="/">Landing</a>
+      <a href="/app">Analyze a case</a>
+      <a href="/convert">IPC → BNS</a>
+      <a href="/tabular" style="color:var(--gold-glow)">Tabular</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <h1>Tabular Contract Review</h1>
+  <p class="lead">
+    Upload up to 8 contracts (PDF, .docx, or .txt) and pick a clause library
+    or write your own questions. Get back a side-by-side matrix of the same
+    clause across every contract. Built for Indian rent agreements,
+    employment contracts, partnership deeds, NDAs, distributor agreements.
+  </p>
+
+  <div class="grid">
+    <!-- Upload -->
+    <div class="card">
+      <h2><span class="card-num">1</span> Contracts</h2>
+      <label class="drop" id="drop">
+        <strong>Drop files here</strong> or click to browse<br>
+        <span style="font-size:11.5px;color:var(--grey-500)">.pdf, .docx, .txt · up to 8 files</span>
+        <input type="file" id="fileInput" multiple accept=".pdf,.docx,.txt" hidden>
+      </label>
+      <div class="filelist" id="fileList"></div>
+    </div>
+
+    <!-- Clauses -->
+    <div class="card">
+      <h2><span class="card-num">2</span> Clause questions</h2>
+      <p style="font-size:12px;color:var(--grey-500);margin-bottom:10px">
+        Pick a library or write up to 12 custom questions.
+      </p>
+      <div class="lib-row">
+        {% for k in libraries %}
+        <button class="lib-btn" onclick="loadLibrary('{{ k }}')">{{ k.replace('_',' ')|title }}</button>
+        {% endfor %}
+        <button class="lib-btn" onclick="clauseRows = []; renderClauses();">Clear</button>
+      </div>
+      <div id="clauses"></div>
+      <button class="btn btn-ghost" onclick="addClause()" style="margin-top:10px">+ Add clause</button>
+    </div>
+  </div>
+
+  <div style="text-align:right">
+    <button class="btn btn-primary" id="runBtn" onclick="runComparison()">Run comparison →</button>
+  </div>
+
+  <div id="result"></div>
+</main>
+
+<script>
+  // Embed libraries from the server template
+  const LIBRARIES = {{ libraries|tojson }};
+
+  const $ = id => document.getElementById(id);
+  const escapeHtml = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  let files = [];
+  let clauseRows = [];
+
+  // ─── Files ─────────────────────────────────────────────────────────────
+  const drop = $('drop');
+  const fileInput = $('fileInput');
+  drop.addEventListener('click', () => fileInput.click());
+  ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => {e.preventDefault(); drop.classList.add('dragging');}));
+  ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => {e.preventDefault(); drop.classList.remove('dragging');}));
+  drop.addEventListener('drop', e => { if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+  fileInput.addEventListener('change', e => { if (e.target.files.length) addFiles(e.target.files); });
+
+  function addFiles(list){
+    for (const f of list){
+      if (files.length >= 8){ alert('Max 8 contracts.'); return; }
+      files.push(f);
+    }
+    renderFiles();
+  }
+  function renderFiles(){
+    $('fileList').innerHTML = files.map((f,i) =>
+      `<span class="file-chip">${escapeHtml(f.name)} · ${(f.size/1024).toFixed(0)}KB
+       <button onclick="files.splice(${i},1);renderFiles()" title="Remove">×</button></span>`
+    ).join('');
+  }
+
+  // ─── Clauses ────────────────────────────────────────────────────────────
+  function addClause(label='', question=''){
+    if (clauseRows.length >= 12){ alert('Max 12 clauses per comparison.'); return; }
+    clauseRows.push({label, question});
+    renderClauses();
+  }
+  function loadLibrary(key){
+    document.querySelectorAll('.lib-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    clauseRows = (LIBRARIES[key] || []).map(c => ({label:c.label, question:c.question}));
+    renderClauses();
+  }
+  function renderClauses(){
+    $('clauses').innerHTML = clauseRows.map((c,i) => `
+      <div class="clause-row">
+        <input value="${escapeHtml(c.label)}" placeholder="Label" oninput="clauseRows[${i}].label=this.value">
+        <input value="${escapeHtml(c.question)}" placeholder="Question to ask of each contract" oninput="clauseRows[${i}].question=this.value">
+        <button onclick="clauseRows.splice(${i},1);renderClauses()" title="Remove">×</button>
+      </div>
+    `).join('');
+  }
+  addClause(); // start with one empty row
+
+  // ─── Run ────────────────────────────────────────────────────────────────
+  async function runComparison(){
+    const out = $('result'); out.innerHTML = '';
+    if (!files.length){ out.innerHTML = '<div class="err">Upload at least one contract.</div>'; return; }
+    const validClauses = clauseRows.filter(c => c.question.trim());
+    if (!validClauses.length){ out.innerHTML = '<div class="err">Add at least one clause-question.</div>'; return; }
+
+    $('runBtn').disabled = true; $('runBtn').textContent = 'Comparing…';
+    out.innerHTML = `<div class="loading"><span class="spinner"></span>Comparing ${validClauses.length} clause${validClauses.length===1?'':'s'} across ${files.length} contract${files.length===1?'':'s'}…</div>`;
+
+    const fd = new FormData();
+    for (const f of files) fd.append('files', f);
+    fd.append('clauses', JSON.stringify(validClauses));
+
+    try {
+      const r = await fetch('/tabular/api/compare', {method:'POST', body: fd});
+      const d = await r.json();
+      $('runBtn').disabled = false; $('runBtn').textContent = 'Run comparison →';
+      if (!r.ok || d.error){
+        out.innerHTML = `<div class="err">${escapeHtml(d.error || 'Comparison failed')}</div>`;
+        return;
+      }
+      render(d);
+    } catch (e) {
+      $('runBtn').disabled = false; $('runBtn').textContent = 'Run comparison →';
+      out.innerHTML = `<div class="err">Network error: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  function render(d){
+    const names = d.contracts.map(c => c.name);
+    const headerCells = names.map(n => `<th>${escapeHtml(n)}</th>`).join('');
+    const rows = d.rows.map(row => {
+      const cells = names.map(n => {
+        const v = row.cells[n] || '';
+        const cls = v === '(not found)' ? 'cell-missing' :
+                    v === '(parse error)' ? 'cell-error' : 'cell-found';
+        return `<td class="${cls}">${escapeHtml(v)}</td>`;
+      }).join('');
+      return `<tr>
+        <td class="clause-label">${escapeHtml(row.label)}<br><span class="clause-q">${escapeHtml(row.question)}</span></td>
+        ${cells}
+      </tr>`;
+    }).join('');
+
+    $('result').innerHTML = `
+      <div class="result">
+        <div class="result-head">
+          <h3>Comparison: ${names.length} contracts × ${d.rows.length} clauses</h3>
+          <div class="stats">
+            ${d.stats.cells_filled} of ${d.stats.cells_total} cells filled
+            · ${d.contracts.reduce((a,c) => a+c.chars, 0).toLocaleString()} chars analysed
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Clause</th>${headerCells}</tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+</script>
+</body>
+</html>

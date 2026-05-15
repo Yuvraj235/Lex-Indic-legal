@@ -215,6 +215,7 @@ import matters as matters_module
 import auth as auth_module
 import ecourts as ecourts_module
 import llm_provider as llm_provider_module
+import tabular as tabular_module
 
 
 @app.route("/monitors")
@@ -567,6 +568,95 @@ def ecourts_demos():
 @app.route("/llm/status")
 def llm_status():
     return jsonify(llm_provider_module.status())
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — Tabular contract review (Day-14).
+# Upload N contracts + pick clause-questions → matrix of answers.
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.route("/tabular")
+def tabular_page():
+    return render_template("tabular.html", libraries={
+        k: [{"label": c.label, "question": c.question} for c in v]
+        for k, v in tabular_module.CLAUSE_LIBRARIES.items()
+    })
+
+
+@app.route("/tabular/api/compare", methods=["POST"])
+def tabular_compare():
+    """Multipart: 'files' = N file uploads, 'clauses' = JSON array of
+    {label, question}."""
+    files = request.files.getlist("files")
+    if not files:
+        return jsonify({"error": "Upload at least one contract."}), 400
+    if len(files) > 8:
+        return jsonify({"error": "At most 8 contracts per comparison."}), 400
+
+    clauses_raw = request.form.get("clauses", "[]")
+    try:
+        clauses_data = json.loads(clauses_raw)
+    except Exception:
+        return jsonify({"error": "Invalid clauses payload."}), 400
+    if not isinstance(clauses_data, list) or not clauses_data:
+        return jsonify({"error": "Provide at least one clause-question."}), 400
+    if len(clauses_data) > 12:
+        return jsonify({"error": "At most 12 clauses per comparison."}), 400
+
+    clauses = [
+        tabular_module.Clause(label=c.get("label", "")[:60], question=c.get("question", "")[:200])
+        for c in clauses_data if c.get("question")
+    ]
+    if not clauses:
+        return jsonify({"error": "Each clause needs a question."}), 400
+
+    # Extract text from every uploaded file
+    contracts = []
+    for f in files:
+        fname = f.filename or "contract"
+        fname_lower = fname.lower()
+        if fname_lower.endswith(".pdf"):
+            text = extract_pdf_text(BytesIO(f.read()))
+        elif fname_lower.endswith(".docx"):
+            try:
+                from docx import Document
+                doc = Document(BytesIO(f.read()))
+                text = "\n".join(p.text for p in doc.paragraphs if p.text)
+            except Exception as e:
+                text = f"[docx extraction failed: {e}]"
+        elif fname_lower.endswith((".txt",)):
+            text = f.read().decode("utf-8", errors="replace")
+        else:
+            return jsonify({"error": f"Unsupported file type: {fname}. Use .pdf, .docx, or .txt."}), 400
+        contracts.append(tabular_module.Contract(name=fname[:60], text=text))
+
+    # Define the llm_call closure based on the active provider
+    def _llm_call(system_prompt: str, user_prompt: str) -> str:
+        if llm_provider_module.get_provider() == "ollama":
+            out = llm_provider_module.complete(
+                system_messages=[system_prompt],
+                user_message=user_prompt,
+                temperature=0.0,  # we want deterministic JSON, not creative
+                max_tokens=2048,
+                timeout_s=120,
+            )
+            return out.get("text", "") or ""
+        # Groq path
+        completion = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt},
+            ],
+            temperature=0.0,
+            max_tokens=2048,
+        )
+        return completion.choices[0].message.content or ""
+
+    try:
+        result = tabular_module.run_comparison(contracts, clauses, _llm_call)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": f"Comparison failed: {str(e)[:200]}"}), 500
 
 
 # ─── Helper: current_user() used by any route that wants the firm tag ─────
