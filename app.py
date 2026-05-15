@@ -204,6 +204,67 @@ def convert_download(filename):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — Precedent Monitor (Day-3 from the Legora teardown).
+# Lawyers register matter areas; daily digest surfaces matching SC rulings.
+# ═══════════════════════════════════════════════════════════════════════════════
+import monitors as monitors_module
+
+
+@app.route("/monitors")
+def monitors_page():
+    return render_template("monitors.html")
+
+
+@app.route("/monitors/api/matters", methods=["GET"])
+def monitors_list_matters():
+    return jsonify({"matters": monitors_module.list_matters()})
+
+
+@app.route("/monitors/api/matters", methods=["POST"])
+def monitors_add_matter():
+    data = request.get_json() or {}
+    label = (data.get("label") or "").strip()
+    sections = data.get("sections") or []
+    keywords = data.get("keywords") or []
+    if not label:
+        return jsonify({"error": "Label is required."}), 400
+    if not isinstance(sections, list) or not isinstance(keywords, list):
+        return jsonify({"error": "Sections and keywords must be arrays."}), 400
+    if not sections and not keywords:
+        return jsonify({"error": "Provide at least one section or one keyword."}), 400
+    saved = monitors_module.add_matter(label, keywords=keywords, sections=sections)
+    return jsonify({"matter": saved})
+
+
+@app.route("/monitors/api/matters/<matter_id>", methods=["DELETE"])
+def monitors_remove_matter(matter_id):
+    if not re.match(r"^m_\d+$", matter_id):
+        return jsonify({"error": "Invalid matter id."}), 400
+    ok = monitors_module.remove_matter(matter_id)
+    if not ok:
+        return jsonify({"error": "Matter not found."}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/monitors/api/digest", methods=["GET"])
+def monitors_digest():
+    since = request.args.get("since")  # optional YYYY-MM-DD
+    d = monitors_module.run_digest(since=since)
+    if request.args.get("save") == "1":
+        monitors_module.save_digest(d)
+    return jsonify(d)
+
+
+@app.route("/monitors/digest.txt")
+def monitors_digest_text():
+    """Plain-text digest — pipe-friendly for cron + email."""
+    d = monitors_module.run_digest()
+    response = make_response(monitors_module.format_digest_text(d))
+    response.headers["Content-Type"] = "text/plain; charset=utf-8"
+    return response
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # ROUTES 1d-h: Microsoft Word Add-in (Day-2 from the Legora teardown).
 # Office Add-ins load HTML/JS in an iframe inside Word's task pane.  We serve:
 #   /addin/install      → human-facing sideload instructions

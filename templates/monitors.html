@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Precedent Monitor — Lex-Indic</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0f2850; --navy-deep:#0a1a35;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --grey-100:#f6f7fb; --grey-200:#ecf0f7; --grey-300:#d9dde6;
+    --grey-500:#6b7280; --grey-700:#2d3748;
+    --green:#146432; --green-light:#e8f7ed;
+    --red:#b41e1e; --red-light:#fff0f0;
+    --shadow-md:0 10px 30px -8px rgba(15,40,80,.18);
+    --ease:cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    color:var(--navy);background:linear-gradient(180deg,var(--grey-100) 0%,#fff 60%);
+    line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased;
+  }
+  .top{
+    background:linear-gradient(135deg,var(--navy-deep),var(--navy));color:#fff;
+    padding:18px clamp(20px,4vw,40px);border-bottom:3px solid var(--gold);
+  }
+  .top-inner{
+    max-width:1180px;margin:0 auto;display:flex;justify-content:space-between;
+    align-items:center;gap:20px;flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff}
+  .brand-mark{
+    width:34px;height:34px;background:linear-gradient(135deg,var(--gold),var(--gold-glow));
+    border-radius:8px;display:grid;place-items:center;color:var(--navy-deep);
+    font-weight:900;font-size:18px;
+  }
+  .brand-name{font-weight:800;font-size:18px}
+  .nav{display:flex;gap:18px;font-size:14px}
+  .nav a{color:rgba(255,255,255,.78);text-decoration:none}
+  .nav a:hover{color:var(--gold-glow)}
+  main{max-width:1180px;margin:40px auto;padding:0 clamp(20px,4vw,40px)}
+
+  .eyebrow{
+    display:inline-block;font-size:12px;font-weight:700;color:var(--gold);
+    text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;
+  }
+  h1{font-family:'Playfair Display',serif;font-size:clamp(28px,4vw,42px);
+     line-height:1.15;margin-bottom:14px;font-weight:700}
+  .lead{font-size:15.5px;color:var(--grey-700);margin-bottom:30px;max-width:760px}
+
+  .grid{display:grid;grid-template-columns:1fr 2fr;gap:28px}
+  @media (max-width:880px){.grid{grid-template-columns:1fr}}
+
+  .card{
+    background:#fff;border:1px solid var(--grey-300);border-radius:14px;
+    padding:22px 24px;box-shadow:var(--shadow-md);
+  }
+  .card h2{font-size:16px;font-weight:700;color:var(--navy);margin-bottom:14px;
+            display:flex;align-items:center;gap:10px}
+  .card-num{
+    background:linear-gradient(135deg,var(--navy),var(--navy-deep));
+    color:var(--gold-glow);width:26px;height:26px;border-radius:7px;
+    display:grid;place-items:center;font-size:12px;font-weight:700;
+  }
+
+  label{display:block;font-size:13px;font-weight:600;color:var(--navy);margin:14px 0 6px}
+  input[type=text]{
+    width:100%;padding:10px 12px;border:1px solid var(--grey-300);
+    border-radius:8px;background:#fff;font-family:inherit;font-size:14px;
+    color:var(--navy);transition:border-color .2s;
+  }
+  input[type=text]:focus{outline:none;border-color:var(--gold);
+                         box-shadow:0 0 0 3px rgba(180,140,40,.12)}
+  .help-text{font-size:12px;color:var(--grey-500);margin-top:4px}
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    padding:11px 20px;font-family:inherit;font-size:14px;font-weight:600;
+    border:none;border-radius:8px;cursor:pointer;transition:all .2s;
+    text-decoration:none;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg,var(--gold),var(--gold-light));
+    color:var(--navy-deep);box-shadow:0 4px 16px rgba(180,140,40,.25);
+  }
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(180,140,40,.45)}
+  .btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--grey-300)}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+  .btn-small{padding:6px 12px;font-size:12px;border-radius:6px}
+
+  /* Matter list */
+  .matter-list{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+  .matter-item{
+    background:var(--grey-100);border:1px solid var(--grey-300);border-radius:8px;
+    padding:11px 14px;display:flex;align-items:center;justify-content:space-between;gap:14px;
+  }
+  .matter-item-label{font-weight:600;font-size:13.5px;color:var(--navy)}
+  .matter-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .chip{
+    display:inline-block;padding:1px 8px;border-radius:99px;font-size:10.5px;
+    font-weight:600;letter-spacing:.3px;
+  }
+  .chip-section{background:#fdecec;color:var(--red);border:1px solid #f0c8c8}
+  .chip-keyword{background:#e6f0ff;color:#1e50a0;border:1px solid #c7daf2}
+  .empty-state{padding:20px;text-align:center;color:var(--grey-500);font-size:13px;font-style:italic}
+
+  /* Digest */
+  .digest-totals{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px;
+  }
+  @media (max-width:640px){.digest-totals{grid-template-columns:1fr 1fr}}
+  .totals-tile{
+    background:linear-gradient(180deg,var(--grey-100),#fff);border:1px solid var(--grey-300);
+    border-radius:10px;padding:11px;text-align:center;
+  }
+  .totals-num{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--navy);line-height:1}
+  .totals-lbl{font-size:10px;font-weight:600;color:var(--grey-500);text-transform:uppercase;
+              letter-spacing:.4px;margin-top:4px;line-height:1.2}
+
+  .matter-block{margin-bottom:22px}
+  .matter-block-header{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:10px 14px;background:var(--navy);color:#fff;
+    border-radius:8px 8px 0 0;font-weight:700;font-size:14px;
+  }
+  .matter-block-header span{
+    background:rgba(240,196,79,.18);color:var(--gold-glow);
+    border-radius:99px;padding:1px 10px;font-size:11px;font-weight:700;
+  }
+  .matter-block-body{
+    background:var(--grey-100);border:1px solid var(--grey-300);border-top:0;
+    border-radius:0 0 8px 8px;padding:6px;
+  }
+
+  .ruling-card{
+    background:#fff;border:1px solid var(--grey-300);border-radius:6px;
+    padding:13px 16px;margin-bottom:6px;
+  }
+  .ruling-title{font-weight:700;font-size:14px;color:var(--navy);line-height:1.35}
+  .ruling-meta{font-size:11.5px;color:var(--grey-500);margin-top:3px;
+               display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .ruling-meta strong{color:var(--gold)}
+  .ruling-relevance{
+    background:var(--green-light);color:var(--green);padding:1px 8px;
+    border-radius:99px;font-size:11px;font-weight:700;
+  }
+  .ruling-reasons{
+    margin-top:8px;font-size:11px;color:var(--grey-500);font-style:italic;
+  }
+  .ruling-ratio{
+    margin-top:10px;font-size:13px;color:var(--grey-700);line-height:1.55;
+    padding:10px 12px;background:var(--grey-100);border-radius:6px;
+    border-left:3px solid var(--gold);
+  }
+  .ruling-impact{
+    margin-top:8px;font-size:12.5px;color:var(--navy);line-height:1.5;
+  }
+  .ruling-impact strong{color:var(--green)}
+
+  .none-yet{
+    background:var(--green-light);border:1px solid #c8e8d0;color:var(--green);
+    border-radius:6px;padding:11px 14px;font-size:13px;
+  }
+
+  /* Form messages */
+  .msg{margin-top:10px;padding:9px 12px;border-radius:6px;font-size:13px}
+  .msg.ok{background:var(--green-light);color:var(--green);border:1px solid #c8e8d0}
+  .msg.err{background:var(--red-light);color:var(--red);border:1px solid #f0c8c8}
+
+  .why-card{
+    background:linear-gradient(135deg,rgba(180,140,40,.06),rgba(180,140,40,.02));
+    border:1px solid rgba(180,140,40,.25);border-radius:12px;padding:18px 22px;
+    margin-top:32px;color:var(--grey-700);font-size:13.5px;line-height:1.6;
+  }
+  .why-card strong{color:var(--navy)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <a href="/" class="brand">
+      <div class="brand-mark">L</div>
+      <span class="brand-name">Lex-Indic</span>
+    </a>
+    <nav class="nav">
+      <a href="/">Landing</a>
+      <a href="/app">Analyze a case</a>
+      <a href="/convert">Convert IPC → BNS</a>
+      <a href="/monitors" style="color:var(--gold-glow)">Monitor</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <span class="eyebrow">Day-3 wedge feature</span>
+  <h1>Precedent Monitor</h1>
+  <p class="lead">
+    Register the matter areas you care about. Every day, Lex-Indic scans newly
+    reported Supreme Court rulings and surfaces the ones that touch your
+    sections or keywords — with a one-line ratio and a practice-impact note.
+    Same RAG discipline as the rest of the engine; every hit traces back to a
+    real citation.
+  </p>
+
+  <div class="grid">
+    <!-- Left: matter registration -->
+    <div>
+      <div class="card">
+        <h2><span class="card-num">1</span> Watch a new matter</h2>
+        <p class="help-text" style="margin-bottom:6px">
+          Give it a label, list the BNS / BNSS sections, and list any keywords
+          that should also trigger an alert (e.g. "chain snatching", "dowry death").
+        </p>
+        <label for="newLabel">Label</label>
+        <input id="newLabel" type="text" placeholder="e.g. Pune chain-snatching matters">
+
+        <label for="newSections">Sections (comma-separated)</label>
+        <input id="newSections" type="text" placeholder="BNS 304, BNS 309, BNSS 480">
+
+        <label for="newKeywords">Keywords (comma-separated)</label>
+        <input id="newKeywords" type="text" placeholder="snatching, robbery, chain snatching">
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="addBtn">+ Watch this matter</button>
+        </div>
+        <div id="addMsg"></div>
+      </div>
+
+      <div class="card" style="margin-top:18px">
+        <h2><span class="card-num">2</span> Your active watches</h2>
+        <div id="matterList" class="matter-list">
+          <div class="empty-state">Loading…</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:18px">
+        <h2><span class="card-num">3</span> Run today's digest</h2>
+        <p class="help-text">
+          Manually re-runs the matcher.  In production, schedule
+          <code style="background:var(--grey-200);padding:1px 5px;border-radius:3px">cron</code>
+          to hit <code style="background:var(--grey-200);padding:1px 5px;border-radius:3px">python3 -m monitors --save --print</code>
+          every morning and pipe the output to your email.
+        </p>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="runBtn">↻ Run digest now</button>
+          <a class="btn btn-ghost" href="/monitors/digest.txt">Plain-text digest</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: digest output -->
+    <div>
+      <div class="card">
+        <h2><span class="card-num">4</span> Today's matches</h2>
+        <div id="digest">
+          <div class="empty-state">Click <strong>Run digest now</strong> to see today's hits.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="why-card">
+    <strong>Why this beats Legora's Monitors for India:</strong>
+    Legora's Monitors track EU/UK regulation. There is no equivalent for
+    Indian Supreme Court precedent in any global legal-AI product. Every
+    Indian criminal advocate currently reads LiveLaw and Bar &amp; Bench by
+    hand — this gives them the same digest, filtered to the matter types
+    they actually litigate.
+  </div>
+</main>
+
+<script>
+  const fmtChip = (text, kind) => `<span class="chip chip-${kind}">${escapeHtml(text)}</span>`;
+
+  function escapeHtml(s){
+    return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  async function loadMatters(){
+    const resp = await fetch('/monitors/api/matters');
+    const data = await resp.json();
+    const el = document.getElementById('matterList');
+    if (!data.matters.length){
+      el.innerHTML = '<div class="empty-state">No active watches yet. Add one on the left.</div>';
+      return;
+    }
+    el.innerHTML = data.matters.map(m => `
+      <div class="matter-item">
+        <div style="flex:1;min-width:0">
+          <div class="matter-item-label">${escapeHtml(m.label)}</div>
+          <div class="matter-tags">
+            ${m.sections.map(s => fmtChip(s, 'section')).join('')}
+            ${m.keywords.map(k => fmtChip(k, 'keyword')).join('')}
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-small" onclick="removeMatter('${m.id}')">Remove</button>
+      </div>
+    `).join('');
+  }
+
+  async function removeMatter(id){
+    if (!confirm('Stop watching this matter?')) return;
+    const resp = await fetch(`/monitors/api/matters/${id}`, {method:'DELETE'});
+    if (resp.ok) loadMatters();
+  }
+
+  document.getElementById('addBtn').addEventListener('click', async () => {
+    const label = document.getElementById('newLabel').value.trim();
+    const sections = document.getElementById('newSections').value.split(',').map(s=>s.trim()).filter(Boolean);
+    const keywords = document.getElementById('newKeywords').value.split(',').map(s=>s.trim()).filter(Boolean);
+    const msg = document.getElementById('addMsg');
+    msg.innerHTML = '';
+    if (!label){
+      msg.innerHTML = '<div class="msg err">Please give the matter a label.</div>';
+      return;
+    }
+    if (!sections.length && !keywords.length){
+      msg.innerHTML = '<div class="msg err">Add at least one section OR one keyword.</div>';
+      return;
+    }
+    const resp = await fetch('/monitors/api/matters', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({label, sections, keywords}),
+    });
+    if (!resp.ok){
+      const e = await resp.json().catch(()=>({error:'Failed'}));
+      msg.innerHTML = `<div class="msg err">${escapeHtml(e.error || 'Failed to add')}</div>`;
+      return;
+    }
+    msg.innerHTML = '<div class="msg ok">✓ Watching this matter.</div>';
+    document.getElementById('newLabel').value = '';
+    document.getElementById('newSections').value = '';
+    document.getElementById('newKeywords').value = '';
+    loadMatters();
+  });
+
+  document.getElementById('runBtn').addEventListener('click', async () => {
+    document.getElementById('digest').innerHTML = '<div class="empty-state">Running…</div>';
+    const resp = await fetch('/monitors/api/digest');
+    const d = await resp.json();
+    renderDigest(d);
+  });
+
+  function renderDigest(d){
+    const el = document.getElementById('digest');
+    const t = d.totals;
+    const totals = `
+      <div class="digest-totals">
+        <div class="totals-tile"><div class="totals-num">${t.rulings_scanned}</div><div class="totals-lbl">Rulings scanned</div></div>
+        <div class="totals-tile"><div class="totals-num">${t.matters_count}</div><div class="totals-lbl">Watches</div></div>
+        <div class="totals-tile"><div class="totals-num">${t.matters_with_hits}</div><div class="totals-lbl">With hits</div></div>
+        <div class="totals-tile"><div class="totals-num">${t.total_hits}</div><div class="totals-lbl">Total hits</div></div>
+      </div>
+    `;
+
+    if (!d.matters.length){
+      el.innerHTML = totals + '<div class="empty-state">No watches yet. Register one on the left.</div>';
+      return;
+    }
+
+    const blocks = d.matters.map(b => {
+      const head = `
+        <div class="matter-block-header">
+          <span style="font-weight:700">${escapeHtml(b.matter.label)}</span>
+          <span>${b.hits.length} ${b.hits.length===1 ? 'hit' : 'hits'}</span>
+        </div>
+      `;
+      let body;
+      if (!b.hits.length){
+        body = '<div class="matter-block-body"><div class="none-yet">No new rulings touching this matter today.</div></div>';
+      } else {
+        body = '<div class="matter-block-body">' +
+          b.hits.map(h => {
+            const r = h.ruling;
+            return `
+              <div class="ruling-card">
+                <div style="display:flex;justify-content:space-between;align-items:start;gap:14px;flex-wrap:wrap">
+                  <div style="flex:1;min-width:0">
+                    <div class="ruling-title">${escapeHtml(r.title)}</div>
+                    <div class="ruling-meta">
+                      <strong>${escapeHtml(r.neutral_citation)}</strong>
+                      <span>· ${escapeHtml(r.court)}</span>
+                      <span>· ${escapeHtml(r.date)}</span>
+                      <span>· ${r.sections.map(s=>escapeHtml(s)).join(', ')}</span>
+                    </div>
+                  </div>
+                  <div class="ruling-relevance">${(h.score*100).toFixed(0)}%</div>
+                </div>
+                <div class="ruling-reasons">${h.reasons.join(' · ')}</div>
+                <div class="ruling-ratio">${escapeHtml(r.ratio)}</div>
+                <div class="ruling-impact"><strong>Practice impact: </strong>${escapeHtml(r.practice_impact)}</div>
+              </div>
+            `;
+          }).join('') + '</div>';
+      }
+      return `<div class="matter-block">${head}${body}</div>`;
+    }).join('');
+
+    el.innerHTML = totals + blocks;
+  }
+
+  loadMatters();
+</script>
+</body>
+</html>
