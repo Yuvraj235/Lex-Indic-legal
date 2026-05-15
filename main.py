@@ -53,6 +53,12 @@ from rich import box
 # ─── LOCAL MODULES ────────────────────────────────────────────────────────────
 # Our curated BNS knowledge base (the 'legal brain' we built)
 import data.bns_knowledge_base as kb
+# Day 11 — BNSS (procedure) + BSA (evidence) corpora.  Optional import: if the
+# file is absent, the RAG build still works with BNS-only.
+try:
+    import data.bnss_bsa_knowledge_base as bnss_bsa_kb
+except ImportError:
+    bnss_bsa_kb = None
 # Case summaries, circulars, and IPC-BNS mapping corpus
 import data.download_legal_corpus as corpus
 
@@ -258,13 +264,19 @@ def build_rag_knowledge_base() -> chromadb.Collection:
     # ── Load BNS Sections ─────────────────────────────────────────────────────
     bns_docs, bns_metas, bns_ids = kb.get_all_documents()
 
+    # ── Day 11: Load BNSS (procedure) + BSA (evidence) sections ──────────────
+    if bnss_bsa_kb is not None:
+        bnss_bsa_docs, bnss_bsa_metas, bnss_bsa_ids = bnss_bsa_kb.get_all_documents()
+    else:
+        bnss_bsa_docs, bnss_bsa_metas, bnss_bsa_ids = [], [], []
+
     # ── Load Case Summaries + Circulars + IPC-BNS Mappings ───────────────────
     corpus_docs, corpus_metas, corpus_ids = corpus.get_corpus_as_rag_documents()
 
     # ── Combine all sources ───────────────────────────────────────────────────
-    all_documents = bns_docs + corpus_docs
-    all_metadatas = bns_metas + corpus_metas
-    all_ids = bns_ids + corpus_ids
+    all_documents = bns_docs + bnss_bsa_docs + corpus_docs
+    all_metadatas = bns_metas + bnss_bsa_metas + corpus_metas
+    all_ids       = bns_ids  + bnss_bsa_ids  + corpus_ids
 
     console.print(f"[dim]Embedding {len(all_documents)} legal documents via Gemini API...[/dim]")
 
@@ -277,8 +289,9 @@ def build_rag_knowledge_base() -> chromadb.Collection:
 
     console.print(
         f"[green]✓[/green] Knowledge Base ready: "
-        f"[bold]{len(bns_docs)} BNS sections[/bold] + "
-        f"[bold]{len(corpus_docs)} case summaries/circulars/mappings[/bold] indexed."
+        f"[bold]{len(bns_docs)} BNS[/bold] + "
+        f"[bold]{len(bnss_bsa_docs)} BNSS+BSA[/bold] + "
+        f"[bold]{len(corpus_docs)} corpus[/bold] documents indexed."
     )
     return collection
 
@@ -301,14 +314,18 @@ def _normalize_source(rank: int, doc_id: str, doc: str, meta: dict, relevance: f
     each with its own metadata fields.
     """
     kind = (meta or {}).get("type")
-    if kind is None and doc_id.startswith("bns_"):
+    if kind is None and doc_id.startswith("bnss_"):
+        kind = "bnss_section"
+    elif kind is None and doc_id.startswith("bsa_"):
+        kind = "bsa_section"
+    elif kind is None and doc_id.startswith("bns_"):
         kind = "bns_section"
     elif kind is None:
         kind = "unknown"
 
     label = ""
-    if kind == "bns_section":
-        label = f"{meta.get('section', 'BNS')} — {meta.get('title', '')}"
+    if kind in ("bns_section", "bnss_section", "bsa_section"):
+        label = f"{meta.get('section', 'Section')} — {meta.get('title', '')}"
     elif kind == "case_summary":
         label = f"{meta.get('case_name', '')} ({meta.get('year', '')})"
     elif kind == "circular":
