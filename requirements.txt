@@ -6,3 +6,4 @@ rich==13.7.1
 flask
 groq
 pdfplumber
+python-docx

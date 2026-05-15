@@ -117,6 +117,93 @@ def app_page():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# ROUTE 1c: IPC → BNS converter (Day-1 from the Legora teardown).
+# Upload an old IPC-era pleading, get back a .docx with every IPC reference
+# highlighted yellow and the BNS equivalent inserted in red right after it.
+# Plain-text path also available for the in-page preview.
+# ═══════════════════════════════════════════════════════════════════════════════
+from ipc_bns_converter import convert_text, convert_docx
+
+
+@app.route("/convert")
+def convert_page():
+    """Drag-drop UI for the IPC→BNS converter."""
+    return render_template("convert.html")
+
+
+@app.route("/convert/text", methods=["POST"])
+def convert_text_endpoint():
+    """
+    Convert a piece of plain text (paste-and-preview path).
+    Accepts: { "text": "..." }
+    Returns: { "annotated": "...", "summary": {...} }
+    """
+    data = request.get_json() or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "Please paste some text to convert."}), 400
+    if len(text) > 200_000:
+        return jsonify({"error": "Text too large (limit 200,000 chars)."}), 400
+
+    annotated, summary = convert_text(text)
+    return jsonify({
+        "annotated": annotated,
+        "summary": summary.to_dict(),
+    })
+
+
+@app.route("/convert/upload", methods=["POST"])
+def convert_upload():
+    """
+    Accept a .docx upload, run the round-trip converter, return the new .docx
+    plus a JSON summary in a multipart-ish response — simplest path is to save
+    the new file to outputs/converted/ and return its filename + the summary.
+    """
+    from werkzeug.utils import secure_filename
+    from datetime import datetime
+
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded."}), 400
+
+    f = request.files["file"]
+    if not f.filename or not f.filename.lower().endswith(".docx"):
+        return jsonify({"error": "Only .docx files are supported."}), 400
+
+    try:
+        new_bytes, summary = convert_docx(f.stream)
+    except Exception as e:
+        return jsonify({"error": f"Conversion failed: {str(e)[:200]}"}), 500
+
+    # Save the converted file to outputs/converted/
+    out_dir = Path("outputs/converted")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    safe = secure_filename(f.filename).removesuffix(".docx") or "pleading"
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_name = f"{safe}_{ts}.bns.docx"
+    out_path = out_dir / out_name
+    with open(out_path, "wb") as out_f:
+        out_f.write(new_bytes)
+
+    return jsonify({
+        "filename": out_name,
+        "summary": summary.to_dict(),
+    })
+
+
+@app.route("/convert/download/<filename>")
+def convert_download(filename):
+    """Serve a converted .docx file from outputs/converted/."""
+    if not re.match(r"^[A-Za-z0-9_\-]+_\d{8}_\d{6}\.bns\.docx$", filename):
+        return "Invalid filename.", 400
+    return send_from_directory(
+        Path("outputs/converted").resolve(),
+        filename,
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # ROUTE 2: Run legal triage — the core API endpoint
 # ═══════════════════════════════════════════════════════════════════════════════
 @app.route("/analyze", methods=["POST"])
