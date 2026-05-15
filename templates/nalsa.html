@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>For NALSA Panel Advocates — Free — Lex-Indic</title>
+<meta name="description" content="Lex-Indic is free for NALSA-empanelled advocates. Process more legal-aid cases with faster BNS triage, Word add-in, and Hindi output.">
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --navy:#0f2850; --navy-deep:#0a1a35;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --green:#146432; --green-light:#e8f7ed;
+    --grey-100:#f6f7fb; --grey-200:#ecf0f7; --grey-300:#d9dde6;
+    --grey-500:#6b7280; --grey-700:#2d3748;
+    --red:#b41e1e; --red-light:#fff0f0;
+    --shadow-md:0 10px 30px -6px rgba(15,40,80,.18);
+    --shadow-lg:0 25px 60px -12px rgba(15,40,80,.35);
+    --ease:cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    color:var(--navy);background:#fff;line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* Top nav */
+  .top{
+    background:linear-gradient(135deg,var(--navy-deep),var(--navy));color:#fff;
+    padding:18px clamp(20px,4vw,40px);border-bottom:3px solid var(--gold);
+  }
+  .top-inner{
+    max-width:1180px;margin:0 auto;display:flex;justify-content:space-between;
+    align-items:center;gap:20px;flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff}
+  .brand-mark{
+    width:34px;height:34px;background:linear-gradient(135deg,var(--gold),var(--gold-glow));
+    border-radius:8px;display:grid;place-items:center;color:var(--navy-deep);
+    font-weight:900;font-size:18px;
+  }
+  .brand-name{font-weight:800;font-size:18px}
+  .top-nav{display:flex;gap:18px;font-size:14px}
+  .top-nav a{color:rgba(255,255,255,.78);text-decoration:none}
+  .top-nav a:hover{color:var(--gold-glow)}
+
+  /* Hero */
+  .hero{
+    background:
+      radial-gradient(ellipse at top right, rgba(180,140,40,.06), transparent 50%),
+      radial-gradient(ellipse at bottom left, rgba(20,100,50,.10), transparent 60%),
+      linear-gradient(180deg, var(--grey-100) 0%, #fff 50%);
+    padding:clamp(50px,8vh,90px) clamp(20px,4vw,40px) 50px;
+  }
+  .hero-inner{max-width:1100px;margin:0 auto}
+  .free-badge{
+    display:inline-flex;align-items:center;gap:8px;
+    background:linear-gradient(135deg, var(--green), #1a9850);
+    color:#fff;padding:7px 18px;border-radius:999px;
+    font-size:13px;font-weight:700;letter-spacing:.4px;
+    margin-bottom:18px;text-transform:uppercase;
+    box-shadow:0 6px 20px rgba(20,100,50,.25);
+  }
+  .free-badge::before{content:'';width:8px;height:8px;background:#fff;border-radius:50%}
+  h1{
+    font-family:'Playfair Display',serif;
+    font-size:clamp(34px,5vw,58px);font-weight:700;
+    line-height:1.1;letter-spacing:-.015em;
+    margin-bottom:18px;color:var(--navy);
+    max-width:880px;
+  }
+  h1 .accent{
+    background:linear-gradient(135deg, var(--green) 0%, var(--gold) 100%);
+    -webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent;
+  }
+  .lead{
+    font-size:clamp(15px,1.4vw,18px);color:var(--grey-700);
+    max-width:740px;margin-bottom:30px;line-height:1.65;
+  }
+
+  /* Stats strip */
+  .stats{
+    display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+    gap:22px;padding:24px 0;border-top:1px solid var(--grey-300);
+    margin-top:30px;
+  }
+  .stat-num{
+    font-family:'Playfair Display',serif;font-size:34px;font-weight:700;
+    color:var(--green);line-height:1;
+  }
+  .stat-lbl{
+    font-size:11.5px;color:var(--grey-500);text-transform:uppercase;
+    letter-spacing:.5px;margin-top:5px;font-weight:600;
+  }
+
+  /* Sections */
+  section{padding:clamp(40px,7vh,80px) clamp(20px,4vw,40px)}
+  .container{max-width:1100px;margin:0 auto}
+  .eyebrow{
+    display:inline-block;font-size:12px;font-weight:700;color:var(--gold);
+    text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;
+  }
+  h2{
+    font-family:'Playfair Display',serif;font-size:clamp(26px,3.5vw,38px);
+    font-weight:700;line-height:1.2;color:var(--navy);margin-bottom:14px;
+  }
+  .section-lead{
+    font-size:15.5px;color:var(--grey-700);max-width:720px;
+    margin-bottom:36px;line-height:1.65;
+  }
+
+  /* What you get cards */
+  .what-grid{
+    display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
+    gap:22px;
+  }
+  .what-card{
+    background:#fff;border:1px solid var(--grey-300);border-radius:14px;
+    padding:24px 26px;transition:all .4s var(--ease);
+  }
+  .what-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);border-color:var(--green)}
+  .what-card-icon{
+    width:48px;height:48px;
+    background:linear-gradient(135deg, var(--green), #1a9850);
+    color:#fff;border-radius:12px;display:grid;place-items:center;
+    margin-bottom:16px;font-size:22px;
+  }
+  .what-card h3{font-size:17px;font-weight:700;color:var(--navy);margin-bottom:8px}
+  .what-card p{font-size:14px;color:var(--grey-700);line-height:1.6}
+
+  /* Registration form */
+  .form-wrap{
+    background:linear-gradient(135deg, var(--grey-100) 0%, #fff 80%);
+  }
+  .form-card{
+    background:#fff;border:1px solid var(--grey-300);border-radius:18px;
+    padding:36px clamp(24px,5vw,44px);box-shadow:var(--shadow-lg);max-width:760px;
+    margin:0 auto;
+  }
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:600px){.form-row{grid-template-columns:1fr}}
+  .field{margin-bottom:16px}
+  label{display:block;font-size:13px;font-weight:600;color:var(--navy);margin-bottom:6px}
+  label .req{color:var(--red);margin-left:3px}
+  .help-text{font-size:12px;color:var(--grey-500);margin-top:4px;line-height:1.45}
+  input[type=text], input[type=email], input[type=tel], input[type=number], select{
+    width:100%;padding:11px 13px;border:1px solid var(--grey-300);
+    border-radius:8px;background:#fff;font-family:inherit;font-size:14px;
+    color:var(--navy);transition:border-color .2s, box-shadow .2s;
+  }
+  input:focus, select:focus{
+    outline:none;border-color:var(--green);
+    box-shadow:0 0 0 3px rgba(20,100,50,.12);
+  }
+  .checkbox-row{display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:var(--grey-700);line-height:1.55}
+  .checkbox-row input{width:18px;height:18px;margin-top:2px;flex-shrink:0}
+
+  .practice-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .practice-chip{
+    cursor:pointer;background:var(--grey-100);border:1px solid var(--grey-300);
+    border-radius:99px;padding:6px 13px;font-size:12.5px;color:var(--grey-700);
+    transition:all .2s;user-select:none;
+  }
+  .practice-chip.active{
+    background:var(--green-light);color:var(--green);
+    border-color:var(--green);font-weight:600;
+  }
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    padding:13px 28px;font-family:inherit;font-size:14px;font-weight:600;
+    border:none;border-radius:10px;cursor:pointer;transition:all .25s var(--ease);
+    text-decoration:none;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg, var(--green), #1a9850);
+    color:#fff;box-shadow:0 5px 18px rgba(20,100,50,.30);
+    width:100%;padding:14px;
+  }
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(20,100,50,.45)}
+  .btn-primary:disabled{opacity:.6;cursor:not-allowed;transform:none}
+
+  /* Success / error messages */
+  .msg{padding:14px 18px;border-radius:10px;font-size:14px;margin-bottom:18px}
+  .msg.ok{background:var(--green-light);color:var(--green);border:1px solid #c8e8d0}
+  .msg.err{background:var(--red-light);color:var(--red);border:1px solid #f0c8c8}
+
+  /* Constitutional callout */
+  .const-card{
+    background:linear-gradient(135deg, rgba(20,100,50,.06), rgba(20,100,50,.02));
+    border:1px solid rgba(20,100,50,.25);border-radius:14px;
+    padding:22px 26px;margin-top:30px;
+    color:var(--grey-700);font-size:14.5px;line-height:1.7;
+  }
+  .const-card strong{color:var(--green)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <a href="/" class="brand">
+      <div class="brand-mark">L</div>
+      <span class="brand-name">Lex-Indic</span>
+    </a>
+    <nav class="top-nav">
+      <a href="/">Landing</a>
+      <a href="/app">Analyze a case</a>
+      <a href="/convert">Convert IPC → BNS</a>
+      <a href="/nalsa" style="color:var(--gold-glow)">For NALSA</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-inner">
+    <div class="free-badge">Free for NALSA empanelled advocates</div>
+    <h1>Process more legal-aid cases<br>without <span class="accent">higher fees</span>.</h1>
+    <p class="lead">
+      Lex-Indic is a constitutional-grade legal-aid tool for India's ~70,000
+      NALSA panel advocates.  Run BNS triage in 7 seconds, draft FIRs and
+      legal notices on your letterhead, and get every citation traced to a
+      verified knowledge base — at zero cost to you or your client.  Built
+      for the Article 39A workload, not a $20M ARR roadmap.
+    </p>
+
+    <div class="stats">
+      <div>
+        <div class="stat-num">₹0</div>
+        <div class="stat-lbl">For NALSA panel · forever</div>
+      </div>
+      <div>
+        <div class="stat-num">7s</div>
+        <div class="stat-lbl">Per-case triage time</div>
+      </div>
+      <div>
+        <div class="stat-num">हिन्दी</div>
+        <div class="stat-lbl">Output in Hindi available</div>
+      </div>
+      <div>
+        <div class="stat-num">100%</div>
+        <div class="stat-lbl">DPDP-compliant audit log</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────── What you get ─────────── -->
+<section>
+  <div class="container">
+    <span class="eyebrow">Included in the NALSA tier</span>
+    <h2>Everything in Lex-Indic, no asterisks.</h2>
+    <p class="section-lead">
+      Same engine as paying customers.  No throttle, no watermark.  Because
+      we believe affordable legal aid in India is a constitutional commitment,
+      not a freemium funnel.
+    </p>
+
+    <div class="what-grid">
+      <div class="what-card">
+        <div class="what-card-icon">⚖️</div>
+        <h3>Full BNS analysis engine</h3>
+        <p>38 curated BNS sections, 6 court-ready output sections per case
+        (advisory · charges · strategy · FIR draft · legal notice · police
+        help report), 9-page PDF case brief on your letterhead.</p>
+      </div>
+      <div class="what-card">
+        <div class="what-card-icon">🛡</div>
+        <h3>Citation provenance</h3>
+        <p>Every BNS section we cite is a clickable badge linking back to
+        the verified KB entry.  Indian Kanoon / SCC Online cross-references
+        included.  The senior advocate reviewing your draft audits in seconds.</p>
+      </div>
+      <div class="what-card">
+        <div class="what-card-icon">📝</div>
+        <h3>Word add-in</h3>
+        <p>Convert IPC-era pleadings to BNS inside Word.  Yellow-highlight
+        every IPC reference and insert the BNS equivalent in red next to it.
+        Ctrl+Z to undo the whole conversion in one step.</p>
+      </div>
+      <div class="what-card">
+        <div class="what-card-icon">हि</div>
+        <h3>Hindi output</h3>
+        <p>One-click toggle to generate the full analysis in Devanagari.
+        BNS citations and technical terms stay in English — the standard
+        form for HC pleadings under Article 348(2).</p>
+      </div>
+      <div class="what-card">
+        <div class="what-card-icon">🔭</div>
+        <h3>SC precedent monitor</h3>
+        <p>Register the matter areas you cover for legal aid (snatching,
+        matrimonial, juvenile, etc.).  Daily digest of new Supreme Court
+        rulings touching those areas, with one-line ratio and practice impact.</p>
+      </div>
+      <div class="what-card">
+        <div class="what-card-icon">📜</div>
+        <h3>DPDP-compliant audit</h3>
+        <p>Every request logged with SHA-256-hashed client story, retrieved
+        sections, and timing.  Your SLSA can audit your usage at any time;
+        no raw client text is stored anywhere.</p>
+      </div>
+    </div>
+
+    <div class="const-card">
+      <strong>Why we do this:</strong>  Article 39A of the Constitution
+      makes free legal aid a state obligation.  The Legal Services
+      Authorities Act 1987 created NALSA to operationalise it.  Panel
+      advocates carry a real workload at flat fees that don't scale —
+      a software tool can't fix the funding, but it can take the
+      ~3 hours/case of cross-referencing and drafting off the lawyer
+      so they can take the next case.
+    </div>
+  </div>
+</section>
+
+<!-- ─────────── Registration form ─────────── -->
+<section class="form-wrap" id="register">
+  <div class="container">
+    <div class="form-card">
+      <span class="eyebrow">Step 1 of 2</span>
+      <h2>Claim your free NALSA panel access</h2>
+      <p class="section-lead" style="margin-bottom:20px">
+        We don't auto-verify — instead we collect your panel ID and SLSA so
+        the firm can spot-check against your authority's published panel list.
+        Your data stays in India and is shared only with your SLSA on request.
+      </p>
+
+      <div id="formMsg"></div>
+
+      <form id="nalsaForm" autocomplete="on" novalidate>
+        <div class="form-row">
+          <div class="field">
+            <label for="full_name">Full name <span class="req">*</span></label>
+            <input type="text" id="full_name" name="full_name" required maxlength="120">
+          </div>
+          <div class="field">
+            <label for="bar_council_no">Bar Council number <span class="req">*</span></label>
+            <input type="text" id="bar_council_no" name="bar_council_no" required
+                   placeholder="e.g. MAH/1234/2010">
+            <div class="help-text">State code / number / year, or your enrolment number.</div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="field">
+            <label for="panel_id">SLSA panel ID <span class="req">*</span></label>
+            <input type="text" id="panel_id" name="panel_id" required
+                   placeholder="As issued by your SLSA">
+          </div>
+          <div class="field">
+            <label for="slsa">State / UT Legal Services Authority <span class="req">*</span></label>
+            <select id="slsa" name="slsa" required>
+              <option value="">— select —</option>
+              {% for s in slsas %}
+              <option value="{{ s }}">{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="field">
+            <label for="email">Email <span class="req">*</span></label>
+            <input type="email" id="email" name="email" required maxlength="120">
+          </div>
+          <div class="field">
+            <label for="phone">Phone <span class="req">*</span></label>
+            <input type="tel" id="phone" name="phone" required placeholder="+91 98xxxxxxxx">
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Practice areas (click all that apply)</label>
+          <div class="practice-chips" id="practiceChips">
+            <span class="practice-chip" data-value="criminal">Criminal</span>
+            <span class="practice-chip" data-value="matrimonial">Matrimonial</span>
+            <span class="practice-chip" data-value="bail">Bail applications</span>
+            <span class="practice-chip" data-value="juvenile">Juvenile justice</span>
+            <span class="practice-chip" data-value="domestic_violence">Domestic violence</span>
+            <span class="practice-chip" data-value="dowry">Dowry / 84/85</span>
+            <span class="practice-chip" data-value="poscso">POCSO</span>
+            <span class="practice-chip" data-value="trafficking">Trafficking</span>
+            <span class="practice-chip" data-value="general">General legal aid</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="case_volume_monthly">Cases per month (approximate)</label>
+          <input type="number" id="case_volume_monthly" name="case_volume_monthly"
+                 min="0" max="500" placeholder="e.g. 12">
+        </div>
+
+        <div class="field">
+          <label class="checkbox-row">
+            <input type="checkbox" id="consent_to_contact" name="consent_to_contact" required>
+            <span>
+              I consent to Lex-Indic contacting my SLSA to verify my panel
+              membership.  I understand that my Bar Council number, panel ID,
+              and SLSA name may be shared with the relevant Authority for
+              that purpose only.  This is required to maintain the free tier
+              for legitimate NALSA panel advocates.
+            </span>
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="submitBtn">
+          Claim free NALSA access →
+        </button>
+
+        <div class="help-text" style="text-align:center;margin-top:12px">
+          Already registered? <a href="/app" style="color:var(--green);font-weight:600">Open the engine →</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Practice-area chips
+  const selectedAreas = new Set();
+  document.querySelectorAll('.practice-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const v = chip.dataset.value;
+      if (selectedAreas.has(v)) { selectedAreas.delete(v); chip.classList.remove('active'); }
+      else { selectedAreas.add(v); chip.classList.add('active'); }
+    });
+  });
+
+  function escapeHtml(s){
+    return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  document.getElementById('nalsaForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById('formMsg');
+    msg.innerHTML = '';
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+
+    const f = e.target;
+    const payload = {
+      full_name: f.full_name.value.trim(),
+      bar_council_no: f.bar_council_no.value.trim(),
+      panel_id: f.panel_id.value.trim(),
+      slsa: f.slsa.value,
+      email: f.email.value.trim(),
+      phone: f.phone.value.trim(),
+      practice_areas: [...selectedAreas],
+      case_volume_monthly: parseInt(f.case_volume_monthly.value, 10) || 0,
+      consent_to_contact: f.consent_to_contact.checked,
+    };
+
+    try {
+      const resp = await fetch('/nalsa/api/register', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+      });
+      const data = await resp.json();
+      btn.disabled = false;
+      btn.textContent = 'Claim free NALSA access →';
+
+      if (!resp.ok || data.error){
+        msg.innerHTML = `<div class="msg err">${escapeHtml(data.error || 'Submission failed.')}</div>`;
+        return;
+      }
+      f.reset();
+      selectedAreas.clear();
+      document.querySelectorAll('.practice-chip.active').forEach(c => c.classList.remove('active'));
+      msg.innerHTML = `
+        <div class="msg ok">
+          <strong>Welcome, ${escapeHtml(data.registration.full_name)}.</strong> Your registration is recorded.
+          We'll spot-check with the ${escapeHtml(data.registration.slsa)} SLSA over the next 7 days.
+          In the meantime <a href="/app" style="color:var(--green);font-weight:700">open the engine →</a>
+          and start running cases — your tier is already active.
+        </div>
+      `;
+      window.scrollTo({top:0, behavior:'smooth'});
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = 'Claim free NALSA access →';
+      msg.innerHTML = `<div class="msg err">Network error: ${escapeHtml(err.message)}</div>`;
+    }
+  });
+</script>
+
+</body>
+</html>

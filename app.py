@@ -209,6 +209,7 @@ def convert_download(filename):
 # ═══════════════════════════════════════════════════════════════════════════════
 import monitors as monitors_module
 import i18n as i18n_module
+import nalsa as nalsa_module
 
 
 @app.route("/monitors")
@@ -276,6 +277,47 @@ def i18n_strings():
     if lang in ("en", "hi"):
         return jsonify(i18n_module.get_strings(lang))
     return jsonify(i18n_module.get_all())
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — NALSA panel onboarding (Day-5 from the Legora teardown).
+# Free tier for NALSA-empanelled advocates serving free legal aid.
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.route("/nalsa")
+def nalsa_page():
+    return render_template("nalsa.html", slsas=nalsa_module.SLSAS)
+
+
+@app.route("/nalsa/api/register", methods=["POST"])
+def nalsa_register():
+    payload = request.get_json() or {}
+    ok, error = nalsa_module.validate(payload)
+    if not ok:
+        return jsonify({"error": error}), 400
+    try:
+        reg = nalsa_module.register(payload)
+    except Exception as e:
+        return jsonify({"error": f"Could not save registration: {str(e)[:200]}"}), 500
+    return jsonify({"registration": reg.to_dict()})
+
+
+@app.route("/nalsa/api/stats")
+def nalsa_stats():
+    return jsonify(nalsa_module.stats())
+
+
+@app.route("/nalsa/api/export.csv")
+def nalsa_export_csv():
+    """SLSA spot-check CSV.  Production: gate behind admin auth."""
+    if os.getenv("NALSA_EXPORT_TOKEN"):
+        provided = request.headers.get("X-Export-Token", "")
+        if provided != os.getenv("NALSA_EXPORT_TOKEN"):
+            return ("Unauthorised.", 401)
+    csv_body = nalsa_module.export_csv()
+    response = make_response(csv_body)
+    response.headers["Content-Type"] = "text/csv; charset=utf-8"
+    response.headers["Content-Disposition"] = 'attachment; filename="nalsa-registry.csv"'
+    return response
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
