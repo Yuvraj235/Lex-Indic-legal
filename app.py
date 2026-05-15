@@ -213,6 +213,7 @@ import nalsa as nalsa_module
 import compliance as compliance_module
 import matters as matters_module
 import auth as auth_module
+import ecourts as ecourts_module
 
 
 @app.route("/monitors")
@@ -526,6 +527,35 @@ def auth_bind_firm():
         return jsonify({"error": "firm_id is required."}), 400
     ok = auth_module.bind_user_to_firm(user_id, firm_id, role=role)
     return jsonify({"ok": ok})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — e-Courts CNR lookup (Day-12).
+# Single page + 2 API endpoints.  Wire ECOURTS_PROVIDER=live + a real
+# adapter in production; ships with stub data for dev/demos.
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.route("/ecourts")
+def ecourts_page():
+    return render_template("ecourts.html", demos=ecourts_module.demo_cnrs())
+
+
+@app.route("/ecourts/api/lookup/<cnr>")
+def ecourts_lookup(cnr):
+    cnr_norm = ecourts_module.normalize_cnr(cnr)
+    if not ecourts_module.is_valid_cnr(cnr_norm):
+        return jsonify({
+            "error": "Invalid CNR. Format: SCCC + 2-digit unit + 6-digit case + 4-digit year (e.g. MHCC010012342024).",
+            "expected_format": "AAAA##NNNNNNYYYY (16 chars)",
+        }), 400
+    result = ecourts_module.fetch_cnr_status(cnr_norm)
+    if not result:
+        return jsonify({"error": f"CNR {cnr_norm} not found in the active provider."}), 404
+    return jsonify(result)
+
+
+@app.route("/ecourts/api/demos")
+def ecourts_demos():
+    return jsonify({"cases": ecourts_module.demo_cnrs()})
 
 
 # ─── Helper: current_user() used by any route that wants the firm tag ─────

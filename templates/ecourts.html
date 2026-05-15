@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>e-Courts CNR Lookup — Lex-Indic</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0f2850; --navy-deep:#0a1a35;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --green:#146432; --green-light:#e8f7ed;
+    --red:#b41e1e; --red-light:#fff0f0;
+    --amber:#fff7d6; --amber-text:#7a5a00;
+    --grey-100:#f6f7fb; --grey-200:#ecf0f7; --grey-300:#d9dde6;
+    --grey-500:#6b7280; --grey-700:#2d3748;
+    --shadow-md:0 10px 30px -8px rgba(15,40,80,.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,-apple-system,sans-serif;color:var(--navy);
+       background:var(--grey-100);line-height:1.6;min-height:100vh;
+       -webkit-font-smoothing:antialiased}
+  .top{background:linear-gradient(135deg,var(--navy-deep),var(--navy));color:#fff;
+       padding:18px clamp(20px,4vw,40px);border-bottom:3px solid var(--gold)}
+  .top-inner{max-width:1180px;margin:0 auto;display:flex;justify-content:space-between;
+             align-items:center;gap:20px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff}
+  .brand-mark{width:34px;height:34px;background:linear-gradient(135deg,var(--gold),var(--gold-glow));
+              border-radius:8px;display:grid;place-items:center;color:var(--navy-deep);
+              font-weight:900;font-size:18px}
+  .brand-name{font-weight:800;font-size:18px}
+  .nav{display:flex;gap:18px;font-size:14px}
+  .nav a{color:rgba(255,255,255,.78);text-decoration:none}
+  .nav a:hover{color:var(--gold-glow)}
+
+  main{max-width:1100px;margin:36px auto;padding:0 clamp(20px,4vw,40px)}
+  h1{font-family:'Playfair Display',serif;font-size:clamp(28px,3.5vw,40px);
+     line-height:1.15;font-weight:700;margin-bottom:8px}
+  .lead{color:var(--grey-700);font-size:15px;max-width:740px;margin-bottom:28px}
+
+  .lookup-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .lookup-row input{
+    flex:1;min-width:280px;padding:13px 16px;border:1px solid var(--grey-300);
+    border-radius:10px;background:#fff;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:15px;letter-spacing:1px;text-transform:uppercase;
+    color:var(--navy);transition:all .2s;
+  }
+  .lookup-row input:focus{outline:none;border-color:var(--gold);
+                           box-shadow:0 0 0 3px rgba(180,140,40,.12)}
+  .btn{display:inline-flex;align-items:center;gap:8px;
+       padding:13px 22px;font-family:inherit;font-size:14px;font-weight:600;
+       border:none;border-radius:10px;cursor:pointer;text-decoration:none;
+       transition:all .2s}
+  .btn-primary{background:linear-gradient(135deg,var(--gold),var(--gold-light));
+               color:var(--navy-deep);box-shadow:0 4px 16px rgba(180,140,40,.25)}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(180,140,40,.45)}
+  .btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
+  .btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--grey-300);
+             font-size:12px;padding:7px 12px}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+
+  .demos{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:24px;font-size:12.5px;color:var(--grey-500)}
+  .demos strong{color:var(--navy);margin-right:8px}
+
+  .err{margin-top:14px;padding:11px 14px;border-radius:8px;font-size:13.5px;
+       background:var(--red-light);color:var(--red);border:1px solid #f0c8c8}
+
+  /* Result card */
+  .case-card{
+    background:#fff;border:1px solid var(--grey-300);border-radius:14px;
+    overflow:hidden;margin-top:18px;box-shadow:var(--shadow-md);
+  }
+  .case-head{
+    background:linear-gradient(135deg,var(--navy),var(--navy-deep));color:#fff;
+    padding:22px 24px;
+  }
+  .case-head .cnr{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;
+    color:var(--gold-glow);letter-spacing:1px;text-transform:uppercase;
+  }
+  .case-head h2{font-family:'Playfair Display',serif;font-size:24px;
+                font-weight:700;margin:6px 0 4px}
+  .case-head .court{font-size:13.5px;color:rgba(255,255,255,.78)}
+  .case-head .judge{font-size:12.5px;color:rgba(255,255,255,.55);margin-top:3px;font-style:italic}
+
+  .case-meta{
+    display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+    gap:0;padding:0;border-bottom:1px solid var(--grey-300);
+  }
+  .meta-tile{padding:14px 18px;border-right:1px solid var(--grey-300)}
+  .meta-tile:last-child{border-right:none}
+  .meta-label{font-size:10.5px;font-weight:700;color:var(--grey-500);
+              text-transform:uppercase;letter-spacing:.5px}
+  .meta-value{font-size:14px;color:var(--navy);font-weight:600;margin-top:3px}
+  .meta-value .chip{display:inline-block;padding:2px 8px;border-radius:99px;
+                    font-size:10.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase}
+  .chip-pending{background:var(--amber);color:var(--amber-text)}
+  .chip-disposed{background:var(--green-light);color:var(--green)}
+  .chip-transferred{background:var(--grey-200);color:var(--grey-700)}
+
+  .case-body{padding:22px 24px}
+  .case-body h3{font-size:13px;font-weight:700;color:var(--gold);
+                text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+
+  .sections{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:22px}
+  .sec-chip{background:#fdecec;color:var(--red);border:1px solid #f0c8c8;
+            padding:4px 11px;border-radius:99px;font-size:12px;font-weight:600;
+            font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  .last-order{
+    background:var(--amber);border:1px solid #f5e0a0;border-radius:10px;
+    padding:13px 16px;margin-bottom:22px;
+  }
+  .last-order .lo-date{font-size:11.5px;color:var(--amber-text);font-weight:700;
+                       text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+  .last-order .lo-text{font-size:13.5px;color:#5a4500;line-height:1.55}
+
+  /* Timeline */
+  .timeline{position:relative;padding-left:24px;margin-top:14px}
+  .timeline::before{content:'';position:absolute;left:8px;top:6px;bottom:6px;
+                    width:2px;background:var(--grey-300)}
+  .tl-event{position:relative;margin-bottom:14px;padding-left:8px}
+  .tl-event::before{content:'';position:absolute;left:-23px;top:6px;width:10px;height:10px;
+                    background:var(--gold);border:2px solid #fff;border-radius:50%;
+                    box-shadow:0 0 0 1px var(--grey-300)}
+  .tl-date{font-size:11.5px;color:var(--grey-500);font-weight:600}
+  .tl-purpose{font-size:13.5px;color:var(--navy);font-weight:600}
+  .tl-desc{font-size:12.5px;color:var(--grey-700);margin-top:3px;line-height:1.5}
+
+  .source-stamp{
+    font-size:11.5px;color:var(--grey-500);text-align:right;padding:10px 24px;
+    border-top:1px solid var(--grey-300);background:var(--grey-100);
+  }
+  .source-stamp code{background:#fff;padding:1px 6px;border-radius:3px;border:1px solid var(--grey-300)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <a href="/" class="brand">
+      <div class="brand-mark">L</div>
+      <span class="brand-name">Lex-Indic</span>
+    </a>
+    <nav class="nav">
+      <a href="/">Landing</a>
+      <a href="/app">Analyze a case</a>
+      <a href="/matters">Matters</a>
+      <a href="/ecourts" style="color:var(--gold-glow)">e-Courts</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <h1>e-Courts CNR Lookup</h1>
+  <p class="lead">
+    Type a 16-character Case Number Record to fetch case status, next hearing,
+    parties, sections invoked, and order history.  Production deployments wire
+    a real provider via <code style="background:var(--grey-200);padding:1px 6px;border-radius:3px">ECOURTS_PROVIDER=live</code> —
+    this build ships with three sample CNRs so the UI flow can be demoed offline.
+  </p>
+
+  <div class="lookup-row">
+    <input id="cnr" type="text" maxlength="16" placeholder="MHCC010012342024" autocomplete="off">
+    <button class="btn btn-primary" id="lookupBtn">Look up →</button>
+  </div>
+
+  <div class="demos">
+    <strong>Try a demo:</strong>
+    {% for c in demos %}
+      <button class="btn btn-ghost" onclick="lookupDemo('{{ c.cnr }}')">{{ c.cnr }}</button>
+    {% endfor %}
+  </div>
+
+  <div id="result"></div>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const escapeHtml = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  function lookupDemo(cnr){
+    $('cnr').value = cnr;
+    lookup();
+  }
+
+  async function lookup(){
+    const cnr = $('cnr').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const out = $('result');
+    out.innerHTML = '';
+    if (!cnr){
+      out.innerHTML = '<div class="err">Enter a CNR.</div>';
+      return;
+    }
+    $('lookupBtn').disabled = true;
+    $('lookupBtn').textContent = 'Looking up…';
+    try {
+      const r = await fetch('/ecourts/api/lookup/' + encodeURIComponent(cnr));
+      const d = await r.json();
+      $('lookupBtn').disabled = false;
+      $('lookupBtn').textContent = 'Look up →';
+      if (!r.ok || d.error){
+        out.innerHTML = `<div class="err">${escapeHtml(d.error || 'Lookup failed')}</div>`;
+        return;
+      }
+      render(d);
+    } catch (e) {
+      $('lookupBtn').disabled = false;
+      $('lookupBtn').textContent = 'Look up →';
+      out.innerHTML = `<div class="err">Network error: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  function render(c){
+    const statusClass = `chip-${c.status}`;
+    const out = $('result');
+    out.innerHTML = `
+      <div class="case-card">
+        <div class="case-head">
+          <div class="cnr">${escapeHtml(c.cnr)}</div>
+          <h2>${escapeHtml(c.petitioner)} v. ${escapeHtml(c.respondent)}</h2>
+          <div class="court">${escapeHtml(c.court)}</div>
+          <div class="judge">${escapeHtml(c.judge)}</div>
+        </div>
+
+        <div class="case-meta">
+          <div class="meta-tile">
+            <div class="meta-label">Case</div>
+            <div class="meta-value">${escapeHtml(c.case_type)}<br><span style="font-family:ui-monospace,Menlo;font-size:12px;color:var(--grey-500);font-weight:400">${escapeHtml(c.case_number)}</span></div>
+          </div>
+          <div class="meta-tile">
+            <div class="meta-label">Status</div>
+            <div class="meta-value"><span class="chip ${statusClass}">${escapeHtml(c.status)}</span></div>
+          </div>
+          <div class="meta-tile">
+            <div class="meta-label">Filed</div>
+            <div class="meta-value">${escapeHtml(c.filing_date)}</div>
+          </div>
+          <div class="meta-tile">
+            <div class="meta-label">Next hearing</div>
+            <div class="meta-value">${escapeHtml(c.next_hearing_date || '—')}</div>
+          </div>
+        </div>
+
+        <div class="case-body">
+          ${c.sections && c.sections.length ? `
+            <h3>Sections invoked</h3>
+            <div class="sections">
+              ${c.sections.map(s => `<span class="sec-chip">${escapeHtml(s)}</span>`).join('')}
+            </div>
+          ` : ''}
+
+          ${c.last_order_summary ? `
+            <h3>Last order</h3>
+            <div class="last-order">
+              <div class="lo-date">${escapeHtml(c.last_order_date)}</div>
+              <div class="lo-text">${escapeHtml(c.last_order_summary)}</div>
+            </div>
+          ` : ''}
+
+          ${c.hearings && c.hearings.length ? `
+            <h3>Hearing timeline</h3>
+            <div class="timeline">
+              ${c.hearings.map(h => `
+                <div class="tl-event">
+                  <div class="tl-date">${escapeHtml(h.date)}</div>
+                  <div class="tl-purpose">${escapeHtml(h.purpose)}</div>
+                  ${h.description ? `<div class="tl-desc">${escapeHtml(h.description)}</div>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="source-stamp">
+          Source: <code>${escapeHtml(c.source)}</code> · Fetched: ${escapeHtml(c.fetched_at)}
+        </div>
+      </div>
+    `;
+  }
+
+  $('lookupBtn').addEventListener('click', lookup);
+  $('cnr').addEventListener('keydown', e => { if (e.key === 'Enter') lookup(); });
+</script>
+</body>
+</html>
