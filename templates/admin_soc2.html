@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOC 2 Readiness — Lex-Indic Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0f2850; --navy-deep:#0a1a35;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --green:#146432; --green-light:#e8f7ed;
+    --red:#b41e1e; --red-light:#fff0f0;
+    --grey-100:#f6f7fb; --grey-200:#ecf0f7; --grey-300:#d9dde6;
+    --grey-500:#6b7280; --grey-700:#2d3748;
+    --shadow-md:0 10px 30px -8px rgba(15,40,80,.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    color:var(--navy);background:var(--grey-100);
+    line-height:1.6;min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .top{
+    background:linear-gradient(135deg,var(--navy-deep),var(--navy));color:#fff;
+    padding:14px 24px;border-bottom:3px solid var(--gold);
+  }
+  .top-inner{display:flex;justify-content:space-between;align-items:center;gap:20px;max-width:1280px;margin:0 auto}
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff}
+  .brand-mark{
+    width:30px;height:30px;background:linear-gradient(135deg,var(--gold),var(--gold-glow));
+    border-radius:7px;display:grid;place-items:center;color:var(--navy-deep);
+    font-weight:900;font-size:16px;
+  }
+  .top-title{
+    font-family:'Playfair Display',serif;font-size:18px;font-weight:700;
+  }
+  .top-pill{
+    background:rgba(240,196,79,.18);color:var(--gold-glow);
+    padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.6px;
+  }
+
+  main{max-width:1280px;margin:30px auto;padding:0 24px}
+
+  /* Summary row */
+  .summary{
+    display:grid;grid-template-columns:repeat(4, 1fr);gap:14px;margin-bottom:24px;
+  }
+  @media (max-width:760px){.summary{grid-template-columns:1fr 1fr}}
+  .sum-tile{
+    background:#fff;border:1px solid var(--grey-300);border-radius:12px;
+    padding:18px 20px;
+  }
+  .sum-num{
+    font-family:'Playfair Display',serif;font-size:36px;font-weight:700;
+    line-height:1;color:var(--navy);
+  }
+  .sum-num.green{color:var(--green)}
+  .sum-num.red{color:var(--red)}
+  .sum-lbl{font-size:11.5px;font-weight:600;color:var(--grey-500);
+           text-transform:uppercase;letter-spacing:.4px;margin-top:6px}
+  .sum-help{font-size:12px;color:var(--grey-500);margin-top:6px;line-height:1.5}
+
+  .actions{margin-bottom:24px;display:flex;gap:10px;flex-wrap:wrap}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:9px 16px;font-family:inherit;font-size:13px;font-weight:600;
+    border:none;border-radius:8px;cursor:pointer;text-decoration:none;
+    transition:all .2s;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg,var(--gold),var(--gold-light));
+    color:var(--navy-deep);box-shadow:0 3px 10px rgba(180,140,40,.20);
+  }
+  .btn-primary:hover{transform:translateY(-1px)}
+  .btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--grey-300)}
+
+  /* Controls grouped by TSC */
+  .tsc-group{margin-bottom:28px}
+  .tsc-head{
+    font-size:13px;font-weight:700;color:var(--navy);
+    text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;
+    padding-bottom:6px;border-bottom:2px solid var(--gold);
+  }
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;
+        overflow:hidden;box-shadow:var(--shadow-md);border:1px solid var(--grey-300)}
+  thead{background:var(--navy);color:#fff}
+  thead th{padding:12px 14px;text-align:left;font-size:11.5px;
+           font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+  tbody tr{border-top:1px solid var(--grey-200)}
+  tbody tr:hover{background:var(--grey-100)}
+  tbody td{padding:14px;vertical-align:top;font-size:13.5px}
+  .ctl-id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+          font-size:11.5px;color:var(--gold);font-weight:700}
+  .ctl-title{font-weight:600;color:var(--navy);margin-bottom:4px}
+  .ctl-desc{font-size:12.5px;color:var(--grey-500);line-height:1.55}
+  .ctl-pointer{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+               font-size:11px;color:var(--grey-500);background:var(--grey-100);
+               padding:2px 6px;border-radius:3px}
+  .status-pill{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:4px 12px;border-radius:99px;font-size:12px;font-weight:700;
+    white-space:nowrap;
+  }
+  .status-pill.pass{background:var(--green-light);color:var(--green);border:1px solid #c8e8d0}
+  .status-pill.fail{background:var(--red-light);color:var(--red);border:1px solid #f0c8c8}
+  .ctl-note{font-size:12.5px;color:var(--grey-700);margin-top:4px;line-height:1.5}
+  .ctl-evidence{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+                font-size:11px;color:var(--grey-500);margin-top:6px;
+                padding:6px 8px;background:var(--grey-100);border-radius:4px;
+                word-break:break-all;}
+
+  /* Why */
+  .why-card{
+    background:linear-gradient(135deg, rgba(180,140,40,.06), rgba(180,140,40,.02));
+    border:1px solid rgba(180,140,40,.25);border-radius:12px;
+    padding:18px 22px;margin-bottom:24px;
+    color:var(--grey-700);font-size:13.5px;line-height:1.65;
+  }
+  .why-card strong{color:var(--navy)}
+
+  .stamp{font-size:11.5px;color:var(--grey-500);margin-top:18px;text-align:right}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <a href="/" class="brand">
+      <div class="brand-mark">L</div>
+      <span class="top-title">Lex-Indic Admin · SOC 2 Readiness</span>
+    </a>
+    <span class="top-pill">Internal · Pre-audit</span>
+  </div>
+</header>
+
+<main>
+  <div class="why-card">
+    <strong>What this dashboard does:</strong>  Runs the 10 SOC 2 controls
+    defined in <code style="background:var(--grey-200);padding:1px 6px;border-radius:3px">tools/soc2/controls.py</code>
+    and reports their live status.  Take a snapshot to persist evidence to
+    <code style="background:var(--grey-200);padding:1px 6px;border-radius:3px">outputs/soc2_evidence/</code>
+    — this builds the continuous-operation trail an AICPA auditor will
+    require during the Type II observation window.  Schedule
+    <code style="background:var(--grey-200);padding:1px 6px;border-radius:3px">python3 tools/soc2/controls.py --save</code>
+    on cron (hourly) once you engage Vanta or Drata.
+  </div>
+
+  <div class="summary">
+    <div class="sum-tile">
+      <div class="sum-num" id="totalNum">—</div>
+      <div class="sum-lbl">Controls defined</div>
+      <div class="sum-help">5 Trust Service Criteria (Security, Confidentiality, Privacy)</div>
+    </div>
+    <div class="sum-tile">
+      <div class="sum-num green" id="passedNum">—</div>
+      <div class="sum-lbl">Passing now</div>
+      <div class="sum-help">Recheck on every page load.</div>
+    </div>
+    <div class="sum-tile">
+      <div class="sum-num red" id="failedNum">—</div>
+      <div class="sum-lbl">Failing</div>
+      <div class="sum-help">Investigate before SOC 2 audit window starts.</div>
+    </div>
+    <div class="sum-tile">
+      <div class="sum-num" style="font-size:18px;line-height:1.4" id="lastCheck">—</div>
+      <div class="sum-lbl">Last checked (UTC)</div>
+      <div class="sum-help">Auto-refreshes every minute.</div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="snapshotBtn">📸 Take evidence snapshot</button>
+    <button class="btn btn-ghost" id="refreshBtn">↻ Re-run checks now</button>
+    <a class="btn btn-ghost" href="/admin/soc2/snapshots">Browse saved snapshots</a>
+    <a class="btn btn-ghost" href="/admin/soc2/summary.json">Raw JSON</a>
+    <span style="flex:1"></span>
+    <span style="font-size:12px;color:var(--grey-500);align-self:center">
+      CLI: <code style="background:var(--grey-200);padding:1px 6px;border-radius:3px">python3 tools/soc2/controls.py --save</code>
+    </span>
+  </div>
+
+  <div id="controls"></div>
+
+  <div class="stamp">Lex-Indic v1.4 · SOC 2 readiness scaffolding</div>
+</main>
+
+<script>
+  async function loadControls(){
+    const resp = await fetch('/admin/soc2/summary.json');
+    const data = await resp.json();
+    document.getElementById('totalNum').textContent = data.total;
+    document.getElementById('passedNum').textContent = data.passed;
+    document.getElementById('failedNum').textContent = data.failed;
+    document.getElementById('lastCheck').textContent = data.checked_at.replace('T', ' ').slice(0,19);
+
+    // Group by TSC
+    const byTsc = {};
+    for (const r of data.rows){
+      (byTsc[r.tsc] = byTsc[r.tsc] || []).push(r);
+    }
+    const wrap = document.getElementById('controls');
+    wrap.innerHTML = Object.keys(byTsc).map(tsc => `
+      <div class="tsc-group">
+        <div class="tsc-head">${escapeHtml(tsc)}</div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:100px">Control</th>
+              <th>Title &amp; description</th>
+              <th style="width:110px">Status</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${byTsc[tsc].map(r => `
+              <tr>
+                <td>
+                  <div class="ctl-id">${escapeHtml(r.id)}</div>
+                  <div class="ctl-pointer" style="margin-top:4px">${escapeHtml(r.pointer)}</div>
+                </td>
+                <td>
+                  <div class="ctl-title">${escapeHtml(r.title)}</div>
+                  <div class="ctl-desc">${escapeHtml(r.description)}</div>
+                </td>
+                <td>
+                  <span class="status-pill ${r.passed ? 'pass' : 'fail'}">
+                    ${r.passed ? '✓ PASS' : '✗ FAIL'}
+                  </span>
+                </td>
+                <td>
+                  <div class="ctl-note">${escapeHtml(r.note)}</div>
+                  ${r.evidence ? `<div class="ctl-evidence">${escapeHtml(r.evidence)}</div>` : ''}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `).join('');
+  }
+
+  function escapeHtml(s){
+    return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', loadControls);
+  document.getElementById('snapshotBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('snapshotBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const r = await fetch('/admin/soc2/snapshot', {method:'POST'});
+      const d = await r.json();
+      alert('Snapshot saved: ' + d.path);
+    } catch (e) {
+      alert('Snapshot failed: ' + e.message);
+    } finally {
+      btn.disabled = false; btn.textContent = '📸 Take evidence snapshot';
+      loadControls();
+    }
+  });
+
+  loadControls();
+  setInterval(loadControls, 60_000);
+</script>
+</body>
+</html>

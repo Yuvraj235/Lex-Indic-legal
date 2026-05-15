@@ -352,6 +352,67 @@ def trust_posture_json():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — SOC 2 readiness scaffolding (Day-7 from the Legora teardown).
+# Internal admin dashboard + evidence-snapshot trail.  Token-gated in prod.
+# ═══════════════════════════════════════════════════════════════════════════════
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).parent / "tools" / "soc2"))
+import controls as soc2_module
+
+
+def _require_admin():
+    """Tiny token-gate so the admin dashboard isn't world-readable in prod.
+    Set ADMIN_TOKEN in .env; pass it via ?token=… or X-Admin-Token header.
+    If ADMIN_TOKEN is unset (dev), allow without a check."""
+    expected = os.getenv("ADMIN_TOKEN")
+    if not expected:
+        return None  # dev mode — no gate
+    provided = request.args.get("token") or request.headers.get("X-Admin-Token", "")
+    if provided != expected:
+        return ("Unauthorised. Set ADMIN_TOKEN and pass it via X-Admin-Token.", 401)
+    return None
+
+
+@app.route("/admin/soc2")
+def admin_soc2_page():
+    guard = _require_admin()
+    if guard: return guard
+    return render_template("admin_soc2.html")
+
+
+@app.route("/admin/soc2/summary.json")
+def admin_soc2_summary():
+    guard = _require_admin()
+    if guard: return guard
+    return jsonify(soc2_module.summary())
+
+
+@app.route("/admin/soc2/snapshot", methods=["POST"])
+def admin_soc2_snapshot():
+    guard = _require_admin()
+    if guard: return guard
+    path = soc2_module.save_evidence_snapshot()
+    return jsonify({"path": str(path.relative_to(Path.cwd())) if path.is_absolute() else str(path)})
+
+
+@app.route("/admin/soc2/snapshots")
+def admin_soc2_snapshots():
+    guard = _require_admin()
+    if guard: return guard
+    snap_dir = Path("outputs/soc2_evidence")
+    if not snap_dir.exists():
+        return jsonify({"snapshots": []})
+    snaps = sorted(snap_dir.glob("*.json"), reverse=True)
+    return jsonify({
+        "snapshots": [
+            {"file": p.name, "size": p.stat().st_size,
+             "mtime": datetime.fromtimestamp(p.stat().st_mtime).isoformat(timespec="seconds")}
+            for p in snaps[:50]
+        ]
+    })
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # ROUTES 1d-h: Microsoft Word Add-in (Day-2 from the Legora teardown).
 # Office Add-ins load HTML/JS in an iframe inside Word's task pane.  We serve:
 #   /addin/install      → human-facing sideload instructions
