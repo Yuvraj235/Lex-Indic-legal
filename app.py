@@ -214,6 +214,7 @@ import compliance as compliance_module
 import matters as matters_module
 import auth as auth_module
 import ecourts as ecourts_module
+import llm_provider as llm_provider_module
 
 
 @app.route("/monitors")
@@ -558,6 +559,16 @@ def ecourts_demos():
     return jsonify({"cases": ecourts_module.demo_cnrs()})
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — LLM provider status (Day-13).
+# Tells the operator which inference backend is active and whether Ollama
+# is reachable.  Used by /admin pages and the trust page.
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.route("/llm/status")
+def llm_status():
+    return jsonify(llm_provider_module.status())
+
+
 # ─── Helper: current_user() used by any route that wants the firm tag ─────
 def _current_user() -> dict | None:
     token = request.cookies.get("lex_session", "")
@@ -806,28 +817,43 @@ def analyze():
         # Day-4: if Hindi requested, append the Hindi system instruction.
         # We layer it as a separate system message so the original LEXI prompt
         # stays untouched and we can A/B the Hindi tail in isolation.
-        messages = [{"role": "system", "content": LEXI_SYSTEM_PROMPT}]
+        system_messages = [LEXI_SYSTEM_PROMPT]
         if language == "hi":
-            messages.append({"role": "system", "content": i18n_module.HINDI_SYSTEM_INSTRUCTION})
-        messages.append({"role": "user", "content": prompt})
+            system_messages.append(i18n_module.HINDI_SYSTEM_INSTRUCTION)
 
         ai_response = None
-        for attempt in range(4):
-            try:
-                completion = groq_client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=messages,
-                    temperature=0.2,
-                    max_tokens=8192,
-                )
-                ai_response = completion.choices[0].message.content
-                break
-            except Exception as e:
-                err = str(e)
-                if ("429" in err or "rate_limit" in err.lower()) and attempt < 3:
-                    time.sleep(20 * (attempt + 1))
-                else:
-                    raise
+        # Day-13: route through llm_provider so Ollama users get local inference
+        # with zero sub-processors.  Groq remains the default; ollama users set
+        # LLM_PROVIDER=ollama in .env.
+        if llm_provider_module.get_provider() == "ollama":
+            result = llm_provider_module.complete(
+                system_messages=system_messages,
+                user_message=prompt,
+                temperature=0.2,
+                max_tokens=8192,
+                timeout_s=180,
+            )
+            ai_response = result["text"]
+        else:
+            # Groq path (unchanged): keep the rate-limit retry loop
+            messages = [{"role": "system", "content": s} for s in system_messages]
+            messages.append({"role": "user", "content": prompt})
+            for attempt in range(4):
+                try:
+                    completion = groq_client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=messages,
+                        temperature=0.2,
+                        max_tokens=8192,
+                    )
+                    ai_response = completion.choices[0].message.content
+                    break
+                except Exception as e:
+                    err = str(e)
+                    if ("429" in err or "rate_limit" in err.lower()) and attempt < 3:
+                        time.sleep(20 * (attempt + 1))
+                    else:
+                        raise
 
         if not ai_response:
             return jsonify({"error": "AI model did not return a response. Try again."}), 500
