@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trust & Compliance — Lex-Indic</title>
+<meta name="description" content="DPDP Act 2023 + information-security compliance posture. Built for the firm GC's first question: where does the data live, who sees it.">
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --navy:#0f2850; --navy-deep:#0a1a35;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --green:#146432; --green-light:#e8f7ed;
+    --red:#b41e1e; --red-light:#fff0f0;
+    --grey-100:#f6f7fb; --grey-200:#ecf0f7; --grey-300:#d9dde6;
+    --grey-500:#6b7280; --grey-700:#2d3748;
+    --shadow-md:0 10px 30px -8px rgba(15,40,80,.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    color:var(--navy);background:#fff;line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  .top{
+    background:linear-gradient(135deg,var(--navy-deep),var(--navy));color:#fff;
+    padding:18px clamp(20px,4vw,40px);border-bottom:3px solid var(--gold);
+  }
+  .top-inner{
+    max-width:1180px;margin:0 auto;display:flex;justify-content:space-between;
+    align-items:center;gap:20px;flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff}
+  .brand-mark{
+    width:34px;height:34px;background:linear-gradient(135deg,var(--gold),var(--gold-glow));
+    border-radius:8px;display:grid;place-items:center;color:var(--navy-deep);
+    font-weight:900;font-size:18px;
+  }
+  .brand-name{font-weight:800;font-size:18px}
+  .top-nav{display:flex;gap:18px;font-size:14px}
+  .top-nav a{color:rgba(255,255,255,.78);text-decoration:none}
+  .top-nav a:hover{color:var(--gold-glow)}
+
+  .hero{
+    background:linear-gradient(180deg, var(--grey-100) 0%, #fff 60%);
+    padding:60px clamp(20px,4vw,40px) 40px;
+    border-bottom:1px solid var(--grey-300);
+  }
+  .container{max-width:1100px;margin:0 auto}
+  .eyebrow{
+    display:inline-block;font-size:12px;font-weight:700;color:var(--gold);
+    text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;
+  }
+  h1{
+    font-family:'Playfair Display',serif;font-size:clamp(30px,4vw,46px);
+    line-height:1.1;font-weight:700;margin-bottom:14px;letter-spacing:-.01em;
+  }
+  .lead{font-size:16px;color:var(--grey-700);max-width:760px;margin-bottom:24px}
+
+  .badge-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+  .badge{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;
+    background:var(--green-light);color:var(--green);
+    border:1px solid #c8e8d0;
+  }
+  .badge.amber{background:#fff7d6;color:#7a5a00;border-color:#f5e0a0}
+
+  .meta-row{
+    display:flex;flex-wrap:wrap;gap:18px;
+    color:var(--grey-500);font-size:13px;margin-top:14px;
+  }
+  .meta-row strong{color:var(--navy)}
+
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:11px 22px;font-family:inherit;font-size:14px;font-weight:600;
+    border:none;border-radius:10px;cursor:pointer;text-decoration:none;
+    transition:all .25s;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg,var(--gold),var(--gold-light));
+    color:var(--navy-deep);box-shadow:0 4px 16px rgba(180,140,40,.25);
+  }
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(180,140,40,.45)}
+  .btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--grey-300)}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+
+  section{padding:50px clamp(20px,4vw,40px)}
+  section.bg{background:var(--grey-100)}
+
+  h2{
+    font-family:'Playfair Display',serif;font-size:clamp(24px,3vw,34px);
+    font-weight:700;line-height:1.15;color:var(--navy);margin-bottom:14px;
+  }
+  .section-lead{font-size:15px;color:var(--grey-700);max-width:780px;margin-bottom:30px}
+
+  /* Data flow */
+  .flow{display:flex;flex-direction:column;gap:14px}
+  .flow-step{
+    display:grid;grid-template-columns:120px 1fr auto;gap:18px;align-items:start;
+    background:#fff;border:1px solid var(--grey-300);border-radius:12px;
+    padding:18px 22px;
+  }
+  @media (max-width:640px){.flow-step{grid-template-columns:1fr;gap:8px}}
+  .flow-stage{
+    font-family:'Playfair Display',serif;font-size:18px;font-weight:700;
+    color:var(--gold);line-height:1.2;
+  }
+  .flow-actor{font-size:11.5px;color:var(--grey-500);text-transform:uppercase;letter-spacing:.5px}
+  .flow-what{font-size:14px;color:var(--grey-700);margin-top:6px}
+  .flow-data{font-size:12px;color:var(--grey-500);margin-top:6px}
+  .flow-data code{background:var(--grey-200);padding:1px 6px;border-radius:3px}
+  .flow-jurisdiction{
+    background:var(--green-light);color:var(--green);
+    padding:4px 10px;border-radius:99px;font-size:11px;font-weight:700;
+    white-space:nowrap;height:fit-content;border:1px solid #c8e8d0;
+  }
+  .flow-jurisdiction.leaves{background:#fff7d6;color:#7a5a00;border-color:#f5e0a0}
+
+  /* Q&A */
+  .qa-block{margin-bottom:32px}
+  .qa-category{
+    font-size:13px;font-weight:700;color:var(--gold);
+    text-transform:uppercase;letter-spacing:1.2px;margin-bottom:14px;
+    padding-bottom:6px;border-bottom:2px solid var(--gold);
+  }
+  details{
+    background:#fff;border:1px solid var(--grey-300);border-radius:10px;
+    margin-bottom:8px;overflow:hidden;
+  }
+  details[open]{box-shadow:var(--shadow-md);border-color:var(--gold)}
+  summary{
+    cursor:pointer;padding:14px 18px;font-weight:600;color:var(--navy);
+    font-size:14.5px;line-height:1.45;list-style:none;
+    display:flex;align-items:flex-start;gap:10px;
+  }
+  summary::-webkit-details-marker{display:none}
+  summary::before{
+    content:'+';flex-shrink:0;width:22px;height:22px;
+    background:var(--navy);color:var(--gold-glow);border-radius:5px;
+    display:grid;place-items:center;font-weight:700;font-size:14px;
+    transition:transform .2s;
+  }
+  details[open] summary::before{content:'−';transform:rotate(0)}
+  .qa-answer{padding:0 18px 16px 50px;color:var(--grey-700);font-size:14px;line-height:1.7}
+
+  /* Final CTA */
+  .cta-card{
+    background:linear-gradient(135deg, var(--navy) 0%, var(--navy-deep) 100%);
+    color:#fff;border-radius:18px;padding:34px 36px;
+    display:grid;grid-template-columns:2fr 1fr;gap:30px;align-items:center;
+    margin-top:30px;
+  }
+  @media (max-width:760px){.cta-card{grid-template-columns:1fr}}
+  .cta-card h3{font-family:'Playfair Display',serif;font-size:22px;margin-bottom:8px}
+  .cta-card p{color:rgba(255,255,255,.78);font-size:14.5px;line-height:1.6}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <a href="/" class="brand">
+      <div class="brand-mark">L</div>
+      <span class="brand-name">Lex-Indic</span>
+    </a>
+    <nav class="top-nav">
+      <a href="/">Landing</a>
+      <a href="/app">Analyze a case</a>
+      <a href="/nalsa">For NALSA</a>
+      <a href="/trust" style="color:var(--gold-glow)">Trust</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="container">
+    <span class="eyebrow">Day-6 wedge feature</span>
+    <h1>Trust &amp; Compliance Posture</h1>
+    <p class="lead">
+      Built for the firm GC's first question: <strong>where does the data
+      live, and who sees it?</strong>  Below: data-flow map, 28 procurement
+      questions answered, downloadable .docx compliance pack for your
+      records.  India-jurisdiction first; sub-processors are optional.
+    </p>
+    <div class="badge-row">
+      <span class="badge">✓ DPDP Act 2023 aligned</span>
+      <span class="badge">✓ India-region default</span>
+      <span class="badge">✓ Append-only audit log</span>
+      <span class="badge">✓ Zero data-for-training</span>
+      <span class="badge amber">⌛ SOC 2 — Q3 2026 target</span>
+    </div>
+    <a href="/trust/pack.docx" class="btn btn-primary">⬇ Download .docx compliance pack</a>
+    <div class="meta-row">
+      <span><strong>Product:</strong> {{ posture.product }}</span>
+      <span><strong>Last updated:</strong> {{ posture.last_updated }}</span>
+      <span><strong>DPO:</strong> {{ posture.contact_dpo }}</span>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────── Data flow ─────────── -->
+<section>
+  <div class="container">
+    <span class="eyebrow">1. Data flow</span>
+    <h2>Every byte's journey.</h2>
+    <p class="section-lead">
+      Standard on-prem deployment. The two stages marked <strong>"Leaves
+      India"</strong> can be eliminated by switching to the local-Ollama
+      path (Llama-3.3-70B + sentence-transformers running on your own GPU),
+      bringing the data-residency story to 100%.
+    </p>
+    <div class="flow">
+      {% for s in data_flow %}
+      <div class="flow-step">
+        <div>
+          <div class="flow-stage">{{ s.stage }}</div>
+          <div class="flow-actor">{{ s.actor }}</div>
+        </div>
+        <div>
+          <div class="flow-what">{{ s.what }}</div>
+          <div class="flow-data">Data: <code>{{ s.data }}</code></div>
+        </div>
+        <span class="flow-jurisdiction {{ 'leaves' if s.leaves_jurisdiction else '' }}">
+          {{ 'Leaves India' if s.leaves_jurisdiction else 'In-region' }}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ─────────── Procurement Q&A ─────────── -->
+<section class="bg">
+  <div class="container">
+    <span class="eyebrow">2. Procurement questionnaire</span>
+    <h2>The 28 questions your GC will ask.</h2>
+    <p class="section-lead">
+      Pre-filled answers for the standard DPDP Act + InfoSec questionnaire.
+      Click any row to expand the answer. The same content is in the
+      downloadable .docx pack above.
+    </p>
+
+    {% set ns = namespace(current_cat=None) %}
+    {% for q in questions %}
+      {% if q.category != ns.current_cat %}
+        {% if not loop.first %}</div>{% endif %}
+        <div class="qa-block">
+          <div class="qa-category">{{ q.category }}</div>
+        {% set ns.current_cat = q.category %}
+      {% endif %}
+      <details>
+        <summary>{{ q.q }}</summary>
+        <div class="qa-answer">{{ q.a }}</div>
+      </details>
+      {% if loop.last %}</div>{% endif %}
+    {% endfor %}
+  </div>
+</section>
+
+<!-- ─────────── Final CTA ─────────── -->
+<section>
+  <div class="container">
+    <div class="cta-card">
+      <div>
+        <h3>Sign with confidence.</h3>
+        <p>
+          Need this on letterhead for your case file?  Want to schedule a
+          security review call?  Need the on-prem deployment guide that
+          removes the two sub-processor stages?  All available via the DPO.
+        </p>
+      </div>
+      <div style="text-align:right">
+        <a href="/trust/pack.docx" class="btn btn-primary" style="margin-bottom:8px">Download .docx pack</a><br>
+        <a href="mailto:{{ posture.contact_dpo.split()[0] }}" class="btn btn-ghost" style="background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.25)">Contact the DPO</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

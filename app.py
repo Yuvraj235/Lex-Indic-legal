@@ -210,6 +210,7 @@ def convert_download(filename):
 import monitors as monitors_module
 import i18n as i18n_module
 import nalsa as nalsa_module
+import compliance as compliance_module
 
 
 @app.route("/monitors")
@@ -318,6 +319,36 @@ def nalsa_export_csv():
     response.headers["Content-Type"] = "text/csv; charset=utf-8"
     response.headers["Content-Disposition"] = 'attachment; filename="nalsa-registry.csv"'
     return response
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — Trust & Compliance (Day-6 from the Legora teardown).
+# Buyer-facing page + downloadable .docx pack for the firm GC.
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.route("/trust")
+def trust_page():
+    return render_template("trust.html", **compliance_module.to_dict())
+
+
+@app.route("/trust/pack.docx")
+def trust_pack_docx():
+    """Compile the procurement-grade .docx pack on-demand."""
+    body = compliance_module.build_pack_docx()
+    response = make_response(body)
+    response.headers["Content-Type"] = (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    response.headers["Content-Disposition"] = (
+        'attachment; filename="lex-indic-compliance-pack.docx"'
+    )
+    return response
+
+
+@app.route("/trust/posture.json")
+def trust_posture_json():
+    """Machine-readable version of the posture — for any procurement tool that
+    can ingest JSON instead of asking 28 questions by hand."""
+    return jsonify(compliance_module.to_dict())
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
