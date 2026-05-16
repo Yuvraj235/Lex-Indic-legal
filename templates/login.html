@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sign in — Lex-Indic</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/lex-design-system.css">
+
 <style>
   :root{
     --navy:#0f2850; --navy-deep:#0a1a35;
@@ -163,5 +165,6 @@
   $('email').addEventListener('keydown', e => { if (e.key === 'Enter') $('sendBtn').click(); });
   $('code').addEventListener('keydown', e => { if (e.key === 'Enter') $('verifyBtn').click(); });
 </script>
+<script src="/static/lex-design-system.js" defer></script>
 </body>
 </html>
