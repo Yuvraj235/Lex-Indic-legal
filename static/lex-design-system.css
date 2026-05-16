@@ -631,6 +631,47 @@ body.is-leaving { animation: ds-page-out var(--dur-fast) var(--ease-in-out) forw
 
 
 /* ════════════════════════════════════════════════════════════════════════
+   TOP PROGRESS BAR
+   2px gold bar that slides across the top during page navigation —
+   reads like a high-performance SaaS app's "we're still loading".
+   Driven by lex-design-system.js (click handler + onbeforeunload).
+   ════════════════════════════════════════════════════════════════════════ */
+#ds-progress {
+  position: fixed;
+  top: 0; left: 0;
+  height: 2px;
+  width: 0%;
+  background: linear-gradient(90deg, var(--colour-gold), var(--colour-gold-glow), var(--colour-gold));
+  background-size: 200% 100%;
+  box-shadow: 0 0 8px rgba(240, 196, 79, 0.6);
+  z-index: 10000;
+  pointer-events: none;
+  opacity: 0;
+  transition: width var(--dur-slow) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+}
+#ds-progress.active {
+  opacity: 1;
+  animation: ds-progress-shimmer 1.4s linear infinite;
+}
+@keyframes ds-progress-shimmer { from { background-position: 0 0; } to { background-position: 200% 0; } }
+
+/* ════════════════════════════════════════════════════════════════════════
+   SCROLL-PROGRESS BAR (bottom 2px of the viewport)
+   Reads the user's progress through long pages (trust, monitors).
+   ════════════════════════════════════════════════════════════════════════ */
+#ds-scroll-progress {
+  position: fixed;
+  bottom: 0; left: 0;
+  height: 2px;
+  width: 0%;
+  background: linear-gradient(90deg, var(--colour-navy), var(--colour-gold));
+  z-index: 999;
+  pointer-events: none;
+  transition: width 80ms linear;
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════
    FORCE REDUCED-MOTION SAFETY NET
    Every animation that's distracting must respect this.
    ════════════════════════════════════════════════════════════════════════ */

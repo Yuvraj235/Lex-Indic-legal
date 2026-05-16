@@ -32,35 +32,78 @@
   }
 
   /* ──────────────────────────────────────────────────────────────────────
-     2) Smooth page transitions — when a same-origin link is clicked,
-        fade the body out, navigate, fade back in (handled by CSS @keyframes
-        ds-page-in / ds-page-out).
+     2) Top progress bar — gold shimmer slides across during navigation
+        and any time JS calls window.dsProgress.start() / .done().
      ────────────────────────────────────────────────────────────────────── */
-  if (!reduceMotion) {
-    document.addEventListener('click', (e) => {
-      const a = e.target.closest('a');
-      if (!a) return;
-      if (a.target === '_blank' || a.hasAttribute('download')) return;
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-
-      const href = a.getAttribute('href');
-      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
-
-      // Same-origin only
-      try {
-        const url = new URL(href, window.location.href);
-        if (url.origin !== window.location.origin) return;
-        if (url.pathname === window.location.pathname && url.search === window.location.search) return;
-      } catch { return; }
-
-      e.preventDefault();
-      document.body.classList.add('is-leaving');
-      setTimeout(() => { window.location.href = href; }, 120);
-    });
-  }
+  const progressBar = document.createElement('div');
+  progressBar.id = 'ds-progress';
+  document.body.appendChild(progressBar);
+  let progressTimer = null;
+  window.dsProgress = {
+    start() {
+      progressBar.classList.add('active');
+      progressBar.style.width = '25%';
+      clearTimeout(progressTimer);
+      progressTimer = setTimeout(() => { progressBar.style.width = '70%'; }, 350);
+    },
+    done() {
+      progressBar.style.width = '100%';
+      setTimeout(() => {
+        progressBar.classList.remove('active');
+        progressBar.style.width = '0%';
+      }, 240);
+    },
+  };
 
   /* ──────────────────────────────────────────────────────────────────────
-     3) Toast helper — window.dsToast(message, kind)
+     3) Scroll-progress bar — thin gradient ticks along as the user scrolls.
+        Throttled via rAF so it doesn't fire on every scroll event.
+     ────────────────────────────────────────────────────────────────────── */
+  const scrollBar = document.createElement('div');
+  scrollBar.id = 'ds-scroll-progress';
+  document.body.appendChild(scrollBar);
+  let scrollRaf = null;
+  window.addEventListener('scroll', () => {
+    if (scrollRaf) return;
+    scrollRaf = requestAnimationFrame(() => {
+      const docH = document.documentElement.scrollHeight - window.innerHeight;
+      const pct = docH > 0 ? (window.scrollY / docH) * 100 : 0;
+      scrollBar.style.width = pct.toFixed(2) + '%';
+      scrollRaf = null;
+    });
+  }, { passive: true });
+
+  /* ──────────────────────────────────────────────────────────────────────
+     4) Smooth page transitions — when a same-origin link is clicked,
+        fade the body out, navigate, fade back in.  Also kicks off the
+        top progress bar so the user gets an immediate visual ack.
+     ────────────────────────────────────────────────────────────────────── */
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a');
+    if (!a) return;
+    if (a.target === '_blank' || a.hasAttribute('download')) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+    const href = a.getAttribute('href');
+    if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+
+    // Same-origin only
+    try {
+      const url = new URL(href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+      if (url.pathname === window.location.pathname && url.search === window.location.search) return;
+    } catch { return; }
+
+    window.dsProgress.start();
+    if (reduceMotion) return;  // honour reduced-motion: still progress bar, no fade
+
+    e.preventDefault();
+    document.body.classList.add('is-leaving');
+    setTimeout(() => { window.location.href = href; }, 140);
+  });
+
+  /* ──────────────────────────────────────────────────────────────────────
+     5) Toast helper — window.dsToast(message, kind)
         kind: 'ok' | 'err' | 'warn' (default neutral)
      ────────────────────────────────────────────────────────────────────── */
   let toastContainer = null;
@@ -89,7 +132,7 @@
   };
 
   /* ──────────────────────────────────────────────────────────────────────
-     4) Auto-focus rings on keyboard, not mouse.
+     6) Auto-focus rings on keyboard, not mouse.
         Body gets .ds-keyboard while the user is tabbing; CSS hooks can
         use it to draw stronger focus rings without affecting click users.
      ────────────────────────────────────────────────────────────────────── */
@@ -101,7 +144,7 @@
   });
 
   /* ──────────────────────────────────────────────────────────────────────
-     5) Tiny utility: convert a plain promise into a button "loading" state
+     7) Tiny utility: convert a plain promise into a button "loading" state
         Usage:   dsWithLoading(btnEl, () => fetch(...))
      ────────────────────────────────────────────────────────────────────── */
   window.dsWithLoading = async function dsWithLoading(btnEl, work) {
@@ -114,7 +157,7 @@
   };
 
   /* ──────────────────────────────────────────────────────────────────────
-     6) Mark the active nav link automatically based on URL.
+     8) Mark the active nav link automatically based on URL.
      ────────────────────────────────────────────────────────────────────── */
   const path = window.location.pathname;
   document.querySelectorAll('.ds-nav-link').forEach((a) => {
