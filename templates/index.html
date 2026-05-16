@@ -4,12 +4,558 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lex-Indic | BNS Transition Engine</title>
-  <!-- Bootstrap 5 CDN -->
+
+  <!-- Premium fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+
+  <!-- Lex-Indic design system -->
+  <link rel="stylesheet" href="/static/lex-design-system.css" />
+
+  <!-- Bootstrap (used for accordion + grid only — design system supersedes most styles) -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
-  <!-- Bootstrap Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
-  <!-- Our custom styles -->
   <link rel="stylesheet" href="/static/style.css" />
+
+  <!-- High-tech surface overlay — applied AFTER style.css so it wins. -->
+  <style>
+    /* Body becomes a layered cool-grey with a faint navy gradient at top */
+    body {
+      font-family: var(--font-sans);
+      background:
+        radial-gradient(ellipse at 0% 0%, rgba(15, 40, 80, 0.04), transparent 40%),
+        radial-gradient(ellipse at 100% 0%, rgba(180, 140, 40, 0.03), transparent 40%),
+        var(--colour-grey-100);
+      color: var(--colour-navy);
+    }
+
+    /* ── Top nav — glass-blurred over a subtle navy gradient ──────── */
+    #topnav {
+      background: var(--gradient-navy);
+      background-attachment: fixed;
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border-bottom: 1px solid rgba(180, 140, 40, 0.3);
+      box-shadow: 0 1px 0 rgba(15, 40, 80, 0.08), 0 8px 24px -16px rgba(15, 40, 80, 0.30);
+      padding: 12px 20px;
+      position: sticky; top: 0; z-index: 50;
+    }
+    .brand-lex { color: var(--colour-gold-glow); font-weight: 800; }
+    .brand-indic { color: #fff; font-weight: 700; }
+    .brand-sub { color: rgba(255,255,255,0.7); font-weight: 500; font-size: 12px; letter-spacing: 0.4px; text-transform: uppercase; }
+
+    /* ── Sidebar — softer borders, glass panel feel ───────────────── */
+    #sidebar {
+      background: linear-gradient(180deg, #1a2640 0%, #0f1d35 100%);
+      border-right: 1px solid rgba(255,255,255,0.05);
+      box-shadow: inset -1px 0 0 rgba(180,140,40,0.10);
+      width: 280px;
+      min-width: 280px;
+      color: #cdd5e2;
+    }
+    .sidebar-header { padding: 16px; }
+    .btn-new-case {
+      background: var(--gradient-gold);
+      color: var(--colour-navy-deep);
+      border: none;
+      border-radius: var(--radius-3);
+      font-weight: 600;
+      padding: 10px 14px;
+      box-shadow: var(--shadow-gold);
+      transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-base) var(--ease-out);
+    }
+    .btn-new-case:hover { transform: translateY(-1px); box-shadow: var(--shadow-gold-hover); color: var(--colour-navy-deep); }
+    .sidebar-section-title {
+      font-size: 10.5px; font-weight: 700; letter-spacing: 1.5px;
+      color: rgba(240, 196, 79, 0.85);
+      padding: 16px 16px 6px;
+      text-transform: uppercase;
+    }
+    .history-item {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--radius-3);
+      padding: 10px 12px;
+      margin: 0 12px 6px;
+      transition: all var(--dur-base) var(--ease-out);
+      cursor: pointer;
+    }
+    .history-item:hover {
+      background: rgba(240, 196, 79, 0.10);
+      border-color: rgba(240, 196, 79, 0.30);
+      transform: translateX(2px);
+    }
+    .history-date { font-size: 10.5px; color: rgba(255,255,255,0.55); font-weight: 600; margin-bottom: 4px; }
+    .history-snippet { font-size: 12px; color: rgba(255,255,255,0.82); line-height: 1.45;
+                       overflow: hidden; text-overflow: ellipsis;
+                       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .history-pdf-link { display: inline-block; margin-top: 6px; font-size: 11px;
+                        color: var(--colour-gold-glow); text-decoration: none;
+                        padding: 2px 8px; background: rgba(240,196,79,0.10);
+                        border-radius: 999px; transition: background var(--dur-fast) var(--ease-out); }
+    .history-pdf-link:hover { background: rgba(240,196,79,0.20); color: var(--colour-gold-glow); }
+
+    /* ── Main intake card — refined card with premium shadow ──────── */
+    .intake-card,
+    .results-header,
+    #resultsAccordion .accordion-item {
+      background: var(--colour-white);
+      border: 1px solid var(--colour-grey-300);
+      border-radius: var(--radius-5);
+      box-shadow: var(--shadow-2);
+      overflow: hidden;
+    }
+    .intake-card { padding: 24px 26px; }
+
+    .intake-title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+    .intake-title-row h4 {
+      font-family: var(--font-serif); font-weight: 700; font-size: 22px;
+      color: var(--colour-navy); margin: 0;
+    }
+    .intake-help { font-size: 13.5px; color: var(--colour-grey-500); margin-bottom: 18px; line-height: 1.55; }
+
+    /* Client Statement label refinement */
+    .label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .label-row label { font-size: 13px; font-weight: 600; color: var(--colour-navy); }
+
+    /* Textarea — refined surface, focus ring */
+    #clientStory, #editStory, #additionalInfo {
+      width: 100%;
+      padding: 14px 16px;
+      font-family: var(--font-sans); font-size: 14.5px; line-height: 1.6;
+      color: var(--colour-navy);
+      background: var(--colour-white);
+      border: 1px solid var(--colour-grey-300);
+      border-radius: var(--radius-4);
+      box-shadow: var(--shadow-inset);
+      resize: vertical;
+      min-height: 200px;
+      transition: border-color var(--dur-fast) var(--ease-out),
+                  box-shadow var(--dur-fast) var(--ease-out);
+    }
+    #clientStory:focus, #editStory:focus, #additionalInfo:focus {
+      outline: none; border-color: var(--colour-gold);
+      box-shadow: var(--focus-ring);
+    }
+
+    /* Attach evidence dropzone — looks like a clickable card */
+    .attach-area {
+      border: 1.5px dashed var(--colour-grey-300);
+      border-radius: var(--radius-4);
+      padding: 14px;
+      background: var(--colour-grey-100);
+      transition: border-color var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out);
+      cursor: pointer;
+    }
+    .attach-area:hover { border-color: var(--colour-gold); background: #fffbf0; }
+
+    /* Speak (voice) button */
+    .speak-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #fff; color: var(--colour-navy);
+      border: 1px solid var(--colour-grey-300);
+      border-radius: var(--radius-pill);
+      padding: 6px 14px; font-size: 12px; font-weight: 600;
+      cursor: pointer;
+      transition: all var(--dur-fast) var(--ease-out);
+    }
+    .speak-btn:hover { border-color: var(--colour-gold); color: var(--colour-gold); }
+    .speak-btn.listening { background: var(--colour-red); color: #fff; border-color: var(--colour-red); }
+
+    /* Analyze (run) button — premium gold gradient */
+    .btn-analyze {
+      background: var(--gradient-gold);
+      color: var(--colour-navy-deep);
+      border: none;
+      border-radius: var(--radius-4);
+      font-weight: 700; font-size: 14.5px;
+      padding: 13px 26px;
+      box-shadow: var(--shadow-gold);
+      transition: transform var(--dur-fast) var(--ease-spring),
+                  box-shadow var(--dur-base) var(--ease-out);
+      cursor: pointer;
+    }
+    .btn-analyze:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-gold-hover);
+      color: var(--colour-navy-deep);
+    }
+
+    /* Quick-test pill buttons */
+    .btn-outline-secondary {
+      background: #fff;
+      border: 1px solid var(--colour-grey-300) !important;
+      color: var(--colour-navy);
+      border-radius: var(--radius-pill);
+      padding: 6px 14px;
+      font-size: 12.5px;
+      transition: all var(--dur-fast) var(--ease-out);
+    }
+    .btn-outline-secondary:hover {
+      background: var(--colour-grey-100);
+      border-color: var(--colour-gold) !important;
+      color: var(--colour-gold);
+    }
+
+    /* Language radio (Day-4) */
+    .btn-check:checked + .btn-outline-secondary {
+      background: var(--colour-navy);
+      border-color: var(--colour-navy) !important;
+      color: var(--colour-gold-glow);
+    }
+
+    /* ── Results header — premium gradient ──────────────────────────── */
+    .results-header {
+      background: linear-gradient(135deg, #fff 0%, var(--colour-grey-100) 100%);
+      padding: 22px 26px;
+      border: 1px solid var(--colour-grey-300);
+      border-radius: var(--radius-5);
+    }
+    .results-header h4 {
+      font-family: var(--font-serif); font-weight: 700;
+      font-size: 22px; color: var(--colour-navy);
+    }
+    .btn-download {
+      background: var(--gradient-gold);
+      color: var(--colour-navy-deep);
+      border: none;
+      border-radius: var(--radius-3);
+      padding: 9px 18px;
+      font-weight: 600;
+      text-decoration: none;
+      box-shadow: var(--shadow-gold);
+      transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-base) var(--ease-out);
+    }
+    .btn-download:hover { transform: translateY(-1px); box-shadow: var(--shadow-gold-hover); color: var(--colour-navy-deep); }
+
+    /* Strength badge — animated gradient pulse */
+    #strengthBadge .badge {
+      padding: 9px 18px;
+      border-radius: var(--radius-pill);
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      font-size: 12.5px;
+      box-shadow: var(--shadow-2);
+    }
+    #strengthBadge .bg-success {
+      background: linear-gradient(135deg, #146432 0%, #1a9850 100%) !important;
+    }
+    #strengthBadge .bg-warning {
+      background: linear-gradient(135deg, #b87b00 0%, #d4a843 100%) !important;
+      color: #fff !important;
+    }
+    #strengthBadge .bg-danger {
+      background: linear-gradient(135deg, #b41e1e 0%, #d63838 100%) !important;
+    }
+
+    /* ── Sources panel — premium glass card ─────────────────────────── */
+    #sourcesPanel.sources-panel {
+      background:
+        linear-gradient(135deg, rgba(15, 40, 80, 0.03), rgba(180, 140, 40, 0.03)),
+        var(--colour-white);
+      border: 1px solid var(--colour-grey-300);
+      border-left: 4px solid var(--colour-gold);
+      border-radius: var(--radius-5);
+      padding: 18px 22px;
+      box-shadow: var(--shadow-2);
+    }
+    .sources-header {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--colour-navy);
+      letter-spacing: 0.2px;
+      margin-bottom: 14px;
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .sources-header strong { color: var(--colour-gold); font-weight: 700; }
+    .sources-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(244px, 1fr));
+      gap: 10px;
+    }
+
+    /* Source card refinement — glass tile with subtle hover lift */
+    .source-card {
+      background: #fff;
+      border: 1px solid var(--colour-grey-300);
+      border-radius: var(--radius-4);
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: transform var(--dur-base) var(--ease-out),
+                  box-shadow var(--dur-base) var(--ease-out),
+                  border-color var(--dur-base) var(--ease-out);
+      position: relative;
+      overflow: hidden;
+    }
+    .source-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(180,140,40,0.06), transparent 60%);
+      opacity: 0;
+      transition: opacity var(--dur-base) var(--ease-out);
+      pointer-events: none;
+    }
+    .source-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-3);
+      border-color: var(--colour-gold);
+    }
+    .source-card:hover::before { opacity: 1; }
+    .source-card-rank {
+      background: var(--gradient-navy);
+      color: var(--colour-gold-glow);
+      border-radius: var(--radius-pill);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 9px;
+      letter-spacing: 0.3px;
+    }
+    .source-card-kind { font-size: 10px; padding: 2px 7px; letter-spacing: 0.4px; }
+    .source-kind-bns_section { background: #fdecec; color: var(--colour-red); }
+    .source-kind-bnss_section { background: #e6f0ff; color: var(--colour-blue); }
+    .source-kind-bsa_section { background: #f5e8ff; color: var(--colour-purple); }
+    .source-kind-case_summary { background: var(--colour-blue-light); color: var(--colour-blue); }
+    .source-kind-circular { background: var(--colour-amber-light); color: var(--colour-amber); }
+    .source-kind-ipc_bns_mapping { background: var(--colour-green-light); color: var(--colour-green); }
+
+    .source-card-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--colour-navy);
+      margin-top: 6px;
+      line-height: 1.35;
+    }
+    .source-card-meta {
+      font-size: 11.5px;
+      color: var(--colour-grey-500);
+      margin-top: 3px;
+      line-height: 1.45;
+    }
+    .source-relevance-bar {
+      flex: 1;
+      height: 4px;
+      background: var(--colour-grey-200);
+      border-radius: var(--radius-pill);
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .source-relevance-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--colour-gold) 0%, #1a9850 100%);
+      border-radius: var(--radius-pill);
+      animation: fill-bar 1s var(--ease-out);
+    }
+    @keyframes fill-bar { from { width: 0; } }
+
+    /* ── Citation badges inline in analysis ─────────────────────────── */
+    .citation-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 1px 8px;
+      background: linear-gradient(135deg, #fffbf0 0%, #fff 100%);
+      border: 1px solid #ead4a0;
+      color: var(--colour-navy);
+      border-radius: var(--radius-2);
+      font-weight: 600;
+      font-size: 0.92em;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all var(--dur-fast) var(--ease-out);
+      white-space: nowrap;
+    }
+    .citation-badge:hover {
+      background: var(--gradient-gold);
+      color: var(--colour-navy-deep);
+      border-color: var(--colour-gold);
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(180, 140, 40, 0.25);
+    }
+    .citation-badge::after {
+      content: '✓';
+      font-size: 0.78em;
+      color: var(--colour-green);
+      margin-left: 2px;
+    }
+    .citation-badge:hover::after { color: var(--colour-navy-deep); }
+
+    /* ── Accordion (6 result sections) — modernized ─────────────────── */
+    .accordion-item { margin-top: 12px; border: 1px solid var(--colour-grey-300) !important; }
+    .accordion-button {
+      font-weight: 600;
+      padding: 16px 20px;
+      font-size: 14.5px;
+      border-radius: var(--radius-5) !important;
+      transition: all var(--dur-base) var(--ease-out);
+    }
+    .accordion-button:not(.collapsed) {
+      box-shadow: inset 0 -1px 0 rgba(0,0,0,0.05);
+    }
+    .accordion-button:focus { box-shadow: var(--focus-ring); }
+    .accordion-body {
+      padding: 22px 24px 26px;
+      font-size: 14.5px;
+      line-height: 1.7;
+    }
+    .accordion-body strong { color: var(--colour-navy); font-weight: 700; }
+
+    /* Each section gets its own accent colour bar at the left */
+    .section-advisory .accordion-body { border-left: 4px solid var(--colour-red); background: linear-gradient(90deg, var(--colour-red-light) 0%, transparent 8%); }
+    .section-legal    .accordion-body { border-left: 4px solid var(--colour-blue); background: linear-gradient(90deg, var(--colour-blue-light) 0%, transparent 8%); }
+    .section-strategy .accordion-body { border-left: 4px solid var(--colour-purple); background: linear-gradient(90deg, var(--colour-purple-light) 0%, transparent 8%); }
+    .section-fir      .accordion-body { border-left: 4px solid var(--colour-green); background: linear-gradient(90deg, var(--colour-green-light) 0%, transparent 8%); }
+    .section-notice   .accordion-body { border-left: 4px solid #146e6e; background: linear-gradient(90deg, #e3f7f7 0%, transparent 8%); }
+    .section-police   .accordion-body { border-left: 4px solid var(--colour-amber); background: linear-gradient(90deg, var(--colour-amber-light) 0%, transparent 8%); }
+
+    /* ── Source modal — premium glass overlay ───────────────────────── */
+    .resource-modal-overlay {
+      background: rgba(10, 26, 53, 0.55);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .resource-modal {
+      border-radius: var(--radius-6);
+      box-shadow: var(--shadow-4);
+      border: 1px solid rgba(255,255,255,0.4);
+      max-width: 760px;
+    }
+    .resource-modal-header {
+      background: var(--gradient-navy);
+      color: #fff;
+      border-radius: var(--radius-6) var(--radius-6) 0 0;
+      padding: 16px 22px;
+      border-bottom: 1px solid rgba(180,140,40,0.25);
+    }
+    .resource-modal-header h5 {
+      font-family: var(--font-serif);
+      font-weight: 700;
+      font-size: 18px;
+      margin: 0;
+      color: var(--colour-gold-glow);
+    }
+    .resource-modal-body { padding: 22px 24px; }
+    #sourceModalBody pre.source-raw {
+      background: var(--colour-grey-100);
+      border: 1px solid var(--colour-grey-300);
+      border-radius: var(--radius-3);
+      padding: 14px 16px;
+      font-size: 13px;
+      line-height: 1.6;
+      font-family: var(--font-mono);
+      color: var(--colour-navy);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      max-height: 360px;
+      overflow-y: auto;
+    }
+    .source-meta-row {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;
+    }
+    .source-meta-row span {
+      background: var(--colour-grey-100);
+      border-radius: var(--radius-2);
+      padding: 4px 10px;
+      font-size: 12px;
+      color: var(--colour-grey-700);
+      border: 1px solid var(--colour-grey-300);
+    }
+    .source-meta-row span strong { color: var(--colour-navy); margin-right: 4px; }
+    .source-bareact-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 14px;
+      padding: 8px 14px;
+      background: var(--gradient-navy);
+      color: var(--colour-gold-glow);
+      border-radius: var(--radius-3);
+      font-size: 12.5px; font-weight: 600;
+      text-decoration: none;
+      transition: opacity var(--dur-fast) var(--ease-out);
+    }
+    .source-bareact-link:hover { opacity: 0.92; color: var(--colour-gold-glow); }
+
+    /* ── LEXI chat bubble — premium floating action button ──────────── */
+    #lexiToggle, #chatToggle {
+      width: 60px; height: 60px;
+      background: var(--gradient-gold);
+      color: var(--colour-navy-deep);
+      border-radius: 50%;
+      box-shadow: var(--shadow-gold), 0 0 0 8px rgba(240, 196, 79, 0.10);
+      border: none;
+      transition: transform var(--dur-base) var(--ease-spring), box-shadow var(--dur-base) var(--ease-out);
+    }
+    #lexiToggle:hover, #chatToggle:hover {
+      transform: scale(1.08) rotate(-3deg);
+      box-shadow: var(--shadow-gold-hover), 0 0 0 10px rgba(240, 196, 79, 0.20);
+    }
+    #chatPanel {
+      border-radius: var(--radius-6);
+      box-shadow: var(--shadow-4);
+      border: 1px solid var(--colour-grey-300);
+      overflow: hidden;
+    }
+
+    /* Find Help card */
+    .find-help-card {
+      background: linear-gradient(135deg, var(--colour-grey-100) 0%, #fff 100%);
+      border: 1px solid var(--colour-grey-300);
+      border-radius: var(--radius-5);
+      padding: 18px 22px;
+      box-shadow: var(--shadow-2);
+    }
+    .find-help-title {
+      font-weight: 700;
+      color: var(--colour-navy);
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+    .find-help-body { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn-find-resource {
+      background: #fff;
+      color: var(--colour-navy);
+      border: 1px solid var(--colour-grey-300);
+      border-radius: var(--radius-3);
+      padding: 9px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--dur-fast) var(--ease-out);
+    }
+    .btn-find-resource:hover {
+      border-color: var(--colour-gold);
+      color: var(--colour-gold);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-2);
+    }
+    .btn-find-lawyer:hover { color: var(--colour-blue); border-color: var(--colour-blue); }
+
+    /* Disclaimer */
+    .alert-warning {
+      background: var(--colour-amber-light) !important;
+      border: 1px solid #f5e0a0 !important;
+      border-radius: var(--radius-4) !important;
+      color: #7a5a00 !important;
+      font-size: 12.5px;
+      padding: 12px 16px;
+      line-height: 1.55;
+    }
+
+    /* Smooth-scroll on the main content area */
+    .main-content { scroll-behavior: smooth; }
+
+    /* Skeleton loader inside the results panel */
+    #loadingPanel .ds-skeleton-block { margin-bottom: 10px; }
+
+    /* Subtle on-load fade for the whole results panel */
+    #resultsPanel:not(.d-none) {
+      animation: fade-up var(--dur-slow) var(--ease-out);
+    }
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
 </head>
 <body>
 
@@ -159,14 +705,63 @@
       </div>
     </div>
 
-    <!-- ── LOADING SPINNER ─────────────────────────────────────────────── -->
-    <div id="loadingPanel" class="d-none text-center py-5">
-      <div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;" role="status"></div>
-      <h5 class="text-primary">Running Legal Analysis...</h5>
-      <p class="text-muted">
-        Searching BNS knowledge base &rarr; Generating with Groq Llama-3.3-70B &rarr; Building PDF
-      </p>
-      <p class="text-muted small">(Usually takes 10–20 seconds)</p>
+    <!-- ── LOADING — skeleton screen + progress stages ──────────────────── -->
+    <div id="loadingPanel" class="d-none">
+      <!-- Progress stages -->
+      <div style="background:#fff;border:1px solid var(--colour-grey-300);border-radius:var(--radius-5);padding:24px 26px;box-shadow:var(--shadow-2);margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          <div class="ds-spinner ds-spinner-lg"></div>
+          <div>
+            <h5 style="font-family:var(--font-serif);font-weight:700;font-size:18px;color:var(--colour-navy);margin:0">
+              Running Legal Analysis
+            </h5>
+            <p style="margin:2px 0 0;font-size:12.5px;color:var(--colour-grey-500)">Usually 6–15 seconds</p>
+          </div>
+        </div>
+        <!-- Per-stage progress -->
+        <div id="loadStages" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:8px">
+          <div class="load-stage active" data-stage="rag">
+            <i class="bi bi-search"></i><span>Searching KB</span>
+          </div>
+          <div class="load-stage" data-stage="model">
+            <i class="bi bi-cpu"></i><span>Llama-3.3-70B</span>
+          </div>
+          <div class="load-stage" data-stage="render">
+            <i class="bi bi-file-earmark-text"></i><span>Drafting outputs</span>
+          </div>
+          <div class="load-stage" data-stage="pdf">
+            <i class="bi bi-file-pdf"></i><span>Building PDF</span>
+          </div>
+        </div>
+      </div>
+      <!-- Skeleton preview of the result -->
+      <div style="background:#fff;border:1px solid var(--colour-grey-300);border-radius:var(--radius-5);padding:18px 22px;box-shadow:var(--shadow-1)">
+        <div class="ds-skeleton ds-skeleton-line" style="width:35%;height:18px"></div>
+        <div class="ds-skeleton ds-skeleton-line"></div>
+        <div class="ds-skeleton ds-skeleton-line"></div>
+        <div class="ds-skeleton ds-skeleton-line short"></div>
+        <div class="ds-skeleton ds-skeleton-block" style="margin-top:14px"></div>
+      </div>
+      <style>
+        .load-stage {
+          display:flex;align-items:center;gap:8px;
+          padding:9px 12px;
+          background:var(--colour-grey-100);
+          border:1px solid var(--colour-grey-300);
+          border-radius:var(--radius-3);
+          font-size:12.5px;font-weight:600;
+          color:var(--colour-grey-500);
+          transition:all var(--dur-base) var(--ease-out);
+        }
+        .load-stage.active {
+          background:linear-gradient(135deg, rgba(180,140,40,.08), rgba(180,140,40,.02));
+          border-color:var(--colour-gold);
+          color:var(--colour-navy);
+          box-shadow:0 0 0 2px rgba(180,140,40,.10);
+        }
+        .load-stage.done { color:var(--colour-green); border-color:#c8e8d0; background:var(--colour-green-light); }
+        .load-stage i { font-size:15px; }
+      </style>
     </div>
 
     <!-- ── ERROR PANEL ─────────────────────────────────────────────────── -->
@@ -558,6 +1153,7 @@
      JAVASCRIPT
 ═══════════════════════════════════════════════════════════════════════════ -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/lex-design-system.js" defer></script>
 <script>
 
 // ── Sample test cases ────────────────────────────────────────────────────────
@@ -681,6 +1277,11 @@ async function _doAnalyze(story, additionalInfo, scope) {
   fd.append('language', langInput ? langInput.value : 'en');
 
   showPanel('loadingPanel');
+  // Drive the per-stage indicator while the request is in flight so the user
+  // sees motion even though the backend is a single round-trip.  Timings are
+  // calibrated against typical 7-second runs; the final stage marks done
+  // as soon as the response actually arrives.
+  startLoadingStages();
   try {
     const resp = await fetch('/analyze', { method: 'POST', body: fd });
     const data = await resp.json();
@@ -689,12 +1290,39 @@ async function _doAnalyze(story, additionalInfo, scope) {
       showPanel('errorPanel');
       return;
     }
+    finishLoadingStages();
     renderResults(data);
     loadHistory();
+    if (window.dsToast) dsToast('Analysis complete · ' + (data.sources?.length || 0) + ' sources retrieved', 'ok');
   } catch (err) {
     document.getElementById('errorMsg').textContent = err.message || 'Network error.';
     showPanel('errorPanel');
   }
+}
+
+// Day-15 polish: animate the 4 progress stages of /analyze
+let _stageTimer = null;
+function startLoadingStages(){
+  const stages = ['rag','model','render','pdf'];
+  const delays = [200, 1800, 4500, 6500];   // approximate stage transitions
+  document.querySelectorAll('.load-stage').forEach(el => { el.classList.remove('active','done'); });
+  stages.forEach((s, i) => {
+    setTimeout(() => {
+      // Mark prior stages done
+      for (let j = 0; j < i; j++){
+        const prev = document.querySelector(`.load-stage[data-stage="${stages[j]}"]`);
+        if (prev) { prev.classList.remove('active'); prev.classList.add('done'); }
+      }
+      const cur = document.querySelector(`.load-stage[data-stage="${s}"]`);
+      if (cur) cur.classList.add('active');
+    }, delays[i]);
+  });
+}
+function finishLoadingStages(){
+  document.querySelectorAll('.load-stage').forEach(el => {
+    el.classList.remove('active');
+    el.classList.add('done');
+  });
 }
 
 // ── Main analysis function ───────────────────────────────────────────────────
