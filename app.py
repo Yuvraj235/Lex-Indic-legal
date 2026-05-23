@@ -1348,6 +1348,15 @@ def try_submit():
         })
     except Exception:
         pass
+    # Day 17: also email the operator if LEAD_NOTIFY_EMAIL is configured
+    try:
+        op = os.getenv("LEAD_NOTIFY_EMAIL", "")
+        if op:
+            import mailer as _mailer
+            from dataclasses import asdict
+            _mailer.send_lead_notification(op, asdict(lead))
+    except Exception:
+        pass
     return jsonify({"lead": {"id": lead.id, "full_name": lead.full_name}})
 
 

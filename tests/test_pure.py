@@ -363,3 +363,43 @@ class TestNalsa:
         assert reg.id.startswith("nalsa_")
         assert is_registered("user@firm.example")
         assert not is_registered("never-registered@example.com")
+
+
+# ────────────────────────────── mailer (Day 17) ────────────────────────────
+class TestMailer:
+    def test_stdout_provider_succeeds(self, monkeypatch):
+        monkeypatch.delenv("MAIL_PROVIDER", raising=False)
+        import mailer
+        r = mailer.send(to="test@example.com", subject="hi", text="hello")
+        assert r.ok
+        assert r.provider == "stdout"
+
+    def test_missing_to_returns_error(self, monkeypatch):
+        import mailer
+        r = mailer.send(to="", subject="hi", text="hello")
+        assert not r.ok
+        assert "to" in r.error.lower()
+
+    def test_unknown_provider_returns_error(self, monkeypatch):
+        monkeypatch.setenv("MAIL_PROVIDER", "carrier-pigeon")
+        import mailer
+        r = mailer.send(to="x@y.in", subject="hi", text="hello")
+        assert not r.ok
+        assert "carrier-pigeon" in r.error
+
+    def test_smtp_provider_missing_host(self, monkeypatch):
+        monkeypatch.setenv("MAIL_PROVIDER", "smtp")
+        monkeypatch.delenv("SMTP_HOST", raising=False)
+        import mailer
+        r = mailer.send(to="x@y.in", subject="hi", text="hello")
+        assert not r.ok
+        assert "SMTP_HOST" in r.error
+
+    def test_send_login_code_includes_code_and_ttl(self, monkeypatch, capsys):
+        monkeypatch.delenv("MAIL_PROVIDER", raising=False)
+        import mailer
+        r = mailer.send_login_code("x@y.in", "123456", ttl_minutes=15)
+        assert r.ok
+        out = capsys.readouterr().out
+        assert "123456" in out
+        assert "x@y.in" in out

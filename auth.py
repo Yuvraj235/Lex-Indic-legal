@@ -151,9 +151,19 @@ def issue_code(email: str) -> str:
 
 
 def _send_code(email: str, code: str):
-    """In dev we print to the log.  Replace this body with a real email send
-    (boto3.ses.send_email / Postmark API / etc.) in production."""
-    print(f"  [auth] login code for {email}: {code}  (TTL {_CODE_TTL}s)", flush=True)
+    """Day 17: delegates to the pluggable mailer.  In dev (MAIL_PROVIDER=stdout
+    or unset), this still prints to the server log + appends to
+    outputs/mail/sent.log.  In prod (MAIL_PROVIDER=smtp|ses), this actually
+    delivers the email."""
+    try:
+        import mailer
+        result = mailer.send_login_code(email, code, ttl_minutes=_CODE_TTL // 60)
+        if not result.ok:
+            # Fall back to stdout if the provider fails — login MUST work
+            print(f"  [auth] mail send failed ({result.error}); code for {email}: {code}",
+                  flush=True)
+    except Exception as e:
+        print(f"  [auth] mailer crashed ({e}); code for {email}: {code}", flush=True)
 
 
 def verify_code(email: str, code: str) -> Optional[str]:
