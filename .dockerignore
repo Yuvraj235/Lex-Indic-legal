@@ -1,0 +1,45 @@
+.git/
+.github/
+.gitignore
+.dockerignore
+.env
+.env.*
+!.env.example
+
+# Tests + dev tooling — not needed at runtime
+tests/
+pytest.ini
+.pytest_cache/
+
+# Python build artefacts
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Generated outputs (lives in a volume mount, not the image)
+outputs/
+
+# Self-signed dev certs
+certs/
+
+# Cloudflared / local-only tooling
+*.log
+*.bak
+
+# IDEs
+.vscode/
+.idea/
+.claude/
+
+# Docs that don't need to ship to runtime
+docs/
+SALES_PLAYBOOK.md
+CHANGELOG.md
+PHASE_2_PLAN.md
+README.md

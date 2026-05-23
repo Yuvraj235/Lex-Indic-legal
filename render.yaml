@@ -1,0 +1,26 @@
+# ════════════════════════════════════════════════════════════════════════════
+#  Lex-Indic — Render.com deployment blueprint
+#  Deploy:  Connect this repo at https://dashboard.render.com/blueprints
+# ════════════════════════════════════════════════════════════════════════════
+
+services:
+  - type:     web
+    name:     lex-indic
+    region:   singapore                # closest to India among Render's regions
+    runtime:  docker
+    plan:     starter                  # $7/mo; bump to standard for >1 instance
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/health
+    autoDeploy:  true                  # redeploy on every push to main
+    disk:
+      name:       lex-outputs
+      mountPath:  /app/outputs
+      sizeGB:     5
+    envVars:
+      # Set the secrets in the Render dashboard (NOT in this file):
+      #   GEMINI_API_KEY, GROQ_API_KEY, ADMIN_TOKEN, AUDIT_HASH_SALT,
+      #   MAIL_PROVIDER, SMTP_*, LEAD_NOTIFY_EMAIL, ...
+      - key:    PYTHONUNBUFFERED
+        value:  "1"
+      - key:    FLASK_APP
+        value:  "app"

@@ -1,0 +1,75 @@
+# ════════════════════════════════════════════════════════════════════════════
+#  Lex-Indic — docker-compose for local dev + small-firm deployments.
+#  Run:   docker compose up -d
+#  Stop:  docker compose down
+#  Logs:  docker compose logs -f lex-indic
+# ════════════════════════════════════════════════════════════════════════════
+#
+#  Out of the box this composes:
+#   - lex-indic         the Flask app on port 8080
+#   - ollama (optional) zero-sub-processor LLM, profile='local-llm'
+#   - postgres (future) for the v2.0 migration, profile='postgres'
+#
+#  To run with local Ollama: docker compose --profile local-llm up
+#  Plain run:                docker compose up
+# ════════════════════════════════════════════════════════════════════════════
+
+services:
+  lex-indic:
+    build: .
+    image: lex-indic:latest
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env                     # contains GEMINI_API_KEY, GROQ_API_KEY, etc.
+    volumes:
+      - ./outputs:/app/outputs   # persist case data + audit logs + leads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/v1/health"]
+      interval: 30s
+      timeout: 4s
+      retries: 3
+      start_period: 40s
+
+  # ── Optional: local Ollama for the zero-sub-processor deployment.
+  #              Set LLM_PROVIDER=ollama + OLLAMA_HOST=http://ollama:11434 in .env
+  #              and pull a model:  docker compose exec ollama ollama pull llama3.3:70b
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["local-llm"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ── Postgres — wired for v2.0; safe to start now, no migrations applied yet.
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER:     lexindic
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB:       lexindic
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lexindic"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  ollama-models:
+  postgres-data:

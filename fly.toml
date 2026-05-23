@@ -1,0 +1,48 @@
+# ════════════════════════════════════════════════════════════════════════════
+#  Lex-Indic — fly.io configuration
+#  Deploy:  fly launch  (first time, picks region)
+#           fly deploy  (subsequent)
+#  Logs:    fly logs
+# ════════════════════════════════════════════════════════════════════════════
+
+app = "lex-indic"
+primary_region = "bom"   # Mumbai — keeps data in India by default
+kill_signal    = "SIGTERM"
+kill_timeout   = 30
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PYTHONUNBUFFERED = "1"
+  FLASK_APP        = "app"
+  # All other env (GEMINI_API_KEY, GROQ_API_KEY, ADMIN_TOKEN, AUDIT_HASH_SALT,
+  # MAIL_PROVIDER, etc.) goes via `fly secrets set …`.
+
+[http_service]
+  internal_port = 8080
+  force_https   = true
+  auto_stop_machines  = "stop"   # idle machines stop to save money
+  auto_start_machines = true
+  min_machines_running = 1       # one always on so the cold-start is rare
+
+  [[http_service.checks]]
+    grace_period  = "30s"
+    interval      = "30s"
+    method        = "GET"
+    path          = "/api/v1/health"
+    protocol      = "http"
+    timeout       = "5s"
+
+[[mounts]]
+  source      = "lex_outputs"
+  destination = "/app/outputs"
+  # 5 GB is enough for ~100,000 audit records + 10,000 PDFs + the SQLite DB.
+  initial_size = "5gb"
+
+[deploy]
+  release_command = "python -c 'from auth import init_db; init_db()'"
+
+[[vm]]
+  size      = "shared-cpu-1x"   # 1 vCPU, 256 MB RAM — fits the engine fine
+  memory_mb = 512               # bump to 1024 if ChromaDB OOMs on the indexing call
