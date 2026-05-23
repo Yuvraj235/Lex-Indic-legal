@@ -4,6 +4,7 @@
 
 [![Status](https://img.shields.io/badge/status-v1.5-success)]()
 [![Stack](https://img.shields.io/badge/stack-Flask%20%2B%20Three.js%20%2B%20ChromaDB-blue)]()
+[![Tests](https://img.shields.io/badge/tests-94%20passing-success)]()
 [![SOC2](https://img.shields.io/badge/SOC2-9%2F10%20controls%20passing-success)]()
 [![License](https://img.shields.io/badge/license-Educational-lightgrey)]()
 
@@ -282,6 +283,21 @@ python3 app.py --https            # HTTPS on :8443 (required for the Word add-in
 ```
 Then open: **http://localhost:8080** (or **https://localhost:8443** for the add-in)
 
+### 5. Run the test suite (recommended after any change)
+```bash
+pip3 install -r requirements-dev.txt
+python3 -m pytest tests/
+```
+94 tests, runs in <2 seconds, zero network calls.  See [`tests/README.md`](tests/README.md) for details.
+
+### 6. Share a public demo URL
+```bash
+brew install cloudflared
+cloudflared tunnel --url http://localhost:8080
+# Ephemeral URL printed in the output. For a stable demo URL that
+# survives reboots, follow docs/STABLE_TUNNEL.md.
+```
+
 The Word add-in install instructions live at `/addin/install` once the
 HTTPS server is up.  Generate the self-signed dev cert once with:
 ```bash
@@ -482,6 +498,9 @@ deliberate. It disclaims AI authorship and protects the firm legally.
 | `/webhooks/api/subscriptions` | GET/POST | Register webhook URLs |
 | `/webhooks/api/subscriptions/<id>` | DELETE | Remove subscription |
 | `/webhooks/api/deliveries` | GET | Recent delivery log |
+| `/try` | GET | Lead-capture page for new prospects |
+| `/try/submit` | POST | Save lead, fire `lead.captured` webhook |
+| `/try/api/leads` | GET | Admin: list captured leads (token-gated) |
 
 Every successful and every error response carries an `X-Request-Id`-like
 field in the JSON body, so users can quote it in support tickets and ops

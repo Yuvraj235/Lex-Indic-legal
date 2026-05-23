@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Try Lex-Indic — tell us about you</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/lex-design-system.css">
+<style>
+  :root{
+    --navy:#0f2850; --navy-deep:#0a1a35;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --green:#146432; --green-light:#e8f7ed;
+    --red:#b41e1e; --red-light:#fff0f0;
+    --grey-100:#f6f7fb; --grey-200:#ecf0f7; --grey-300:#d9dde6;
+    --grey-500:#6b7280; --grey-700:#2d3748;
+    --shadow-lg:0 25px 60px -12px rgba(15,40,80,.35);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Inter',system-ui,-apple-system,sans-serif;color:var(--navy);
+    background:
+      radial-gradient(ellipse at 80% 10%, rgba(240,196,79,.10), transparent 50%),
+      linear-gradient(135deg,var(--navy-deep) 0%,var(--navy) 60%,var(--navy-deep) 100%);
+    min-height:100vh;display:grid;place-items:center;padding:24px 16px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .card{
+    background:#fff;border-radius:18px;padding:36px clamp(28px,5vw,48px);
+    width:100%;max-width:540px;box-shadow:var(--shadow-lg);
+  }
+  .brand{
+    display:flex;align-items:center;gap:10px;margin-bottom:24px;
+    text-decoration:none;color:var(--navy);
+  }
+  .brand-mark{
+    width:42px;height:42px;background:linear-gradient(135deg,var(--gold),var(--gold-glow));
+    color:var(--navy-deep);border-radius:10px;display:grid;place-items:center;
+    font-weight:900;font-size:20px;
+  }
+  .brand-name{font-weight:800;font-size:18px}
+  .eyebrow{font-size:12px;font-weight:700;color:var(--gold);
+           text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px}
+  h1{font-family:'Playfair Display',serif;font-size:30px;font-weight:700;
+     line-height:1.15;margin-bottom:8px;letter-spacing:-.01em}
+  .lead{color:var(--grey-700);font-size:14.5px;margin-bottom:24px;line-height:1.6}
+
+  label{display:block;font-size:13px;font-weight:600;margin:14px 0 5px;color:var(--navy)}
+  input,select,textarea{
+    width:100%;padding:11px 13px;border:1px solid var(--grey-300);
+    border-radius:8px;background:#fff;font-family:inherit;font-size:14px;
+    color:var(--navy);transition:all .2s;
+  }
+  input:focus,select:focus,textarea:focus{
+    outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(180,140,40,.12);
+  }
+  textarea{min-height:60px;resize:vertical}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+  .chip{
+    cursor:pointer;background:var(--grey-100);border:1px solid var(--grey-300);
+    border-radius:99px;padding:5px 11px;font-size:12px;color:var(--grey-700);
+    user-select:none;transition:all .15s;
+  }
+  .chip:hover{border-color:var(--gold);color:var(--navy)}
+  .chip.active{background:var(--green-light);color:var(--green);border-color:var(--green);font-weight:600}
+
+  .btn{
+    width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+    padding:13px;font-family:inherit;font-size:14px;font-weight:600;
+    border:none;border-radius:10px;cursor:pointer;margin-top:20px;
+    background:linear-gradient(135deg,var(--gold),var(--gold-light));
+    color:var(--navy-deep);box-shadow:0 5px 16px rgba(180,140,40,.25);
+    transition:all .25s;
+  }
+  .btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 22px rgba(180,140,40,.45)}
+  .btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+
+  .msg{padding:11px 14px;border-radius:8px;font-size:13.5px;margin-top:14px;line-height:1.55}
+  .msg.ok{background:var(--green-light);color:var(--green);border:1px solid #c8e8d0}
+  .msg.err{background:var(--red-light);color:var(--red);border:1px solid #f0c8c8}
+
+  .skip{text-align:center;margin-top:18px;font-size:13px;color:var(--grey-500)}
+  .skip a{color:var(--gold);text-decoration:none;font-weight:600}
+  .skip a:hover{text-decoration:underline}
+
+  .reassurance{
+    margin-top:16px;padding:12px 14px;
+    background:rgba(180,140,40,.06);border:1px solid rgba(180,140,40,.20);
+    border-radius:8px;font-size:12.5px;color:var(--grey-700);line-height:1.55;
+  }
+  .reassurance strong{color:var(--navy)}
+</style>
+</head>
+<body>
+<div class="card">
+  <a href="/" class="brand">
+    <div class="brand-mark">L</div>
+    <span class="brand-name">Lex-Indic</span>
+  </a>
+
+  <div class="eyebrow">Try the engine</div>
+  <h1>Tell us about you first.</h1>
+  <p class="lead">
+    Three fields, 20 seconds.  Helps us keep the demo URL alive for your
+    visit and follow up with one short email if you want.  Skip straight
+    to the engine below if you'd rather just look around.
+  </p>
+
+  <div id="form">
+    <label for="full_name">Your name <span style="color:var(--red)">*</span></label>
+    <input id="full_name" type="text" placeholder="e.g. Adv. Priya Sharma" autocomplete="name">
+
+    <label for="email">Email <span style="color:var(--red)">*</span></label>
+    <input id="email" type="email" placeholder="you@firm.example" autocomplete="email">
+
+    <label for="firm_or_org">Firm / chamber / organisation</label>
+    <input id="firm_or_org" type="text" placeholder="e.g. Singhania & Partners, or Pune District Court" autocomplete="organization">
+
+    <label for="role">Your role</label>
+    <select id="role">
+      <option value="">— choose —</option>
+      <option value="partner">Senior partner / proprietor</option>
+      <option value="associate">Associate</option>
+      <option value="junior_associate">Junior associate / paralegal</option>
+      <option value="in_house">In-house counsel</option>
+      <option value="nalsa_panel">NALSA panel advocate</option>
+      <option value="academic">Academic / law student</option>
+      <option value="legal_tech">Legal-tech / vendor</option>
+      <option value="other">Other</option>
+    </select>
+
+    <label>What brought you here? (pick any)</label>
+    <div class="chip-row" id="interestChips">
+      <span class="chip" data-value="bns_transition">BNS transition</span>
+      <span class="chip" data-value="word_addin">Word add-in</span>
+      <span class="chip" data-value="hindi_output">Hindi output</span>
+      <span class="chip" data-value="contract_review">Tabular contract review</span>
+      <span class="chip" data-value="precedent_monitor">SC precedent monitor</span>
+      <span class="chip" data-value="nalsa_tier">NALSA free tier</span>
+      <span class="chip" data-value="dpdp_compliance">DPDP compliance</span>
+      <span class="chip" data-value="pricing_inquiry">Pricing inquiry</span>
+    </div>
+
+    <label for="how_heard">Where did you hear about Lex-Indic? (optional)</label>
+    <textarea id="how_heard" placeholder="e.g. Yuvraj's email, LinkedIn, conference, referred by..."></textarea>
+
+    <button class="btn" onclick="submitLead()" id="submitBtn">
+      Continue to the engine →
+    </button>
+
+    <div id="msg"></div>
+
+    <div class="reassurance">
+      <strong>Your info stays with Lex-Indic.</strong>  We use it only to
+      reply to you about your interest.  No mailing list, no third-party
+      sharing.  Audit trail in our <a href="/trust" style="color:var(--gold);text-decoration:none">trust page</a>.
+    </div>
+
+    <div class="skip">
+      Just looking? <a href="/app">Skip and open the engine →</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const escapeHtml = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const selectedInterests = new Set();
+
+  document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => {
+    const v = c.dataset.value;
+    if (selectedInterests.has(v)){ selectedInterests.delete(v); c.classList.remove('active'); }
+    else { selectedInterests.add(v); c.classList.add('active'); }
+  }));
+
+  async function submitLead(){
+    const msg = $('msg'); msg.innerHTML = '';
+    const btn = $('submitBtn'); btn.disabled = true; btn.textContent = 'Saving…';
+    const payload = {
+      full_name:   $('full_name').value.trim(),
+      email:       $('email').value.trim(),
+      firm_or_org: $('firm_or_org').value.trim(),
+      role:        $('role').value,
+      how_heard:   $('how_heard').value.trim(),
+      interests:   [...selectedInterests],
+    };
+    try {
+      const r = await fetch('/try/submit', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+      });
+      const d = await r.json();
+      if (!r.ok || d.error){
+        btn.disabled = false; btn.textContent = 'Continue to the engine →';
+        msg.innerHTML = `<div class="msg err">${escapeHtml(d.error || 'Submit failed')}</div>`;
+        return;
+      }
+      msg.innerHTML = `<div class="msg ok">Thanks, ${escapeHtml(payload.full_name.split(' ')[0])}. Opening the engine…</div>`;
+      setTimeout(() => { window.location.href = '/app'; }, 700);
+    } catch (e) {
+      btn.disabled = false; btn.textContent = 'Continue to the engine →';
+      msg.innerHTML = `<div class="msg err">Network error: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  // Enter submits from any input
+  document.querySelectorAll('#form input, #form select').forEach(el =>
+    el.addEventListener('keydown', e => { if (e.key === 'Enter') submitLead(); }));
+</script>
+</body>
+</html>

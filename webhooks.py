@@ -86,7 +86,8 @@ def list_subs() -> list[dict]:
 def add_sub(url: str, events: list[str], description: str = "") -> dict:
     if not url.startswith(("http://", "https://")):
         raise ValueError("URL must start with http:// or https://")
-    valid_events = {"analysis.completed", "monitor.digest.ready", "matter.created", "nalsa.registered"}
+    valid_events = {"analysis.completed", "monitor.digest.ready", "matter.created",
+                    "nalsa.registered", "lead.captured"}
     events = [e for e in events if e in valid_events]
     if not events:
         raise ValueError("Provide at least one valid event.")

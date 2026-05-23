@@ -217,6 +217,7 @@ import ecourts as ecourts_module
 import llm_provider as llm_provider_module
 import tabular as tabular_module
 import webhooks as webhooks_module
+import leads as leads_module
 
 
 @app.route("/monitors")
@@ -1309,6 +1310,51 @@ def chat():
             "sources": [],
             "request_id": request_id,
         })
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — Lead capture (/try).  Shown to prospects who hit the demo URL
+# without context.  3-field form → outputs/leads/leads.json + webhook.
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.route("/try")
+def try_page():
+    return render_template("try.html")
+
+
+@app.route("/try/submit", methods=["POST"])
+def try_submit():
+    data = request.get_json() or {}
+    ok, err = leads_module.validate(data)
+    if not ok:
+        return jsonify({"error": err}), 400
+    try:
+        lead = leads_module.capture(
+            data,
+            referrer=request.headers.get("Referer", ""),
+            user_agent=request.headers.get("User-Agent", ""),
+        )
+    except Exception as e:
+        return jsonify({"error": f"Could not save: {str(e)[:200]}"}), 500
+    # Fire webhook so the operator can pipe leads to Slack / Notion / CRM
+    try:
+        webhooks_module.emit("lead.captured", {
+            "lead_id":     lead.id,
+            "email":       lead.email,
+            "firm_or_org": lead.firm_or_org,
+            "role":        lead.role,
+            "interests":   lead.interests,
+        })
+    except Exception:
+        pass
+    return jsonify({"lead": {"id": lead.id, "full_name": lead.full_name}})
+
+
+@app.route("/try/api/leads")
+def try_leads():
+    """List leads — admin-gated."""
+    guard = _require_admin()
+    if guard: return guard
+    return jsonify({"leads": leads_module.list_all(), "stats": leads_module.stats()})
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
