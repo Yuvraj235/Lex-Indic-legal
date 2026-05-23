@@ -1568,6 +1568,19 @@ def dashboard_page():
     return render_template("dashboard.html")
 
 
+@app.route("/db/health")
+def db_health():
+    """Postgres health probe (Day 20). Returns ok+latency+row-counts when
+    DATABASE_URL is configured; otherwise reports it's unset.  Admin-gated."""
+    guard = _require_admin()
+    if guard: return guard
+    try:
+        import db as db_module
+        return jsonify(db_module.health_check())
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:200]}), 500
+
+
 @app.route("/dashboard/data.json")
 def dashboard_data():
     guard = _require_admin()

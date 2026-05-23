@@ -403,3 +403,40 @@ class TestMailer:
         out = capsys.readouterr().out
         assert "123456" in out
         assert "x@y.in" in out
+
+
+# ────────────────────────────── db.py (Day 20) ─────────────────────────────
+class TestDbModule:
+    def test_disabled_when_no_url(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import db
+        assert not db.is_enabled()
+
+    def test_enabled_with_sqlite_url(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path}/lex.db")
+        # Force re-evaluation of the engine
+        import db
+        db._engine = None
+        assert db.is_enabled()
+        db.create_all()
+        with db.session() as s:
+            # All 7 tables should be empty + queryable
+            for cls in (db.Firm, db.Lawyer, db.Matter, db.MonitorMatter,
+                        db.NalsaRegistration, db.Lead, db.WebhookSub):
+                assert s.query(cls).count() == 0
+
+    def test_health_check_reports_disabled_when_url_unset(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import db
+        db._engine = None
+        h = db.health_check()
+        assert not h["ok"]
+        assert "DATABASE_URL" in h["error"]
+
+    def test_session_raises_when_disabled(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import db, pytest
+        db._engine = None
+        with pytest.raises(RuntimeError, match="DATABASE_URL"):
+            with db.session():
+                pass

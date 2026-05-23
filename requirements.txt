@@ -9,3 +9,7 @@ groq>=0.30,<2.0
 pdfplumber>=0.11,<1.0
 python-docx>=1.0,<2.0
 gunicorn>=21.0,<24.0
+# v2.0 — opt-in via DATABASE_URL. SQLite works out of the box, postgres
+# is the production target.
+sqlalchemy>=2.0,<3.0
+psycopg[binary]>=3.1,<4.0; sys_platform != "win32"
