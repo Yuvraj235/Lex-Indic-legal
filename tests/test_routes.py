@@ -541,3 +541,29 @@ class TestApiV1:
         r = client.get("/api/v1/sections",
                        headers={"X-Api-Key": key["full_key"]})
         assert r.status_code == 401
+
+
+# ────────────────────────────── Operator dashboard (Day 19) ────────────────
+class TestDashboard:
+    def test_open_without_admin_token(self, client, monkeypatch):
+        monkeypatch.delenv("ADMIN_TOKEN", raising=False)
+        r = client.get("/dashboard")
+        assert r.status_code == 200
+
+    def test_blocked_without_token(self, client, monkeypatch):
+        monkeypatch.setenv("ADMIN_TOKEN", "test-tok-xyz")
+        r = client.get("/dashboard")
+        assert r.status_code == 401
+
+    def test_query_token_unlocks_data(self, client, monkeypatch):
+        monkeypatch.setenv("ADMIN_TOKEN", "test-tok-xyz")
+        r = client.get("/dashboard/data.json?token=test-tok-xyz")
+        assert r.status_code == 200
+        d = r.get_json()
+        assert "kpis" in d and "funnel" in d
+        assert "daily_analyses" in d
+        # daily_analyses is always exactly 14 days (zero-filled if no data)
+        assert len(d["daily_analyses"]) == 14
+        for kpi in ("leads_total", "analyses_24h", "matters_total",
+                    "users_total", "api_keys_active", "errors_24h"):
+            assert kpi in d["kpis"]

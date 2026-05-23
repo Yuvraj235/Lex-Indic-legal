@@ -1557,6 +1557,154 @@ _LISTEN_PORT = 8080
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — Operator dashboard (Day 19).
+# Aggregates KPIs from audit log + leads + matters + monitors into one
+# admin-gated dashboard at /dashboard.
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.route("/dashboard")
+def dashboard_page():
+    guard = _require_admin()
+    if guard: return guard
+    return render_template("dashboard.html")
+
+
+@app.route("/dashboard/data.json")
+def dashboard_data():
+    guard = _require_admin()
+    if guard: return guard
+
+    now = datetime.now(timezone.utc)
+    cutoff_24h = now - timedelta(hours=24)
+    cutoff_7d  = now - timedelta(days=7)
+    cutoff_14d = now - timedelta(days=14)
+
+    # ── Read audit records across the last 14 days ─────────────────────────
+    audit_dir = Path("outputs/audit")
+    records = []
+    if audit_dir.exists():
+        for f in sorted(audit_dir.glob("audit-*.log"))[-15:]:   # 15 files = enough
+            try:
+                for line in f.read_text(encoding="utf-8").splitlines():
+                    if not line.strip(): continue
+                    try:
+                        records.append(json.loads(line))
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+    # Newest first
+    records.sort(key=lambda r: r.get("ts", ""), reverse=True)
+
+    def in_window(r, cutoff):
+        ts = r.get("ts", "")
+        return ts >= cutoff.isoformat(timespec="seconds")
+
+    # ── KPIs ───────────────────────────────────────────────────────────────
+    analyses_all = [r for r in records if r.get("endpoint") in ("/analyze", "/api/v1/analyze")]
+    analyses_24h = [r for r in analyses_all if in_window(r, cutoff_24h)]
+    analyses_7d  = [r for r in analyses_all if in_window(r, cutoff_7d)]
+    errors_24h   = [r for r in analyses_24h if r.get("status") == "error"]
+
+    leads_all = leads_module.list_all()
+    leads_7d = [l for l in leads_all if l.get("captured_at", "") >= cutoff_7d.isoformat(timespec="seconds")]
+
+    matters_all = matters_module.list_matters()
+    matters_open = [m for m in matters_all if m.get("status") == "open"]
+
+    monitors_data = monitors_module.run_digest()
+    monitor_hits_24h = monitors_data.get("totals", {}).get("total_hits", 0)
+    matters_watched = monitors_data.get("totals", {}).get("matters_count", 0)
+
+    users_count = auth_module.stats().get("total_users", 0)
+    api_keys_active = len([k for k in api_keys_module.list_keys() if not k.get("revoked_at")])
+
+    kpis = {
+        "leads_total":     len(leads_all),
+        "leads_7d":        len(leads_7d),
+        "analyses_total":  len(analyses_all),
+        "analyses_24h":    len(analyses_24h),
+        "analyses_7d":     len(analyses_7d),
+        "matters_total":   len(matters_all),
+        "matters_open":    len(matters_open),
+        "monitor_hits_24h": monitor_hits_24h,
+        "matters_watched": matters_watched,
+        "users_total":     users_count,
+        "api_keys_active": api_keys_active,
+        "errors_24h":      len(errors_24h),
+    }
+
+    # ── Funnel (7d) — distinct client_ips across each stage ───────────────
+    # Heuristic: an "ip" set per endpoint.  Real conversion tracking would
+    # need cookies/sessions, but ip-distinct is good enough for a first pass.
+    landing_ips = {r.get("client_ip","") for r in records
+                   if in_window(r, cutoff_7d) and r.get("endpoint") == "/"}
+    app_ips = {r.get("client_ip","") for r in records
+               if in_window(r, cutoff_7d) and r.get("endpoint") == "/app"}
+    analyze_ips = {r.get("client_ip","") for r in records
+                   if in_window(r, cutoff_7d) and r.get("endpoint") in ("/analyze", "/api/v1/analyze")
+                   and r.get("status") == "ok"}
+    # /try submissions aren't endpoints — count from leads captured_at
+    try_submits_ip = {l.get("captured_at", "") for l in leads_7d}  # placeholder
+    # Use the lead count as a reasonable proxy (we don't log /try/submit hits in audit currently)
+
+    funnel = {
+        "landing":        max(len(landing_ips), len(app_ips), len(analyze_ips)),
+        "try_submitted":  len(leads_7d),
+        "app_opened":     len(app_ips),
+        "analyzed":       len(analyze_ips),
+    }
+
+    # ── Daily analysis volume (last 14 days) ──────────────────────────────
+    daily = {}
+    for r in analyses_all:
+        ts = r.get("ts", "")
+        if ts >= cutoff_14d.isoformat(timespec="seconds"):
+            d = ts[:10]
+            daily[d] = daily.get(d, 0) + 1
+    # Build a full 14-day window including zero-days
+    dates = []
+    for i in range(13, -1, -1):
+        d = (now - timedelta(days=i)).strftime("%Y-%m-%d")
+        dates.append({"date": d, "count": daily.get(d, 0)})
+
+    # ── Top retrieved sources (7d) ────────────────────────────────────────
+    source_counts = {}
+    for r in analyses_7d:
+        for sid in (r.get("sources") or []):
+            source_counts[sid] = source_counts.get(sid, 0) + 1
+    top_sources = [{"id": k, "count": v} for k, v in
+                   sorted(source_counts.items(), key=lambda x: -x[1])[:10]]
+
+    # ── Recent analyses (last 8) ──────────────────────────────────────────
+    recent_analyses = []
+    for r in records[:30]:
+        if r.get("endpoint") not in ("/analyze", "/api/v1/analyze"): continue
+        recent_analyses.append({
+            "ts":           r.get("ts", ""),
+            "status":       r.get("status", ""),
+            "language":     (r.get("extra") or {}).get("language") or
+                            ("hi" if "hi" in str(r.get("extra",{})) else "en"),
+            "source_count": len(r.get("sources") or []),
+            "duration_ms":  r.get("duration_ms", 0),
+            "request_id":   r.get("request_id", ""),
+        })
+        if len(recent_analyses) >= 8: break
+
+    # ── Recent leads (last 8) ─────────────────────────────────────────────
+    recent_leads = leads_all[-8:][::-1] if leads_all else []
+
+    return jsonify({
+        "generated_at":    now.isoformat(timespec="seconds"),
+        "kpis":            kpis,
+        "funnel":          funnel,
+        "daily_analyses":  dates,
+        "top_sources":     top_sources,
+        "recent_analyses": recent_analyses,
+        "recent_leads":    recent_leads,
+    })
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # ROUTES — REST API v1 (Day 16).
 # Same engines as the UI routes, but wrapped in API-key auth + rate limiting.
 # OpenAPI spec at /api/v1/openapi.json; Swagger UI at /api/v1/docs.
