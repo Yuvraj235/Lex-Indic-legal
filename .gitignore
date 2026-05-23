@@ -38,3 +38,7 @@ data/legal_corpus/embedding_cache.json
 # Each clone generates its own. See templates/addin/install.html.
 certs/*.pem
 certs/*.key
+
+# SOC 2 audit-log size baseline — auto-regenerated on every controls check.
+# Tracking it creates noisy commits.  The live file remains for auditor review.
+tools/soc2/evidence/audit_log_sizes.json
