@@ -4,6 +4,12 @@ All notable changes to Lex-Indic. Auto-generated from git log.
 
 ## May 2026
 
+- **23 May** [`ea390f2`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/ea390f2) — Day 20: Postgres-ready ORM + JSON-files migration tool
+- **23 May** [`6398312`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/6398312) — Day 19: operator dashboard at /dashboard
+- **23 May** [`63984e5`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/63984e5) — Day 18: Dockerfile + docker-compose + fly.io + Render + on-prem guides
+- **23 May** [`c2818b8`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/c2818b8) — Day 17: pluggable email sender — stdout / SMTP / SES
+- **23 May** [`c8cc5f8`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/c8cc5f8) — Day 16: REST API v1 + API-key auth + OpenAPI 3.0 spec + Swagger UI
+- **23 May** [`c96cba5`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/c96cba5) — Test suite (94 tests, <2s) + /try lead capture + CHANGELOG + tunnel doc
 - **23 May** [`3e682ff`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/3e682ff) — Multi-tenant binding + i18n on all pages + 2 new clause libraries + prewarm
 - **23 May** [`e165b1b`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/e165b1b) — Hardening: pin numpy<2, gitignore noisy SOC2 evidence file
 - **16 May** [`32313e2`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/32313e2) — chore: refresh SOC2 audit-log size snapshot

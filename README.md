@@ -2,10 +2,11 @@
 
 ### AI-Powered Junior Associate for Indian Law Firms
 
-[![Status](https://img.shields.io/badge/status-v1.5-success)]()
+[![Status](https://img.shields.io/badge/status-v1.6-success)]()
 [![Stack](https://img.shields.io/badge/stack-Flask%20%2B%20Three.js%20%2B%20ChromaDB-blue)]()
-[![Tests](https://img.shields.io/badge/tests-94%20passing-success)]()
+[![Tests](https://img.shields.io/badge/tests-115%20passing-success)]()
 [![SOC2](https://img.shields.io/badge/SOC2-9%2F10%20controls%20passing-success)]()
+[![API](https://img.shields.io/badge/API-v1%20%2B%20OpenAPI-blue)]()
 [![License](https://img.shields.io/badge/license-Educational-lightgrey)]()
 
 ---
@@ -23,6 +24,16 @@ and within seconds the system produces a **complete legal case brief with 6 outp
 > that hallucinates section numbers.
 
 ---
+
+## What's New in v1.6 (Operability sprint — Days 16-20)
+
+| Day | Feature | URL / file | Why it matters |
+|---|---|---|---|
+| **16** | REST API v1 + API keys + OpenAPI spec + Swagger UI | `/api/v1/docs`, `api_keys.py`, `openapi_spec.py` | A firm's IT team can integrate Lex-Indic with their case-management system. Rate-limited per key. |
+| **17** | Pluggable email sender (stdout / SMTP / SES) | `mailer.py`, `tools/send_monitor_digest.py` | Login codes, monitor digests, and lead notifications land in real inboxes. |
+| **18** | Dockerfile + docker-compose + fly.io + Render configs + on-prem guide | `Dockerfile`, `fly.toml`, `render.yaml`, `docs/DEPLOY.md` | Customer can `docker compose up` instead of installing Python. |
+| **19** | Operator dashboard at `/dashboard` | `templates/dashboard.html` | Daily home page: KPIs, 7-day funnel, recent activity, top sources, 14-day chart. |
+| **20** | Postgres-ready ORM + JSON-files → DB migration tool | `db.py`, `tools/migrate_to_postgres.py` | When the JSON registries hit ~100 users, one command moves the data. |
 
 ## What's New in v1.5 (Legora-teardown sprint — 15 days)
 
@@ -501,6 +512,20 @@ deliberate. It disclaims AI authorship and protects the firm legally.
 | `/try` | GET | Lead-capture page for new prospects |
 | `/try/submit` | POST | Save lead, fire `lead.captured` webhook |
 | `/try/api/leads` | GET | Admin: list captured leads (token-gated) |
+| `/dashboard` | GET | Operator dashboard — KPIs + funnel + activity (token-gated) |
+| `/dashboard/data.json` | GET | JSON aggregate for the dashboard |
+| `/db/health` | GET | Postgres health probe (token-gated) |
+| `/api/v1/docs` | GET | Swagger UI for the JSON API |
+| `/api/v1/openapi.json` | GET | OpenAPI 3.0 spec |
+| `/api/v1/health` | GET | Liveness probe (no auth) |
+| `/api/v1/analyze` | POST | Run analysis (X-Api-Key required) |
+| `/api/v1/convert/text` | POST | IPC→BNS regex conversion |
+| `/api/v1/sections` | GET | Browse the KB |
+| `/api/v1/ecourts/lookup/<cnr>` | GET | CNR lookup |
+| `/api/v1/monitors/digest` | GET | Today's SC precedent digest |
+| `/api/v1/leads` | POST | External lead capture |
+| `/admin/api-keys` | GET / POST | Manage API keys |
+| `/admin/api-keys/<id>` | DELETE | Revoke a key |
 
 Every successful and every error response carries an `X-Request-Id`-like
 field in the JSON body, so users can quote it in support tickets and ops
@@ -549,8 +574,9 @@ circulars (MHA, SC, NHRC) — all retrievable via the same RAG pipeline.
 | **v1.3** | IPC→BNS converter (web + Word add-in) — the Legora wedge | Done |
 | **v1.4** | SC precedent monitor + Hindi UI/output + NALSA tier + DPDP trust page + SOC 2 dashboard | Done |
 | **v1.5** | Deep-links, matter intake, multi-tenant auth, BNSS+BSA, e-Courts, Ollama, tabular review, status+webhooks | Done |
-| **v2.0** | Postgres migration, formal SOC 2 Type II audit via Vanta/Drata, BNS full-358 corpus | Planned |
-| **v2.1** | Regional languages (Marathi, Tamil, Bengali), tabular due-diligence libraries for M&A | Planned |
+| **v1.6** | REST API + OpenAPI, email sender (SES/SMTP), Dockerfile + fly.io + Render, operator dashboard, Postgres-ready ORM | Done |
+| **v2.0** | Cut over each JSON-registry module to Postgres (using db.py); formal SOC 2 Type II via Vanta/Drata | Planned |
+| **v2.1** | BNS full-358 corpus, regional languages (Marathi, Tamil, Bengali), AppSource Word add-in submission | Planned |
 | **v2.0** | Postgres + multi-tenant auth, India-region deployment guide, BNSS + BSA corpora | Planned |
 | **v2.1** | Hindi + regional language support, on-prem Llama-3.3-70B via Ollama | Planned |
 
