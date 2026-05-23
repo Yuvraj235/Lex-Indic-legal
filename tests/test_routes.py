@@ -451,3 +451,93 @@ class TestTryRoutes:
         monkeypatch.setenv("ADMIN_TOKEN", "test-token-abc")
         r = client.get("/try/api/leads")
         assert r.status_code == 401
+
+
+# ────────────────────────────── /api/v1 (Day 16) ───────────────────────────
+class TestApiV1:
+    def test_openapi_spec_served(self, client):
+        r = client.get("/api/v1/openapi.json")
+        assert r.status_code == 200
+        spec = r.get_json()
+        assert spec["openapi"].startswith("3.")
+        assert spec["info"]["title"] == "Lex-Indic API"
+        # Must document /analyze, /convert/text, /ecourts/lookup, etc.
+        assert "/analyze" in spec["paths"]
+        assert "/convert/text" in spec["paths"]
+        assert "/health" in spec["paths"]
+
+    def test_swagger_ui_loads(self, client):
+        r = client.get("/api/v1/docs")
+        assert r.status_code == 200
+        assert b"swagger" in r.data.lower()
+        assert b"/api/v1/openapi.json" in r.data
+
+    def test_health_no_auth_required(self, client):
+        r = client.get("/api/v1/health")
+        assert r.status_code == 200
+        d = r.get_json()
+        assert d["ok"] is True
+        assert d["version"]
+
+    def test_analyze_requires_api_key(self, client):
+        r = client.post("/api/v1/analyze", json={"client_story": "x" * 50})
+        assert r.status_code == 401
+        d = r.get_json()
+        assert "X-Api-Key" in d["error"]
+
+    def test_analyze_rejects_bad_key(self, client):
+        r = client.post("/api/v1/analyze",
+                        json={"client_story": "x" * 50},
+                        headers={"X-Api-Key": "lex_live_doesnotexist:00"})
+        assert r.status_code == 401
+
+    def test_analyze_with_valid_key(self, client):
+        import api_keys
+        # First issue a key for a fake user
+        api_keys.init_db()
+        key = api_keys.issue_key("usr_test_routes", label="test", rate_per_min=60)
+        r = client.post("/api/v1/analyze",
+                        json={"client_story": "A real client story with enough chars to pass validation."},
+                        headers={"X-Api-Key": key["full_key"]})
+        assert r.status_code == 200
+        d = r.get_json()
+        assert "sections" in d and "sources" in d and "request_id" in d
+
+    def test_sections_endpoint(self, client):
+        import api_keys
+        key = api_keys.issue_key("usr_test_routes_2", label="sections")
+        r = client.get("/api/v1/sections?kind=bns",
+                       headers={"X-Api-Key": key["full_key"]})
+        assert r.status_code == 200
+        d = r.get_json()
+        assert d["count"] > 0
+        # Every entry must have id, kind, section, title
+        for s in d["sections"][:3]:
+            assert s["id"].startswith("bns_")
+            assert s["kind"] == "bns"
+            assert s["section"]
+            assert s["title"]
+
+    def test_rate_limit_enforced(self, client):
+        import api_keys
+        # Issue a key with a very tight rate limit
+        key = api_keys.issue_key("usr_rate_test", label="rate", rate_per_min=2)
+        # First two requests OK
+        for _ in range(2):
+            r = client.get("/api/v1/sections?kind=bns",
+                           headers={"X-Api-Key": key["full_key"]})
+            assert r.status_code == 200
+        # Third → 429
+        r = client.get("/api/v1/sections?kind=bns",
+                       headers={"X-Api-Key": key["full_key"]})
+        assert r.status_code == 429
+
+    def test_revoked_key_rejected_after_grace(self, client):
+        import api_keys, time
+        key = api_keys.issue_key("usr_revoke_test", label="revoke")
+        # Revoke with 0-min grace → immediate
+        api_keys.revoke_key(key["key_id"], grace_period_min=0)
+        time.sleep(0.05)
+        r = client.get("/api/v1/sections",
+                       headers={"X-Api-Key": key["full_key"]})
+        assert r.status_code == 401

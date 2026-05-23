@@ -218,6 +218,8 @@ import llm_provider as llm_provider_module
 import tabular as tabular_module
 import webhooks as webhooks_module
 import leads as leads_module
+import api_keys as api_keys_module
+import openapi_spec as openapi_spec_module
 
 
 @app.route("/monitors")
@@ -1543,6 +1545,255 @@ def webhooks_deliveries():
 
 # Need this for the self-probe latency measurement; track the port we boot on.
 _LISTEN_PORT = 8080
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — REST API v1 (Day 16).
+# Same engines as the UI routes, but wrapped in API-key auth + rate limiting.
+# OpenAPI spec at /api/v1/openapi.json; Swagger UI at /api/v1/docs.
+# ═══════════════════════════════════════════════════════════════════════════════
+def _require_api_key():
+    """Verify X-Api-Key header, enforce rate limit. Returns (key_record, error_response)."""
+    raw = request.headers.get("X-Api-Key", "")
+    if not raw:
+        return None, (jsonify({"error": "Missing X-Api-Key header."}), 401)
+    key = api_keys_module.verify_key(raw)
+    if not key:
+        return None, (jsonify({"error": "Invalid or revoked API key."}), 401)
+    ok, remaining = api_keys_module.check_rate_limit(key["key_id"], key["rate_per_min"])
+    if not ok:
+        return None, (jsonify({"error": f"Rate limit exceeded ({key['rate_per_min']}/min)."}), 429)
+    return key, None
+
+
+@app.route("/api/v1/openapi.json")
+def api_openapi_json():
+    return jsonify(openapi_spec_module.spec())
+
+
+@app.route("/api/v1/docs")
+def api_docs():
+    """Swagger UI page — pure HTML, loads swagger-ui from CDN."""
+    return """<!DOCTYPE html>
+<html><head>
+  <meta charset="UTF-8"><title>Lex-Indic API — Swagger UI</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+</head><body>
+  <div id="swagger"></div>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    window.onload = () => SwaggerUIBundle({
+      url: "/api/v1/openapi.json",
+      dom_id: "#swagger",
+      deepLinking: true,
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+      layout: "BaseLayout",
+    });
+  </script>
+</body></html>"""
+
+
+@app.route("/api/v1/health")
+def api_health():
+    """No auth required — for k8s liveness, monitoring, etc."""
+    import time as _t
+    return jsonify({
+        "ok": True,
+        "version": "1.0.0",
+        "uptime_s": int((datetime.now(timezone.utc) - _SERVER_STARTED_AT).total_seconds()),
+    })
+
+
+@app.route("/api/v1/analyze", methods=["POST"])
+def api_analyze():
+    key, err = _require_api_key()
+    if err: return err
+    # Delegate to the existing /analyze handler logic — just call the function.
+    # Simplest path: forward the JSON to the existing route via test client?
+    # No — duplicate the minimum logic so we don't lose request context.
+    data = request.get_json() or {}
+    story = (data.get("client_story") or "").strip()
+    if not story or len(story) < 30:
+        return jsonify({"error": "client_story must be ≥30 chars"}), 400
+
+    # Reuse the existing retrieval + Groq pipeline directly
+    try:
+        retrieved_context, sources = retrieve_relevant_sections_structured(
+            rag_collection, story, n_results=8,
+        )
+        prompt = build_legal_prompt(story, retrieved_context)
+        completion = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": LEXI_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.2, max_tokens=8192,
+        )
+        ai_response = completion.choices[0].message.content
+        txt_path = save_raw_output(story, ai_response)
+        pdf_path = generate_pdf(txt_path)
+        with open(txt_path, "r", encoding="utf-8") as f:
+            raw_text = f.read()
+        sections = parse_sections(raw_text)
+        for k in sections:
+            if isinstance(sections[k], str):
+                sections[k] = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", sections[k])
+        request_id = audit.log_request(
+            endpoint="/api/v1/analyze",
+            client_ip=request.remote_addr or "",
+            user_agent=f"api-key:{key['key_id']}",
+            story=story, sources=sources, status="ok",
+            duration_ms=0, response_chars=len(ai_response or ""),
+            pdf_filename=Path(pdf_path).name,
+            extra={"user_id": key["user_id"], "firm_id": key.get("firm_id") or None,
+                   "api_key_id": key["key_id"]},
+        )
+        return jsonify({
+            "sections": sections, "client_statement": story,
+            "pdf_filename": Path(pdf_path).name, "sources": sources,
+            "language": "en", "request_id": request_id,
+        })
+    except Exception as e:
+        return jsonify({"error": f"Analysis failed: {str(e)[:200]}"}), 500
+
+
+@app.route("/api/v1/convert/text", methods=["POST"])
+def api_convert_text():
+    key, err = _require_api_key()
+    if err: return err
+    data = request.get_json() or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "text is required"}), 400
+    if len(text) > 200_000:
+        return jsonify({"error": "text too large (>200,000 chars)"}), 400
+    annotated, summary = convert_text(text)
+    return jsonify({"annotated": annotated, "summary": summary.to_dict()})
+
+
+@app.route("/api/v1/ecourts/lookup/<cnr>")
+def api_ecourts_lookup(cnr):
+    key, err = _require_api_key()
+    if err: return err
+    cnr_norm = ecourts_module.normalize_cnr(cnr)
+    if not ecourts_module.is_valid_cnr(cnr_norm):
+        return jsonify({"error": "invalid CNR format"}), 400
+    result = ecourts_module.fetch_cnr_status(cnr_norm)
+    if not result:
+        return jsonify({"error": "CNR not found"}), 404
+    return jsonify(result)
+
+
+@app.route("/api/v1/monitors/digest")
+def api_monitors_digest():
+    key, err = _require_api_key()
+    if err: return err
+    since = request.args.get("since")
+    return jsonify(monitors_module.run_digest(since=since))
+
+
+@app.route("/api/v1/sections")
+def api_sections():
+    key, err = _require_api_key()
+    if err: return err
+    kind = (request.args.get("kind") or "all").lower()
+    out = []
+    # BNS
+    if kind in ("bns", "all"):
+        import data.bns_knowledge_base as bns_kb
+        for s in bns_kb.BNS_SECTIONS:
+            out.append({"id": s["id"], "kind": "bns", **{
+                k: s[k] for k in ("section", "old_ipc", "title", "punishment",
+                                  "bailable", "cognizable", "transition_note")
+            }})
+    # BNSS + BSA
+    if kind in ("bnss", "bsa", "all"):
+        try:
+            import data.bnss_bsa_knowledge_base as b_kb
+            for s in b_kb.BNSS_SECTIONS + b_kb.BSA_SECTIONS:
+                k = "bnss" if s["id"].startswith("bnss_") else "bsa"
+                if kind in (k, "all"):
+                    out.append({"id": s["id"], "kind": k, **{
+                        x: s[x] for x in ("section", "old_ipc", "title", "punishment",
+                                          "bailable", "cognizable", "transition_note")
+                    }})
+        except ImportError:
+            pass
+    return jsonify({"sections": out, "count": len(out)})
+
+
+@app.route("/api/v1/leads", methods=["POST"])
+def api_leads():
+    key, err = _require_api_key()
+    if err: return err
+    data = request.get_json() or {}
+    ok, msg = leads_module.validate(data)
+    if not ok:
+        return jsonify({"error": msg}), 400
+    lead = leads_module.capture(data, referrer="api-key:"+key["key_id"],
+                                user_agent=request.headers.get("User-Agent", ""))
+    try:
+        webhooks_module.emit("lead.captured", {
+            "lead_id": lead.id, "email": lead.email,
+            "firm_or_org": lead.firm_or_org, "via": "api",
+        })
+    except Exception:
+        pass
+    return jsonify({"lead": {"id": lead.id, "full_name": lead.full_name}})
+
+
+# ─── Admin endpoints to manage API keys ────────────────────────────────────
+@app.route("/admin/api-keys", methods=["GET", "POST"])
+def admin_api_keys():
+    """Sign-in-required: list / issue API keys for the current user."""
+    user = _current_user()
+    if not user:
+        # Allow ADMIN_TOKEN to act as a superuser for ops
+        guard = _require_admin()
+        if guard: return guard
+        if request.method == "GET":
+            return jsonify({"keys": api_keys_module.list_keys()})
+        # POST without user — must specify user_id
+        data = request.get_json() or {}
+        if not data.get("user_id"):
+            return jsonify({"error": "user_id required when calling as admin"}), 400
+        try:
+            key = api_keys_module.issue_key(
+                user_id=data["user_id"], firm_id=data.get("firm_id", ""),
+                label=data.get("label", "admin-issued"),
+                rate_per_min=int(data.get("rate_per_min", 60)),
+            )
+            return jsonify({"key": key})
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+
+    if request.method == "GET":
+        return jsonify({"keys": api_keys_module.list_keys(user_id=user["id"])})
+    data = request.get_json() or {}
+    try:
+        key = api_keys_module.issue_key(
+            user_id=user["id"],
+            firm_id=user.get("firm_id") or "",
+            label=data.get("label", ""),
+            rate_per_min=int(data.get("rate_per_min", 60)),
+        )
+        return jsonify({"key": key})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/admin/api-keys/<key_id>", methods=["DELETE"])
+def admin_api_key_revoke(key_id):
+    user = _current_user()
+    if not user:
+        guard = _require_admin()
+        if guard: return guard
+    if not re.match(r"^lex_live_[a-f0-9]+$", key_id):
+        return jsonify({"error": "invalid key id"}), 400
+    if not api_keys_module.revoke_key(key_id):
+        return jsonify({"error": "key not found or already revoked"}), 404
+    return jsonify({"ok": True})
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
