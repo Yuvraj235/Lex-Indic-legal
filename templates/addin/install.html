@@ -142,10 +142,17 @@
       <span class="brand-name">Lex-Indic</span>
     </a>
     <nav class="nav">
-      <a href="/">Landing</a>
-      <a href="/app">Analyze a case</a>
-      <a href="/convert">Convert IPC → BNS</a>
-      <a href="/addin/install" style="color:var(--gold-glow)">Word add-in</a>
+      <a href="/" data-i18n="nav.landing">Landing</a>
+      <a href="/app" data-i18n="nav.analyze">Analyze a case</a>
+      <a href="/convert" data-i18n="nav.convert">Convert IPC → BNS</a>
+      <a href="/addin/install" style="color:var(--gold-glow)" data-i18n="nav.addin">Word add-in</a>
+    
+      <div class="btn-group btn-group-sm" role="group" aria-label="Language" style="margin-left:auto;display:flex;gap:0">
+        <button type="button" onclick="setLexLang('en')" id="lexLangEn"
+                style="background:transparent;border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.78);padding:5px 12px;border-radius:6px 0 0 6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">EN</button>
+        <button type="button" onclick="setLexLang('hi')" id="lexLangHi"
+                style="background:transparent;border:1px solid rgba(255,255,255,.25);border-left:0;color:rgba(255,255,255,.78);padding:5px 12px;border-radius:0 6px 6px 0;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">हिन्दी</button>
+      </div>
     </nav>
   </div>
 </header>
@@ -268,5 +275,39 @@ https://localhost:8443</pre>
 </main>
 
 <script src="/static/lex-design-system.js" defer></script>
+
+<script>
+/* Lex-Indic shared i18n runtime (auto-injected). Reads /i18n/strings.json
+   once, toggles every data-i18n element on EN/हिन्दी click. Choice
+   persists in localStorage. */
+(function(){
+  var STRINGS = null;
+  function apply(lang){
+    if (lang !== 'en' && lang !== 'hi') lang = 'en';
+    localStorage.setItem('lexindic.lang', lang);
+    document.documentElement.lang = lang;
+    var en = document.getElementById('lexLangEn'), hi = document.getElementById('lexLangHi');
+    if (en && hi){
+      en.style.background = lang === 'en' ? 'rgba(240,196,79,.18)' : 'transparent';
+      en.style.color      = lang === 'en' ? '#f0c44f' : 'rgba(255,255,255,.78)';
+      hi.style.background = lang === 'hi' ? 'rgba(240,196,79,.18)' : 'transparent';
+      hi.style.color      = lang === 'hi' ? '#f0c44f' : 'rgba(255,255,255,.78)';
+    }
+    if (!STRINGS) return;
+    document.querySelectorAll('[data-i18n]').forEach(function(el){
+      var key = el.getAttribute('data-i18n');
+      var entry = STRINGS[key];
+      if (!entry) return;
+      var val = (typeof entry === 'object') ? (entry[lang] || entry.en) : entry;
+      if (val) el.textContent = val;
+    });
+  }
+  window.setLexLang = apply;
+  fetch('/i18n/strings.json').then(function(r){return r.json();}).then(function(s){
+    STRINGS = s;
+    apply(localStorage.getItem('lexindic.lang') || 'en');
+  });
+})();
+</script>
 </body>
 </html>

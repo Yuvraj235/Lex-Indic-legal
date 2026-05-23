@@ -41,7 +41,16 @@ STRINGS: dict[str, dict[str, str]] = {
     "nav.analyze":     {"en": "Analyze a case",   "hi": "केस विश्लेषण"},
     "nav.convert":     {"en": "Convert IPC → BNS","hi": "IPC → BNS रूपांतरण"},
     "nav.monitor":     {"en": "Monitor",          "hi": "मॉनिटर"},
+    "nav.matters":     {"en": "Matters",          "hi": "केस फ़ाइलें"},
+    "nav.tabular":     {"en": "Tabular",          "hi": "तुलना तालिका"},
+    "nav.ecourts":     {"en": "e-Courts",         "hi": "ई-कोर्ट"},
+    "nav.trust":       {"en": "Trust",            "hi": "विश्वास"},
+    "nav.status":      {"en": "Status",           "hi": "स्थिति"},
+    "nav.nalsa":       {"en": "For NALSA",        "hi": "NALSA पैनल"},
+    "nav.login":       {"en": "Sign in",          "hi": "साइन इन"},
     "nav.try":         {"en": "Try the engine",   "hi": "इंजन का उपयोग करें"},
+    "common.lang.toggle.en": {"en": "EN", "hi": "EN"},
+    "common.lang.toggle.hi": {"en": "हिन्दी", "hi": "हिन्दी"},
 
     # ── App page (intake form)
     "app.header.title":     {"en": "BNS Transition Engine",

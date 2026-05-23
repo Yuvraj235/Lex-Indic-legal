@@ -368,11 +368,23 @@ def matters_page():
 
 @app.route("/matters/api/firms", methods=["GET", "POST"])
 def matters_firms():
+    """Day-16 multi-tenant rules:
+      GET  — anonymous: returns all firms (demo).
+             authenticated: returns only the user's firm.
+      POST — anyone can create a firm; if user is authenticated and has
+             no firm_id yet, auto-bind them to the new firm as 'partner'."""
+    u = _current_user()
     if request.method == "GET":
-        return jsonify({"firms": matters_module.list_firms()})
+        firms = matters_module.list_firms()
+        if u and u.get("firm_id"):
+            firms = [f for f in firms if f["id"] == u["firm_id"]]
+        return jsonify({"firms": firms})
     data = request.get_json() or {}
     try:
         firm = matters_module.add_firm(data.get("name", ""), data.get("address", ""))
+        # Auto-bind the creating user to the new firm on first create
+        if u and not u.get("firm_id"):
+            auth_module.bind_user_to_firm(u["id"], firm["id"], role="partner")
         return jsonify({"firm": firm})
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -380,12 +392,18 @@ def matters_firms():
 
 @app.route("/matters/api/lawyers", methods=["GET", "POST"])
 def matters_lawyers():
+    u = _current_user()
     if request.method == "GET":
-        return jsonify({"lawyers": matters_module.list_lawyers()})
+        lawyers = matters_module.list_lawyers()
+        if u and u.get("firm_id"):
+            lawyers = [l for l in lawyers if l["firm_id"] == u["firm_id"]]
+        return jsonify({"lawyers": lawyers})
     data = request.get_json() or {}
+    # Authenticated user: silently override firm_id to their own
+    firm_id = u["firm_id"] if (u and u.get("firm_id")) else data.get("firm_id", "")
     try:
         lwy = matters_module.add_lawyer(
-            firm_id=data.get("firm_id", ""),
+            firm_id=firm_id,
             full_name=data.get("full_name", ""),
             bar_council_no=data.get("bar_council_no", ""),
             email=data.get("email", ""),
@@ -398,24 +416,40 @@ def matters_lawyers():
 
 @app.route("/matters/api/matters", methods=["GET", "POST"])
 def matters_matters():
+    u = _current_user()
     if request.method == "GET":
-        return jsonify({"matters": matters_module.list_matters()})
+        matters = matters_module.list_matters()
+        if u and u.get("firm_id"):
+            matters = [m for m in matters if m["firm_id"] == u["firm_id"]]
+        return jsonify({"matters": matters})
     data = request.get_json() or {}
+    firm_id = u["firm_id"] if (u and u.get("firm_id")) else data.get("firm_id", "")
     try:
         m = matters_module.add_matter(
-            firm_id=data.get("firm_id", ""),
+            firm_id=firm_id,
             lawyer_id=data.get("lawyer_id", ""),
             client_name=data.get("client_name", ""),
             opposing_party=data.get("opposing_party", ""),
             matter_type=data.get("matter_type", ""),
             description=data.get("description", ""),
         )
-        # Conflict check is informational, not blocking
         conflicts = matters_module.check_conflict(
-            firm_id=data.get("firm_id", ""),
+            firm_id=firm_id,
             client_name=data.get("client_name", ""),
             opposing_party=data.get("opposing_party", ""),
         )
+        # Day-15 webhook: matter.created
+        try:
+            webhooks_module.emit("matter.created", {
+                "matter_id": m["id"],
+                "firm_id":   m["firm_id"],
+                "lawyer_id": m["lawyer_id"],
+                "matter_type": m.get("matter_type"),
+                "conflicts_count": len(conflicts),
+                "by_user_id": (u or {}).get("id"),
+            })
+        except Exception:
+            pass
         return jsonify({"matter": m, "conflicts": conflicts})
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -829,6 +863,12 @@ def analyze():
     t_start    = time.monotonic()
     client_ip  = (request.headers.get("X-Forwarded-For") or request.remote_addr or "")
     user_agent = request.headers.get("User-Agent", "")
+    # Day-16: enrich audit with user_id/firm_id when authenticated.
+    _u = _current_user()
+    _audit_extra = {
+        "user_id":   (_u or {}).get("id", "") or None,
+        "firm_id":   (_u or {}).get("firm_id", "") or None,
+    }
 
     # Accept multipart/form-data (with files) OR plain JSON
     ct = request.content_type or ""
@@ -836,15 +876,15 @@ def analyze():
         client_story    = request.form.get("client_story", "").strip()
         additional_info = request.form.get("additional_info", "").strip()
         uploaded_files  = request.files.getlist("attachments")
-        # Day-4: optional output-language flag.  Accepted values: 'en', 'hi'.
-        # Anything else falls back to English silently.
         language        = (request.form.get("language") or "en").lower()
+        _audit_extra["matter_id"] = request.form.get("matter_id") or None
     else:
         data            = request.get_json() or {}
         client_story    = data.get("client_story", "").strip()
         additional_info = data.get("additional_info", "").strip()
         uploaded_files  = []
         language        = (data.get("language") or "en").lower()
+        _audit_extra["matter_id"] = (data.get("matter_id") or None)
     if language not in ("en", "hi"):
         language = "en"
 
@@ -852,7 +892,7 @@ def analyze():
         rid = audit.log_request(
             endpoint="/analyze", client_ip=client_ip, user_agent=user_agent,
             story="", status="error", duration_ms=int((time.monotonic() - t_start) * 1000),
-            error="empty client_story",
+            error="empty client_story", extra=_audit_extra,
         )
         return jsonify({"error": "Please enter the client's story.", "request_id": rid}), 400
 
@@ -861,7 +901,7 @@ def analyze():
             endpoint="/analyze", client_ip=client_ip, user_agent=user_agent,
             story=client_story, status="error",
             duration_ms=int((time.monotonic() - t_start) * 1000),
-            error="story too short",
+            error="story too short", extra=_audit_extra,
         )
         return jsonify({"error": "Please provide more details about the client's situation.", "request_id": rid}), 400
 
@@ -977,6 +1017,7 @@ def analyze():
             duration_ms=int((time.monotonic() - t_start) * 1000),
             response_chars=len(ai_response or ""),
             pdf_filename=pdf_filename,
+            extra=_audit_extra,
         )
 
         # Day 15: fire the analysis.completed webhook (fire-and-forget)
@@ -1012,6 +1053,7 @@ def analyze():
             status="error",
             duration_ms=int((time.monotonic() - t_start) * 1000),
             error=str(e),
+            extra=_audit_extra,
         )
         return jsonify({
             "error": f"Analysis failed: {str(e)[:300]}",

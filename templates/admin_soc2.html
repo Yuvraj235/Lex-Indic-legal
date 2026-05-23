@@ -269,5 +269,39 @@
   setInterval(loadControls, 60_000);
 </script>
 <script src="/static/lex-design-system.js" defer></script>
+
+<script>
+/* Lex-Indic shared i18n runtime (auto-injected). Reads /i18n/strings.json
+   once, toggles every data-i18n element on EN/हिन्दी click. Choice
+   persists in localStorage. */
+(function(){
+  var STRINGS = null;
+  function apply(lang){
+    if (lang !== 'en' && lang !== 'hi') lang = 'en';
+    localStorage.setItem('lexindic.lang', lang);
+    document.documentElement.lang = lang;
+    var en = document.getElementById('lexLangEn'), hi = document.getElementById('lexLangHi');
+    if (en && hi){
+      en.style.background = lang === 'en' ? 'rgba(240,196,79,.18)' : 'transparent';
+      en.style.color      = lang === 'en' ? '#f0c44f' : 'rgba(255,255,255,.78)';
+      hi.style.background = lang === 'hi' ? 'rgba(240,196,79,.18)' : 'transparent';
+      hi.style.color      = lang === 'hi' ? '#f0c44f' : 'rgba(255,255,255,.78)';
+    }
+    if (!STRINGS) return;
+    document.querySelectorAll('[data-i18n]').forEach(function(el){
+      var key = el.getAttribute('data-i18n');
+      var entry = STRINGS[key];
+      if (!entry) return;
+      var val = (typeof entry === 'object') ? (entry[lang] || entry.en) : entry;
+      if (val) el.textContent = val;
+    });
+  }
+  window.setLexLang = apply;
+  fetch('/i18n/strings.json').then(function(r){return r.json();}).then(function(s){
+    STRINGS = s;
+    apply(localStorage.getItem('lexindic.lang') || 'en');
+  });
+})();
+</script>
 </body>
 </html>
