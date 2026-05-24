@@ -39,6 +39,8 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import db   # Day-21 dual-backend
+
 _REGISTRY_PATH = Path("outputs") / "nalsa" / "registry.json"
 
 # The 36 NALSA SLSA jurisdictions (28 states + 8 union territories).
@@ -74,19 +76,42 @@ class NalsaRegistration:
         return asdict(self)
 
 
-def _load() -> list[NalsaRegistration]:
+# ── JSON-file backend (default) ─────────────────────────────────────────────
+def _load_json() -> list[NalsaRegistration]:
     if not _REGISTRY_PATH.exists():
         return []
     raw = json.loads(_REGISTRY_PATH.read_text(encoding="utf-8"))
     return [NalsaRegistration(**r) for r in raw]
 
 
-def _save(regs: list[NalsaRegistration]):
+def _save_json(regs: list[NalsaRegistration]):
     _REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
     _REGISTRY_PATH.write_text(
         json.dumps([r.to_dict() for r in regs], indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
+
+
+# ── DB-backed helpers ───────────────────────────────────────────────────────
+def _row_to_reg(row) -> NalsaRegistration:
+    return NalsaRegistration(
+        id=row.id, full_name=row.full_name, panel_id=row.panel_id or "",
+        slsa=row.slsa, bar_council_no=row.bar_council_no or "",
+        email=row.email, phone=row.phone or "",
+        practice_areas=list(row.practice_areas or []),
+        case_volume_monthly=int(row.case_volume_monthly or 0),
+        consent_to_contact=bool(row.consent_to_contact),
+        registered_at=row.registered_at.isoformat(timespec="seconds") if row.registered_at else "",
+        status=row.status or "self_claimed",
+    )
+
+
+def _all() -> list[NalsaRegistration]:
+    if db.is_enabled():
+        with db.session() as s:
+            rows = s.query(db.NalsaRegistration).order_by(db.NalsaRegistration.registered_at.asc()).all()
+            return [_row_to_reg(r) for r in rows]
+    return _load_json()
 
 
 # ── Validation ──────────────────────────────────────────────────────────────
@@ -116,7 +141,6 @@ def validate(payload: dict) -> tuple[bool, str | None]:
 
 def register(payload: dict) -> NalsaRegistration:
     """Save a new self-claimed registration.  Caller must validate() first."""
-    regs = _load()
     new = NalsaRegistration(
         id=f"nalsa_{int(datetime.now(timezone.utc).timestamp())}",
         full_name=payload["full_name"].strip()[:120],
@@ -131,17 +155,31 @@ def register(payload: dict) -> NalsaRegistration:
         registered_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         status="self_claimed",
     )
+    if db.is_enabled():
+        with db.session() as s:
+            s.add(db.NalsaRegistration(
+                id=new.id, full_name=new.full_name, panel_id=new.panel_id,
+                slsa=new.slsa, bar_council_no=new.bar_council_no,
+                email=new.email, phone=new.phone,
+                practice_areas=new.practice_areas,
+                case_volume_monthly=new.case_volume_monthly,
+                consent_to_contact=new.consent_to_contact,
+                registered_at=datetime.now(timezone.utc),
+                status=new.status,
+            ))
+        return new
+    regs = _load_json()
     regs.append(new)
-    _save(regs)
+    _save_json(regs)
     return new
 
 
 def list_all() -> list[dict]:
-    return [r.to_dict() for r in _load()]
+    return [r.to_dict() for r in _all()]
 
 
 def stats() -> dict:
-    regs = _load()
+    regs = _all()
     by_slsa: dict[str, int] = {}
     by_status: dict[str, int] = {}
     total_volume = 0
@@ -159,7 +197,7 @@ def stats() -> dict:
 
 def export_csv() -> str:
     """Spot-check CSV for SLSA verification.  Caller should restrict access."""
-    regs = _load()
+    regs = _all()
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow([
@@ -178,4 +216,18 @@ def is_registered(email: str) -> bool:
     if not email:
         return False
     email = email.lower().strip()
-    return any(r.email == email and r.status != "revoked" for r in _load())
+    if db.is_enabled():
+        with db.session() as s:
+            row = (s.query(db.NalsaRegistration)
+                    .filter(db.NalsaRegistration.email == email,
+                            db.NalsaRegistration.status != "revoked")
+                    .first())
+            return row is not None
+    return any(r.email == email and r.status != "revoked" for r in _load_json())
+
+
+def backend() -> str:
+    if not db.is_enabled():
+        return "json"
+    scheme = db.database_url().split(":")[0].lower()
+    return "postgres" if "postgres" in scheme else ("sqlite" if "sqlite" in scheme else scheme)
