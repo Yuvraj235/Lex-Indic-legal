@@ -64,6 +64,8 @@ def init_db():
             user_id          TEXT NOT NULL,               -- joins auth.users
             firm_id          TEXT,                        -- multi-tenant scope
             label            TEXT,                        -- human label, e.g. "Singhania integration"
+            tier             TEXT NOT NULL DEFAULT 'firm',-- free | nalsa | firm | internal
+            daily_limit      INTEGER,                     -- NULL = use tier default
             rate_per_min     INTEGER NOT NULL DEFAULT 60,
             created_at       TEXT NOT NULL,
             last_used_at     TEXT,
@@ -72,6 +74,12 @@ def init_db():
         );
         CREATE INDEX IF NOT EXISTS idx_keys_user ON api_keys(user_id);
         """)
+        # Non-destructive column migrations for existing DBs
+        existing_cols = {row[1] for row in c.execute("PRAGMA table_info(api_keys)").fetchall()}
+        if "tier" not in existing_cols:
+            c.execute("ALTER TABLE api_keys ADD COLUMN tier TEXT NOT NULL DEFAULT 'firm'")
+        if "daily_limit" not in existing_cols:
+            c.execute("ALTER TABLE api_keys ADD COLUMN daily_limit INTEGER")
 
 
 def _hash_secret(secret: str) -> str:
@@ -82,12 +90,17 @@ def _hash_secret(secret: str) -> str:
 
 # ─── Public API ─────────────────────────────────────────────────────────────
 def issue_key(user_id: str, *, firm_id: str = "", label: str = "",
+              tier: str = "firm", daily_limit: int | None = None,
               rate_per_min: int = 60) -> dict:
     """Mint a new key. Returns {key_id, secret, full_key}.
-    The plaintext secret is shown ONCE; store it on the caller side."""
+    The plaintext secret is shown ONCE; store it on the caller side.
+    tier: 'free' | 'nalsa' | 'firm' | 'internal'
+    """
     init_db()
     if not user_id:
         raise ValueError("user_id is required")
+    if tier not in ("free", "nalsa", "firm", "internal"):
+        raise ValueError("tier must be one of: free, nalsa, firm, internal")
     if rate_per_min <= 0 or rate_per_min > 6000:
         raise ValueError("rate_per_min must be 1..6000")
     key_id = "lex_live_" + secrets.token_hex(16)
@@ -96,9 +109,9 @@ def issue_key(user_id: str, *, firm_id: str = "", label: str = "",
     with _db() as c:
         c.execute(
             "INSERT INTO api_keys(key_id, secret_hash, user_id, firm_id, label,"
-            " rate_per_min, created_at) VALUES(?,?,?,?,?,?,?)",
+            " tier, daily_limit, rate_per_min, created_at) VALUES(?,?,?,?,?,?,?,?,?)",
             (key_id, _hash_secret(secret), user_id, firm_id, label[:120],
-             int(rate_per_min), now),
+             tier, daily_limit, int(rate_per_min), now),
         )
     return {
         "key_id":       key_id,
@@ -107,6 +120,8 @@ def issue_key(user_id: str, *, firm_id: str = "", label: str = "",
         "user_id":      user_id,
         "firm_id":      firm_id,
         "label":        label,
+        "tier":         tier,
+        "daily_limit":  daily_limit,
         "rate_per_min": rate_per_min,
         "created_at":   now,
         "warning":      "Save this secret now — it will never be shown again.",
@@ -151,15 +166,16 @@ def list_keys(*, user_id: str = "") -> list[dict]:
     with _db() as c:
         if user_id:
             rows = c.execute(
-                "SELECT key_id, user_id, firm_id, label, rate_per_min, created_at, "
-                "last_used_at, revoked_at FROM api_keys WHERE user_id = ? "
-                "ORDER BY created_at DESC",
+                "SELECT key_id, user_id, firm_id, label, tier, daily_limit, "
+                "rate_per_min, created_at, last_used_at, revoked_at "
+                "FROM api_keys WHERE user_id = ? ORDER BY created_at DESC",
                 (user_id,),
             ).fetchall()
         else:
             rows = c.execute(
-                "SELECT key_id, user_id, firm_id, label, rate_per_min, created_at, "
-                "last_used_at, revoked_at FROM api_keys ORDER BY created_at DESC LIMIT 500"
+                "SELECT key_id, user_id, firm_id, label, tier, daily_limit, "
+                "rate_per_min, created_at, last_used_at, revoked_at "
+                "FROM api_keys ORDER BY created_at DESC LIMIT 500"
             ).fetchall()
     return [dict(r) for r in rows]
 

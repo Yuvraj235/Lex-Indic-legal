@@ -527,3 +527,68 @@ class TestDualBackendIndicators:
         assert monitors.remove_matter(m["id"])
         listing2 = monitors.list_matters()
         assert not any(x["id"] == m["id"] for x in listing2)
+
+
+# ────────────────────────────── Day 23: pricing tier ───────────────────────
+class TestPricing:
+    def test_disabled_flag_always_allows(self, monkeypatch):
+        monkeypatch.setenv("DISABLE_RATE_LIMITS", "1")
+        import pricing
+        result = pricing.check(client_ip="1.2.3.4")
+        assert result["allowed"]
+        assert result["tier"] == "internal"
+
+    def test_internal_api_key_always_allows(self, monkeypatch):
+        monkeypatch.delenv("DISABLE_RATE_LIMITS", raising=False)
+        import pricing
+        result = pricing.check(api_key_id="lex_live_abc", api_key_tier="internal")
+        assert result["allowed"]
+        assert result["tier"] == "internal"
+        assert result["limit"] is None
+
+    def test_nalsa_api_key_always_allows(self, monkeypatch):
+        monkeypatch.delenv("DISABLE_RATE_LIMITS", raising=False)
+        import pricing
+        result = pricing.check(api_key_id="lex_live_abc", api_key_tier="nalsa")
+        assert result["allowed"]
+        assert result["tier"] == "nalsa"
+
+    def test_free_tier_blocks_after_limit(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("DISABLE_RATE_LIMITS", raising=False)
+        monkeypatch.setenv("FREE_DAILY_LIMIT", "2")
+        # Write fake audit records to make it look like 2 analyses already used
+        from datetime import datetime, timezone
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        audit_dir = tmp_path / "audit"
+        audit_dir.mkdir()
+        audit_file = audit_dir / f"audit-{today}.log"
+        import json
+        record = json.dumps({
+            "endpoint": "/analyze", "status": "ok", "client_ip": "10.0.0.1",
+        })
+        audit_file.write_text(record + "\n" + record + "\n")
+        import pricing
+        monkeypatch.setattr(pricing, "_AUDIT_DIR", audit_dir)
+        monkeypatch.setattr(pricing, "FREE_DAILY_LIMIT", 2)
+        result = pricing.check(client_ip="10.0.0.1")
+        assert not result["allowed"]
+        assert result["tier"] == "free"
+        assert result["used"] == 2
+        assert "2" in result["reason"]
+
+    def test_free_tier_allows_under_limit(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("DISABLE_RATE_LIMITS", raising=False)
+        import pricing
+        monkeypatch.setattr(pricing, "_AUDIT_DIR", tmp_path / "audit")
+        monkeypatch.setattr(pricing, "FREE_DAILY_LIMIT", 3)
+        result = pricing.check(client_ip="10.0.0.2")
+        assert result["allowed"]
+        assert result["used"] == 0
+        assert result["limit"] == 3
+
+    def test_tier_label_strings(self):
+        import pricing
+        assert pricing.tier_label("free")     == "Free"
+        assert pricing.tier_label("nalsa")    == "NALSA Panel (Free)"
+        assert pricing.tier_label("firm")     == "Firm"
+        assert pricing.tier_label("internal") == "Internal"

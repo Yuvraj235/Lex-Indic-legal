@@ -220,6 +220,7 @@ import webhooks as webhooks_module
 import leads as leads_module
 import api_keys as api_keys_module
 import openapi_spec as openapi_spec_module
+import pricing as pricing_module   # Day 23
 
 
 @app.route("/monitors")
@@ -907,6 +908,32 @@ def analyze():
             error="story too short", extra=_audit_extra,
         )
         return jsonify({"error": "Please provide more details about the client's situation.", "request_id": rid}), 400
+
+    # Day 23 — pricing / quota check
+    _user_email = ((_u or {}).get("email") or "").strip().lower()
+    _price_result = pricing_module.check(
+        client_ip=client_ip,
+        user_email=_user_email,
+        api_key_id="",
+        api_key_tier="",
+    )
+    _audit_extra["pricing_tier"] = _price_result["tier"]
+    _audit_extra["user_email"]   = _user_email or None
+    if not _price_result["allowed"]:
+        rid = audit.log_request(
+            endpoint="/analyze", client_ip=client_ip, user_agent=user_agent,
+            story=client_story, status="rate_limited",
+            duration_ms=int((time.monotonic() - t_start) * 1000),
+            error="rate_limited", extra=_audit_extra,
+        )
+        return jsonify({
+            "error":      _price_result["reason"],
+            "tier":       _price_result["tier"],
+            "used":       _price_result["used"],
+            "limit":      _price_result["limit"],
+            "request_id": rid,
+            "upgrade_url": "/nalsa",
+        }), 429
 
     try:
         # ── Step 0: Process any attached files ────────────────────────────────
@@ -1803,6 +1830,20 @@ def api_analyze():
     story = (data.get("client_story") or "").strip()
     if not story or len(story) < 30:
         return jsonify({"error": "client_story must be ≥30 chars"}), 400
+
+    # Day 23 — pricing check for API key
+    _price = pricing_module.check(
+        client_ip=request.remote_addr or "",
+        api_key_id=key["key_id"],
+        api_key_tier=key.get("tier", "firm"),
+    )
+    if not _price["allowed"]:
+        return jsonify({
+            "error": _price["reason"],
+            "tier": _price["tier"],
+            "used": _price["used"],
+            "limit": _price["limit"],
+        }), 429
 
     # Reuse the existing retrieval + Groq pipeline directly
     try:
