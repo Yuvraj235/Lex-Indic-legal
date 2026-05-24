@@ -292,6 +292,9 @@
         <h2>Recent leads <a href="/try/api/leads">full list →</a></h2>
         ${leadsTable(d.recent_leads)}
       </div>
+
+      <!-- Storage backend indicator (Day 21) -->
+      ${d.storage ? storageCard(d.storage) : ''}
     `;
     $('content').innerHTML = html;
   }
@@ -383,6 +386,29 @@
           </tr>
         `).join('')}</tbody>
       </table>`;
+  }
+
+  function storageCard(storage){
+    const colors = {json:'#8b8fa8',sqlite:'#f0a500',postgres:'#6bca90'};
+    const icons  = {json:'📄',sqlite:'🗄️',postgres:'🐘'};
+    const summary = storage.summary;
+    const backends = storage.backends || {};
+    const rows = Object.entries(backends).map(([mod, be]) => `
+      <tr>
+        <td style="color:#ccc;padding:3px 8px 3px 0">${mod}</td>
+        <td><span style="background:${colors[be]||'#555'};color:#111;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:600">${icons[be]||''}${be}</span></td>
+      </tr>`).join('');
+    return `
+      <div class="card" style="margin-top:20px;border-left:3px solid ${colors[summary]||'#555'}">
+        <h2>Storage backend <span style="font-size:12px;font-weight:400;color:#8b8fa8">Day 21 — dual-backend mode</span></h2>
+        <table style="border-collapse:collapse"><tbody>${rows}</tbody></table>
+        <p style="font-size:11.5px;color:#8b8fa8;margin-top:10px">
+          ${summary==='json'?'Running on JSON files (dev mode). Set <code>DATABASE_URL</code> to switch to Postgres.':
+            summary==='postgres'?'✅ Running on Postgres. All data is durable.':
+            summary==='sqlite'?'Running on SQLite. Good for single-server; upgrade to Postgres for multi-instance.':
+            'Modules are on mixed backends — check deployment config.'}
+        </p>
+      </div>`;
   }
 
   loadData();

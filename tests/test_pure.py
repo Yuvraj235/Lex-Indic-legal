@@ -440,3 +440,82 @@ class TestDbModule:
         with pytest.raises(RuntimeError, match="DATABASE_URL"):
             with db.session():
                 pass
+
+
+# ────────────────────────────── Day 21: dual-backend indicators ─────────────
+class TestDualBackendIndicators:
+    """All five dual-backed modules report 'json' when DATABASE_URL is unset."""
+
+    def test_matters_backend_json(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import db; db._engine = None
+        import matters
+        assert matters.backend() == "json"
+
+    def test_monitors_backend_json(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import db; db._engine = None
+        import monitors
+        assert monitors.backend() == "json"
+
+    def test_nalsa_backend_json(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import db; db._engine = None
+        import nalsa
+        assert nalsa.backend() == "json"
+
+    def test_leads_backend_json(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import db; db._engine = None
+        import leads
+        assert leads.backend() == "json"
+
+    def test_webhooks_backend_json(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import db; db._engine = None
+        import webhooks
+        assert webhooks.backend() == "json"
+
+    def test_all_backends_sqlite(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path}/lex.db")
+        import db; db._engine = None
+        db.create_all()
+        import matters, monitors, nalsa, leads, webhooks
+        assert matters.backend() == "sqlite"
+        assert monitors.backend() == "sqlite"
+        assert nalsa.backend() == "sqlite"
+        assert leads.backend() == "sqlite"
+        assert webhooks.backend() == "sqlite"
+
+    def test_matters_dual_backend_crud(self, monkeypatch, tmp_path):
+        """End-to-end: add firm+lawyer+matter against SQLite, then read back."""
+        monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path}/lex.db")
+        import db; db._engine = None
+        db.create_all()
+        import matters
+        firm = matters.add_firm("Dual Test & Co", "Mumbai")
+        assert firm["id"].startswith("firm_")
+        lwy = matters.add_lawyer(firm["id"], "Arjun Singh", role="associate")
+        assert lwy["id"].startswith("lwy_")
+        m = matters.add_matter(firm["id"], lwy["id"], "Rajan Kumar",
+                               opposing_party="State of Maharashtra",
+                               matter_type="criminal")
+        assert "/" in m["id"]  # DUALTESTCO/2026/0001
+        assert m["status"] == "open"
+        assert matters.get_matter(m["id"])["client_name"] == "Rajan Kumar"
+        assert matters.update_matter_status(m["id"], "filed")
+        assert matters.get_matter(m["id"])["status"] == "filed"
+
+    def test_monitors_dual_backend_crud(self, monkeypatch, tmp_path):
+        """add_matter / list_matters / remove_matter against SQLite."""
+        monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path}/lex.db")
+        import db; db._engine = None
+        db.create_all()
+        import monitors
+        m = monitors.add_matter("dowry matters", ["dowry", "BNS 85"], ["BNS 85", "BNS 80"])
+        assert m["id"].startswith("m_")
+        listing = monitors.list_matters()
+        assert any(x["id"] == m["id"] for x in listing)
+        assert monitors.remove_matter(m["id"])
+        listing2 = monitors.list_matters()
+        assert not any(x["id"] == m["id"] for x in listing2)

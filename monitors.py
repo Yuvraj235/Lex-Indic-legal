@@ -49,6 +49,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
+import db   # Day-21 dual-backend
+
 # ─── Storage paths ──────────────────────────────────────────────────────────
 _DATA_DIR    = Path(__file__).parent / "data" / "monitor_corpus"
 _RULINGS_FILE = _DATA_DIR / "sc_rulings.json"
@@ -433,19 +435,61 @@ def _save_matters(matters: list[Matter]):
     )
 
 
+def _row_to_matter(row) -> Matter:
+    return Matter(
+        id=row.id, label=row.label,
+        keywords=list(row.keywords or []),
+        sections=list(row.sections or []),
+        created_at=row.created_at.isoformat(timespec="seconds") if row.created_at else "",
+    )
+
+
+def backend() -> str:
+    if not db.is_enabled():
+        return "json"
+    scheme = db.database_url().split(":")[0].lower()
+    return "postgres" if "postgres" in scheme else ("sqlite" if "sqlite" in scheme else scheme)
+
+
 def list_matters() -> list[dict]:
+    if db.is_enabled():
+        with db.session() as s:
+            rows = s.query(db.MonitorMatter).order_by(
+                db.MonitorMatter.created_at.asc()
+            ).all()
+            return [asdict(_row_to_matter(r)) for r in rows]
     return [asdict(m) for m in _load_matters()]
 
 
 def add_matter(label: str, keywords: list[str], sections: list[str]) -> dict:
     """Register a new matter to watch. Returns the saved matter."""
+    new_id = f"m_{int(datetime.now(timezone.utc).timestamp())}"
+    now = datetime.now(timezone.utc)
+    clean_kw = [k.strip().lower() for k in keywords if k.strip()][:20]
+    clean_sec = [s.strip().upper() for s in sections if s.strip()][:20]
+
+    if db.is_enabled():
+        with db.session() as s:
+            s.add(db.MonitorMatter(
+                id=new_id,
+                label=label.strip()[:100],
+                keywords=clean_kw,
+                sections=clean_sec,
+                created_at=now,
+            ))
+        return {
+            "id": new_id, "label": label.strip()[:100],
+            "keywords": clean_kw, "sections": clean_sec,
+            "created_at": now.isoformat(timespec="seconds"),
+        }
+
     matters = _load_matters()
     new = Matter(
-        id=f"m_{int(datetime.now(timezone.utc).timestamp())}",
+        id=new_id,
         label=label.strip()[:100],
-        keywords=[k.strip().lower() for k in keywords if k.strip()][:20],
-        sections=[s.strip().upper() for s in sections if s.strip()][:20],
-        created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        keywords=clean_kw,
+        sections=clean_sec,
+        created_at=now.isoformat(timespec="seconds"),
     )
     matters.append(new)
     _save_matters(matters)
@@ -453,6 +497,16 @@ def add_matter(label: str, keywords: list[str], sections: list[str]) -> dict:
 
 
 def remove_matter(matter_id: str) -> bool:
+    if db.is_enabled():
+        with db.session() as s:
+            row = s.query(db.MonitorMatter).filter(
+                db.MonitorMatter.id == matter_id
+            ).first()
+            if not row:
+                return False
+            s.delete(row)
+        return True
+
     matters = _load_matters()
     n = len(matters)
     matters = [m for m in matters if m.id != matter_id]
@@ -525,7 +579,8 @@ def run_digest(*, since: str | None = None) -> dict:
             'totals': {'matters_with_hits': N, 'total_hits': N},
         }
     """
-    matters = _load_matters()
+    matters_raw = list_matters()  # dual-backend aware
+    matters = [Matter(**m) for m in matters_raw]
     rulings = load_rulings()
 
     if since:

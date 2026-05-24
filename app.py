@@ -1706,14 +1706,29 @@ def dashboard_data():
     # ── Recent leads (last 8) ─────────────────────────────────────────────
     recent_leads = leads_all[-8:][::-1] if leads_all else []
 
+    # ── Storage backend indicators (Day 21) ──────────────────────────────────
+    storage_backends = {
+        "matters":   matters_module.backend(),
+        "monitors":  monitors_module.backend(),
+        "leads":     leads_module.backend(),
+        "nalsa":     nalsa_module.backend(),
+        "webhooks":  webhooks_module.backend(),
+    }
+    # summarise: if any module is on postgres/sqlite, show that; else "json"
+    unique = set(storage_backends.values())
+    storage_summary = "json" if unique == {"json"} else next(
+        (v for v in ("postgres", "sqlite") if v in unique), "mixed"
+    )
+
     return jsonify({
-        "generated_at":    now.isoformat(timespec="seconds"),
-        "kpis":            kpis,
-        "funnel":          funnel,
-        "daily_analyses":  dates,
-        "top_sources":     top_sources,
-        "recent_analyses": recent_analyses,
-        "recent_leads":    recent_leads,
+        "generated_at":      now.isoformat(timespec="seconds"),
+        "kpis":              kpis,
+        "funnel":            funnel,
+        "daily_analyses":    dates,
+        "top_sources":       top_sources,
+        "recent_analyses":   recent_analyses,
+        "recent_leads":      recent_leads,
+        "storage":           {"backends": storage_backends, "summary": storage_summary},
     })
 
 
