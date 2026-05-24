@@ -592,3 +592,59 @@ class TestPricing:
         assert pricing.tier_label("nalsa")    == "NALSA Panel (Free)"
         assert pricing.tier_label("firm")     == "Firm"
         assert pricing.tier_label("internal") == "Internal"
+
+
+# ────────────────────────────── Day 24: cron jobs ──────────────────────────
+class TestCron:
+    def test_nalsa_csv_export(self, tmp_path, monkeypatch):
+        """nalsa_csv_export writes a dated CSV to outputs/nalsa/."""
+        monkeypatch.chdir(tmp_path)
+        import cron
+        result = cron.nalsa_csv_export()
+        assert result["status"] == "ok"
+        from pathlib import Path
+        assert Path(result["path"]).exists()
+        assert result["rows"] >= 0
+
+    def test_cleanup_audit_no_dir(self, tmp_path, monkeypatch):
+        """cleanup_audit returns ok even when audit dir doesn't exist."""
+        monkeypatch.chdir(tmp_path)
+        import cron
+        result = cron.cleanup_audit()
+        assert result["status"] == "ok"
+        assert result["deleted"] == 0
+
+    def test_cleanup_audit_deletes_old_logs(self, tmp_path, monkeypatch):
+        """cleanup_audit deletes logs older than retention days."""
+        monkeypatch.chdir(tmp_path)
+        audit_dir = tmp_path / "outputs" / "audit"
+        audit_dir.mkdir(parents=True)
+        # Create an old log (120 days ago) and a recent one (2 days ago)
+        from datetime import datetime, timezone, timedelta
+        old_date = (datetime.now(timezone.utc) - timedelta(days=120)).strftime("%Y-%m-%d")
+        new_date = (datetime.now(timezone.utc) - timedelta(days=2)).strftime("%Y-%m-%d")
+        (audit_dir / f"audit-{old_date}.log").write_text("old")
+        (audit_dir / f"audit-{new_date}.log").write_text("new")
+        import cron
+        result = cron.cleanup_audit()
+        assert result["deleted"] == 1
+        assert not (audit_dir / f"audit-{old_date}.log").exists()
+        assert (audit_dir / f"audit-{new_date}.log").exists()
+
+    def test_digest_email_dry_run(self, tmp_path, monkeypatch, capsys):
+        """digest_email dry_run prints emails, doesn't call mailer."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("DIGEST_EMAIL_TO", "test@firm.in")
+        import cron
+        result = cron.digest_email(dry_run=True)
+        assert result["status"] in ("ok", "no_recipients")
+        assert result["sent"] >= 0
+
+    def test_format_digest_empty(self):
+        """_format_digest_email handles empty matters gracefully."""
+        import cron
+        digest = {"date": "2026-05-25", "matters": [],
+                  "totals": {"matters_count": 0, "total_hits": 0, "matters_with_hits": 0}}
+        text = cron._format_digest_email(digest)
+        assert "No watch-matters" in text
+        assert "2026-05-25" in text

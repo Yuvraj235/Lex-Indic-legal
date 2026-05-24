@@ -221,6 +221,7 @@ import leads as leads_module
 import api_keys as api_keys_module
 import openapi_spec as openapi_spec_module
 import pricing as pricing_module   # Day 23
+import cron as cron_module          # Day 24
 
 
 @app.route("/monitors")
@@ -1760,6 +1761,36 @@ def dashboard_data():
         "recent_leads":      recent_leads,
         "storage":           {"backends": storage_backends, "summary": storage_summary},
     })
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — Cron / scheduled jobs (Day 24).
+# Admin-gated endpoints to trigger scheduled jobs on demand (useful for testing
+# and for Render / Fly.io cron-job integrations that use HTTP callbacks).
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.route("/cron/digest_email", methods=["POST"])
+def cron_digest_email():
+    guard = _require_admin()
+    if guard: return guard
+    dry_run = request.args.get("dry_run", "").lower() in ("1", "true", "yes")
+    result = cron_module.digest_email(dry_run=dry_run)
+    return jsonify(result)
+
+
+@app.route("/cron/nalsa_csv", methods=["POST"])
+def cron_nalsa_csv():
+    guard = _require_admin()
+    if guard: return guard
+    result = cron_module.nalsa_csv_export()
+    return jsonify(result)
+
+
+@app.route("/cron/cleanup", methods=["POST"])
+def cron_cleanup():
+    guard = _require_admin()
+    if guard: return guard
+    result = cron_module.cleanup_audit()
+    return jsonify(result)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
