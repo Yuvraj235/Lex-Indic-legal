@@ -25,7 +25,7 @@ and within seconds the system produces a **complete legal case brief with 6 outp
 
 ---
 
-## What's New in v1.6 (Operability sprint — Days 16-20)
+## What's New in v1.6 
 
 | Day | Feature | URL / file | Why it matters |
 |---|---|---|---|
@@ -35,7 +35,7 @@ and within seconds the system produces a **complete legal case brief with 6 outp
 | **19** | Operator dashboard at `/dashboard` | `templates/dashboard.html` | Daily home page: KPIs, 7-day funnel, recent activity, top sources, 14-day chart. |
 | **20** | Postgres-ready ORM + JSON-files → DB migration tool | `db.py`, `tools/migrate_to_postgres.py` | When the JSON registries hit ~100 users, one command moves the data. |
 
-## What's New in v1.5 (Legora-teardown sprint — 15 days)
+## What's New in v1.5 
 
 | Day | Feature | URL | Why it matters |
 |---|---|---|---|
