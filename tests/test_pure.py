@@ -297,6 +297,14 @@ class TestWebhooks:
         from webhooks import remove_sub
         assert remove_sub("wh_doesnotexist") is False
 
+    def test_retry_queue_stats_empty(self, tmp_path, monkeypatch):
+        """retry_queue_stats returns zero when no queue DB exists."""
+        monkeypatch.setattr("webhooks._RETRY_DB", tmp_path / "retry_queue.db")
+        from webhooks import retry_queue_stats
+        stats = retry_queue_stats()
+        assert stats["pending"] == 0
+        assert stats["oldest"] is None
+
 
 # ────────────────────────────── llm_provider ───────────────────────────────
 class TestLlmProvider:

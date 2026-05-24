@@ -1549,7 +1549,10 @@ def webhooks_remove(sub_id):
 
 @app.route("/webhooks/api/deliveries")
 def webhooks_deliveries():
-    return jsonify({"deliveries": webhooks_module.recent_deliveries(20)})
+    return jsonify({
+        "deliveries":    webhooks_module.recent_deliveries(20),
+        "retry_queue":   webhooks_module.retry_queue_stats(),   # Day 22
+    })
 
 
 # Need this for the self-probe latency measurement; track the port we boot on.
