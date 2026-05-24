@@ -648,3 +648,74 @@ class TestCron:
         text = cron._format_digest_email(digest)
         assert "No watch-matters" in text
         assert "2026-05-25" in text
+
+
+# ────────────────────────────── Day 25: SMS / WhatsApp ─────────────────────
+class TestSms:
+    def test_stdout_provider_is_default(self, monkeypatch, capsys):
+        monkeypatch.delenv("SMS_PROVIDER", raising=False)
+        import sms
+        result = sms.send(to="9876543210", template="magic_link",
+                          variables={"code": "999888", "ttl": "10"})
+        assert result.ok
+        assert result.provider == "stdout"
+        out = capsys.readouterr().out
+        assert "9876543210" in out or "+919876543210" in out
+
+    def test_normalise_10_digit_indian_number(self):
+        import sms
+        assert sms._normalise_phone("9876543210") == "+919876543210"
+        assert sms._normalise_phone("+919876543210") == "+919876543210"
+        assert sms._normalise_phone("919876543210") == "+919876543210"
+
+    def test_unknown_template_returns_error(self, monkeypatch):
+        monkeypatch.delenv("SMS_PROVIDER", raising=False)
+        import sms
+        result = sms.send(to="9876543210", template="nonexistent_template")
+        assert not result.ok
+        assert "nonexistent_template" in result.error
+
+    def test_missing_to_returns_error(self, monkeypatch):
+        monkeypatch.delenv("SMS_PROVIDER", raising=False)
+        import sms
+        result = sms.send(to="", template="magic_link",
+                          variables={"code": "111", "ttl": "10"})
+        assert not result.ok
+        assert "phone" in result.error.lower()
+
+    def test_missing_variable_returns_error(self, monkeypatch):
+        monkeypatch.delenv("SMS_PROVIDER", raising=False)
+        import sms
+        result = sms.send(to="9876543210", template="magic_link",
+                          variables={"code": "111"})   # missing 'ttl'
+        assert not result.ok
+        assert "ttl" in result.error
+
+    def test_msg91_missing_auth_key(self, monkeypatch):
+        monkeypatch.setenv("SMS_PROVIDER", "msg91")
+        monkeypatch.delenv("MSG91_AUTH_KEY", raising=False)
+        import sms
+        result = sms.send(to="9876543210", template="magic_link",
+                          variables={"code": "111", "ttl": "5"})
+        assert not result.ok
+        assert "MSG91_AUTH_KEY" in result.error
+
+    def test_twilio_missing_credentials(self, monkeypatch):
+        monkeypatch.setenv("SMS_PROVIDER", "twilio")
+        monkeypatch.delenv("TWILIO_ACCOUNT_SID", raising=False)
+        monkeypatch.delenv("TWILIO_AUTH_TOKEN",  raising=False)
+        import sms
+        result = sms.send(to="9876543210", template="magic_link",
+                          variables={"code": "111", "ttl": "5"})
+        assert not result.ok
+        assert "TWILIO" in result.error
+
+    def test_convenience_helpers(self, monkeypatch, capsys):
+        monkeypatch.delenv("SMS_PROVIDER", raising=False)
+        import sms
+        r1 = sms.send_digest_alert("9876543210", "dowry matters", 3)
+        assert r1.ok
+        r2 = sms.send_magic_link_sms("9876543210", "654321", ttl_minutes=10)
+        assert r2.ok
+        r3 = sms.send_nalsa_welcome("9876543210", "MH/1234/2022")
+        assert r3.ok

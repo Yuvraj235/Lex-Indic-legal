@@ -222,6 +222,7 @@ import api_keys as api_keys_module
 import openapi_spec as openapi_spec_module
 import pricing as pricing_module   # Day 23
 import cron as cron_module          # Day 24
+import sms as sms_module            # Day 25
 
 
 @app.route("/monitors")
@@ -310,6 +311,16 @@ def nalsa_register():
         reg = nalsa_module.register(payload)
     except Exception as e:
         return jsonify({"error": f"Could not save registration: {str(e)[:200]}"}), 500
+
+    # Day 25 — WhatsApp welcome message (fire-and-forget on a thread)
+    if reg.phone:
+        import threading, sms as sms_module
+        threading.Thread(
+            target=sms_module.send_nalsa_welcome,
+            kwargs={"phone": reg.phone, "panel_id": reg.panel_id},
+            daemon=True,
+        ).start()
+
     return jsonify({"registration": reg.to_dict()})
 
 
@@ -1791,6 +1802,46 @@ def cron_cleanup():
     if guard: return guard
     result = cron_module.cleanup_audit()
     return jsonify(result)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — SMS / WhatsApp (Day 25).
+# Admin-gated test endpoint + provider status check.
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.route("/sms/test", methods=["POST"])
+def sms_test():
+    """Admin-only: send a test SMS/WhatsApp to verify provider config."""
+    guard = _require_admin()
+    if guard: return guard
+    data    = request.get_json() or {}
+    phone   = (data.get("phone") or "").strip()
+    channel = (data.get("channel") or "sms").lower()
+    if not phone:
+        return jsonify({"error": "phone is required"}), 400
+    result = sms_module.send(
+        to=phone, template="magic_link", channel=channel,
+        variables={"code": "123456", "ttl": "10"},
+    )
+    return jsonify({
+        "ok":         result.ok,
+        "provider":   result.provider,
+        "message_id": result.message_id,
+        "error":      result.error,
+    }), 200 if result.ok else 502
+
+
+@app.route("/sms/status")
+def sms_status():
+    """Returns the configured SMS provider and which env vars are set."""
+    import os as _os
+    provider = _os.getenv("SMS_PROVIDER", "stdout")
+    config = {
+        "provider": provider,
+        "msg91_configured":   bool(_os.getenv("MSG91_AUTH_KEY")),
+        "twilio_configured":  bool(_os.getenv("TWILIO_ACCOUNT_SID") and _os.getenv("TWILIO_AUTH_TOKEN")),
+        "templates": list(sms_module.TEMPLATES.keys()),
+    }
+    return jsonify(config)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
