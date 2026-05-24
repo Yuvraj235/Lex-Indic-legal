@@ -2,9 +2,9 @@
 
 ### AI-Powered Junior Associate for Indian Law Firms
 
-[![Status](https://img.shields.io/badge/status-v1.6-success)]()
+[![Status](https://img.shields.io/badge/status-v1.7-success)]()
 [![Stack](https://img.shields.io/badge/stack-Flask%20%2B%20Three.js%20%2B%20ChromaDB-blue)]()
-[![Tests](https://img.shields.io/badge/tests-115%20passing-success)]()
+[![Tests](https://img.shields.io/badge/tests-80%20passing-success)]()
 [![SOC2](https://img.shields.io/badge/SOC2-9%2F10%20controls%20passing-success)]()
 [![API](https://img.shields.io/badge/API-v1%20%2B%20OpenAPI-blue)]()
 [![License](https://img.shields.io/badge/license-Educational-lightgrey)]()
@@ -25,7 +25,17 @@ and within seconds the system produces a **complete legal case brief with 6 outp
 
 ---
 
-## What's New in v1.6 
+## What's New in v1.7
+
+| Day | Feature | File | Why it matters |
+|---|---|---|---|
+| **21** | Dual-backend complete — matters + monitors wired to Postgres | `matters.py`, `monitors.py` | All 5 modules now transparently use Postgres/SQLite when `DATABASE_URL` is set. Dashboard shows storage backend per module. |
+| **22** | Webhook retry queue — SQLite-backed exponential backoff | `webhooks.py` | Failed webhook deliveries retried up to 5× (10 s → 1 min → 5 min → 15 min → 1 h). No more silently dropped alerts. |
+| **23** | Pricing tier enforcement — free / NALSA / firm / internal | `pricing.py` | Free: 3/day; NALSA panel: unlimited free; Firm API key: 200/day. 429 response includes upgrade URL. |
+| **24** | Scheduled cron jobs — digest email, NALSA CSV, audit cleanup | `cron.py` | Daily digest email to registered lawyers; NALSA registry CSV for SLSA spot-checks; auto-delete audit logs > 90 days. |
+| **25** | SMS/WhatsApp alerts — MSG91 (India) + Twilio + stdout | `sms.py` | WhatsApp welcome on NALSA signup; digest alerts; magic-link SMS. DLT-template registry for TRAI compliance. |
+
+## What's New in v1.6
 
 | Day | Feature | URL / file | Why it matters |
 |---|---|---|---|
@@ -575,6 +585,7 @@ circulars (MHA, SC, NHRC) — all retrievable via the same RAG pipeline.
 | **v1.4** | SC precedent monitor + Hindi UI/output + NALSA tier + DPDP trust page + SOC 2 dashboard | Done |
 | **v1.5** | Deep-links, matter intake, multi-tenant auth, BNSS+BSA, e-Courts, Ollama, tabular review, status+webhooks | Done |
 | **v1.6** | REST API + OpenAPI, email sender (SES/SMTP), Dockerfile + fly.io + Render, operator dashboard, Postgres-ready ORM | Done |
+| **v1.7** | Dual-backend complete, webhook retry queue, pricing tiers, cron jobs, SMS/WhatsApp (MSG91 + Twilio) | Done |
 | **v2.0** | Cut over each JSON-registry module to Postgres (using db.py); formal SOC 2 Type II via Vanta/Drata | Planned |
 | **v2.1** | BNS full-358 corpus, regional languages (Marathi, Tamil, Bengali), AppSource Word add-in submission | Planned |
 | **v2.0** | Postgres + multi-tenant auth, India-region deployment guide, BNSS + BSA corpora | Planned |

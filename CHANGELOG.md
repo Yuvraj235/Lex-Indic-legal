@@ -4,6 +4,11 @@ All notable changes to Lex-Indic. Auto-generated from git log.
 
 ## May 2026
 
+- **25 May** [`6429a0a`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/6429a0a) — Day 25: SMS/WhatsApp alert channel — MSG91 + Twilio + stdout
+- **25 May** [`58b3b75`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/58b3b75) — Day 24: scheduled cron jobs — digest emails, NALSA CSV export, audit cleanup
+- **25 May** [`ac67668`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/ac67668) — Day 23: pricing tier enforcement — free / NALSA / firm / internal
+- **25 May** [`95018dd`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/95018dd) — Day 22: webhook retry queue — SQLite-backed exponential backoff
+- **25 May** [`4ce55cf`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/4ce55cf) — Day 21: wire matters.py + monitors.py to dual JSON/DB backend (complete)
 - **23 May** [`ea390f2`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/ea390f2) — Day 20: Postgres-ready ORM + JSON-files migration tool
 - **23 May** [`6398312`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/6398312) — Day 19: operator dashboard at /dashboard
 - **23 May** [`63984e5`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/63984e5) — Day 18: Dockerfile + docker-compose + fly.io + Render + on-prem guides
