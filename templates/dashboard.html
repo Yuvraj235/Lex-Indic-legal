@@ -296,8 +296,71 @@
 
       <!-- Storage backend indicator (Day 21) -->
       ${d.storage ? storageCard(d.storage) : ''}
+
+      <!-- Cron job last-run (gap fix) -->
+      ${d.cron ? cronCard(d.cron) : ''}
+
+      <!-- Incidents (gap fix) -->
+      ${d.incidents ? incidentsCard(d.incidents) : ''}
     `;
     $('content').innerHTML = html;
+  }
+
+  function cronCard(cron){
+    const jobs = Object.entries(cron || {});
+    if (!jobs.length) return `
+      <div class="card" style="margin-top:20px">
+        <h2>Scheduled jobs</h2>
+        <div class="empty">No cron job has run yet. Run <code>python3 cron.py all</code> on the server.</div>
+      </div>`;
+    const rows = jobs.map(([job, info]) => {
+      const ok = (info.status || '').match(/ok|partial/) ? 'green' : 'red';
+      return `
+        <tr>
+          <td style="padding:5px 12px 5px 0;font-weight:600">${escapeHtml(job)}</td>
+          <td><span class="badge ${ok}">${escapeHtml(info.status||'?')}</span></td>
+          <td class="compact" style="color:#888">${escapeHtml((info.ts||'').replace('T',' '))}</td>
+          <td style="font-size:11px;color:#aaa">${escapeHtml(JSON.stringify(info.summary||{}).slice(0,80))}</td>
+        </tr>`;
+    }).join('');
+    return `
+      <div class="card" style="margin-top:20px">
+        <h2>Scheduled jobs — last run</h2>
+        <table style="border-collapse:collapse;width:100%">
+          <thead><tr><th>Job</th><th>Status</th><th>When (UTC)</th><th>Details</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  function incidentsCard(inc){
+    const overall = inc.overall || {};
+    const color = overall.color || 'green';
+    const bgmap = {green:'#234c38',orange:'#5b3c1d',yellow:'#5b4f1d',red:'#5b1d1d'};
+    const bg = bgmap[color] || '#333';
+    const recent = inc.recent || [];
+    const recentHtml = recent.length === 0
+      ? '<div class="empty">No incidents recorded.</div>'
+      : recent.map(i => `
+          <tr>
+            <td class="compact">${escapeHtml((i.created_at||'').slice(0,16).replace('T',' '))}</td>
+            <td><span class="badge ${i.status==='resolved'?'green':'red'}">${escapeHtml(i.status)}</span></td>
+            <td><span class="badge ${i.severity==='critical'?'red':i.severity==='major'?'gold':'blue'}">${escapeHtml(i.severity)}</span></td>
+            <td>${escapeHtml(i.component)}</td>
+            <td>${escapeHtml(i.title)}</td>
+          </tr>`).join('');
+    return `
+      <div class="card" style="margin-top:20px;border-left:4px solid ${bg}">
+        <h2>System status
+          <span style="background:${bg};color:#fff;padding:3px 10px;border-radius:5px;font-size:12px;font-weight:600;margin-left:8px">
+            ${escapeHtml(overall.label || 'Operational')}
+          </span>
+        </h2>
+        <table style="border-collapse:collapse;width:100%;margin-top:8px">
+          <thead><tr><th>When</th><th>Status</th><th>Severity</th><th>Component</th><th>Title</th></tr></thead>
+          <tbody>${recentHtml}</tbody>
+        </table>
+      </div>`;
   }
 
   function kpi(label, value, delta, link, deltaClass){

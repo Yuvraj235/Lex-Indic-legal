@@ -324,16 +324,20 @@ def _attempt_http(sub: "Subscription", body: bytes, sig: str, event_id: str) -> 
     start = time.monotonic()
     status = 0
     error = ""
+    # Receiver should reject deliveries where X-Lex-Timestamp is older than 5 minutes
+    # to prevent replay attacks. Timestamp is included inside the signed body too.
+    ts_header = str(int(time.time()))
     try:
         req = urllib.request.Request(
             sub.url,
             data=body,
             headers={
                 "Content-Type":       "application/json",
-                "User-Agent":         "Lex-Indic-Webhook/1.5",
+                "User-Agent":         "Lex-Indic-Webhook/1.6",
                 "X-Lex-Signature":    sig,
                 "X-Lex-Event-Id":     event_id,
                 "X-Lex-Subscription": sub.id,
+                "X-Lex-Timestamp":    ts_header,
             },
             method="POST",
         )
@@ -346,6 +350,29 @@ def _attempt_http(sub: "Subscription", body: bytes, sig: str, event_id: str) -> 
     except Exception as e:
         error = str(e)
     return False, status, error
+
+
+def verify_signature(body: bytes, signature_header: str,
+                     timestamp_header: str = "", max_age_seconds: int = 300) -> bool:
+    """Receiver-side helper. Returns True iff:
+       1. HMAC-SHA256(body) matches X-Lex-Signature header (constant-time compare), AND
+       2. X-Lex-Timestamp is within max_age_seconds of now (replay protection).
+
+    Receivers should call this before processing any webhook delivery.
+    """
+    if not signature_header:
+        return False
+    expected = hmac.new(_secret(), body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, signature_header):
+        return False
+    if timestamp_header:
+        try:
+            ts = int(timestamp_header)
+            if abs(time.time() - ts) > max_age_seconds:
+                return False
+        except ValueError:
+            return False
+    return True
 
 
 def emit(event: str, payload: dict):

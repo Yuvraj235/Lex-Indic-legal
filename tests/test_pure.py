@@ -719,3 +719,82 @@ class TestSms:
         assert r2.ok
         r3 = sms.send_nalsa_welcome("9876543210", "MH/1234/2022")
         assert r3.ok
+
+
+# ────────────────────────────── Gap fixes ───────────────────────────────────
+class TestIncidents:
+    def test_empty_status_is_operational(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        import incidents
+        s = incidents.overall_status()
+        assert s["color"] == "green"
+        assert s["open_count"] == 0
+
+    def test_open_then_resolve(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        import incidents
+        inc = incidents.open_incident(
+            title="LLM provider slow", component="llm",
+            severity="major", description="Gemini latency spike",
+        )
+        assert inc["status"] == "investigating"
+        # Now overall status is degraded
+        s = incidents.overall_status()
+        assert s["color"] == "orange"
+        # Resolve
+        updated = incidents.update_incident(inc["id"], status="resolved",
+                                              message="Provider recovered.")
+        assert updated["status"] == "resolved"
+        assert updated["resolved_at"]
+        s2 = incidents.overall_status()
+        assert s2["color"] == "green"
+
+    def test_invalid_severity_raises(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        import incidents, pytest
+        with pytest.raises(ValueError):
+            incidents.open_incident(title="x", component="llm",
+                                     severity="catastrophic")
+
+    def test_critical_incident_shows_red(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        import incidents
+        incidents.open_incident(title="DB down", component="database",
+                                  severity="critical")
+        assert incidents.overall_status()["color"] == "red"
+
+
+class TestWebhookVerification:
+    def test_verify_signature_round_trip(self, monkeypatch):
+        monkeypatch.setenv("AUDIT_HASH_SALT", "test-salt-1234")
+        import webhooks, hashlib, hmac, time
+        body = b'{"event":"test","data":{}}'
+        sig = hmac.new(webhooks._secret(), body, hashlib.sha256).hexdigest()
+        ts  = str(int(time.time()))
+        assert webhooks.verify_signature(body, sig, ts)
+
+    def test_verify_signature_rejects_bad_sig(self, monkeypatch):
+        monkeypatch.setenv("AUDIT_HASH_SALT", "test-salt-1234")
+        import webhooks, time
+        body = b'{"event":"test"}'
+        assert not webhooks.verify_signature(body, "deadbeef" * 8, str(int(time.time())))
+
+    def test_verify_signature_rejects_old_timestamp(self, monkeypatch):
+        monkeypatch.setenv("AUDIT_HASH_SALT", "test-salt-1234")
+        import webhooks, hashlib, hmac, time
+        body = b'{"event":"test"}'
+        sig = hmac.new(webhooks._secret(), body, hashlib.sha256).hexdigest()
+        old = str(int(time.time()) - 600)   # 10 minutes ago
+        assert not webhooks.verify_signature(body, sig, old, max_age_seconds=300)
+
+
+class TestCronLastRun:
+    def test_record_and_read(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        import cron
+        cron._record_last_run("digest_email", {"status": "ok", "sent": 5})
+        cron._record_last_run("cleanup",     {"status": "ok", "deleted": 0})
+        data = cron.last_run_status()
+        assert "digest_email" in data
+        assert data["digest_email"]["status"] == "ok"
+        assert data["cleanup"]["summary"]["deleted"] == 0

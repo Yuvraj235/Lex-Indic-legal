@@ -43,6 +43,7 @@ ENVIRONMENT VARIABLES
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from datetime import datetime, timezone, timedelta
@@ -52,6 +53,36 @@ import monitors as monitors_module
 import nalsa as nalsa_module
 import mailer as mailer_module
 import auth as auth_module
+
+_LAST_RUN_PATH = Path("outputs") / "cron" / "last_run.json"
+
+
+def _record_last_run(job: str, result: dict):
+    """Append the last successful run of each job to a JSON file the dashboard reads."""
+    _LAST_RUN_PATH.parent.mkdir(parents=True, exist_ok=True)
+    data = {}
+    if _LAST_RUN_PATH.exists():
+        try:
+            data = json.loads(_LAST_RUN_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+    data[job] = {
+        "ts":      datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "status":  result.get("status", "?"),
+        "summary": {k: v for k, v in result.items() if k != "errors" and not isinstance(v, list)},
+    }
+    _LAST_RUN_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False),
+                              encoding="utf-8")
+
+
+def last_run_status() -> dict:
+    """Returns the most-recent run of each job (for /dashboard)."""
+    if not _LAST_RUN_PATH.exists():
+        return {}
+    try:
+        return json.loads(_LAST_RUN_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
 
 
 # ─── 1. Daily digest email ────────────────────────────────────────────────────
@@ -83,6 +114,9 @@ def digest_email(*, dry_run: bool = False) -> dict:
         else "Lex-Indic SC Monitor | No new rulings matched today"
     )
 
+    # Render HTML version of digest (gap fix — was plain-text only)
+    html_body = _format_digest_email_html(digest)
+
     sent = 0
     errors = []
     for email in recipients:
@@ -90,7 +124,8 @@ def digest_email(*, dry_run: bool = False) -> dict:
             print(f"[DRY RUN] Would email {email}: {subject}")
             sent += 1
             continue
-        result = mailer_module.send(to=email, subject=subject, text=text_body)
+        result = mailer_module.send(to=email, subject=subject,
+                                     text=text_body, html=html_body)
         if result.ok:
             sent += 1
         else:
@@ -183,6 +218,64 @@ def _format_digest_email(digest: dict) -> str:
     return "\n".join(lines)
 
 
+def _format_digest_email_html(digest: dict) -> str:
+    """HTML version of the daily digest — looks better in inboxes than plain text."""
+    matters = digest.get("matters", [])
+    totals = digest.get("totals", {})
+    rows_html = []
+    if not matters:
+        rows_html.append('<tr><td style="padding:20px;color:#666;text-align:center">'
+                          'No watch-matters registered yet. '
+                          '<a href="http://localhost:8080/monitors" style="color:#0f2850">Register one</a>.</td></tr>')
+    else:
+        for block in matters:
+            m = block.get("matter", {})
+            hits = block.get("hits", [])
+            hits_html = ""
+            for h in hits[:5]:
+                r = h.get("ruling", {})
+                score = int((h.get("score", 0) or 0) * 100)
+                reasons = ", ".join(h.get("reasons", [])[:3]) or "—"
+                hits_html += (
+                    f'<tr><td style="padding:8px 12px;border-top:1px solid #eee;font-size:13px">'
+                    f'<span style="background:#f0a500;color:#fff;padding:2px 8px;border-radius:3px;font-weight:600;font-size:11px">{score}%</span> '
+                    f'<strong style="color:#0f2850">{r.get("title","")}</strong><br>'
+                    f'<span style="color:#666;font-size:11px">{r.get("date","")} · {r.get("neutral_citation","")}'
+                    f' · {reasons}</span></td></tr>'
+                )
+            if not hits:
+                hits_html = '<tr><td style="padding:8px 12px;color:#888;font-style:italic">No matching rulings today.</td></tr>'
+            rows_html.append(
+                f'<tr><td style="padding:16px;background:#f7f7fb">'
+                f'<h3 style="margin:0 0 6px;color:#0f2850;font-family:sans-serif">{m.get("label","Untitled")}</h3>'
+                f'<div style="color:#777;font-size:11px;margin-bottom:8px">'
+                f'Keywords: {", ".join(m.get("keywords",[]))} · Sections: {", ".join(m.get("sections",[]))}</div>'
+                f'<table style="width:100%;border-collapse:collapse">{hits_html}</table>'
+                f'</td></tr>'
+            )
+
+    return (
+        f'<!DOCTYPE html><html><body style="margin:0;padding:0;background:#fff;'
+        f'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#222">'
+        f'<div style="max-width:640px;margin:0 auto;padding:24px">'
+        f'<div style="background:linear-gradient(135deg,#0f2850 0%,#1a3a6e 100%);'
+        f'color:#fff;padding:24px;border-radius:8px 8px 0 0">'
+        f'<h1 style="margin:0;font-size:22px;color:#f0a500">LEX-INDIC</h1>'
+        f'<p style="margin:6px 0 0;font-size:13px;opacity:0.85">'
+        f'Daily Supreme Court monitor · {digest.get("date","")}</p>'
+        f'</div>'
+        f'<table style="width:100%;border-collapse:collapse;background:#fff;'
+        f'border:1px solid #e5e5ec;border-top:none">{"".join(rows_html)}</table>'
+        f'<div style="background:#f7f7fb;padding:14px;border:1px solid #e5e5ec;border-top:none;'
+        f'border-radius:0 0 8px 8px;font-size:11px;color:#888;text-align:center">'
+        f'Total matters watched: {totals.get("matters_count",0)} · '
+        f'Total ruling hits today: {totals.get("total_hits",0)}<br>'
+        f'<a href="http://localhost:8080/monitors" style="color:#0f2850">View full digest</a>'
+        f'</div>'
+        f'</div></body></html>'
+    )
+
+
 # ─── 2. NALSA CSV export ──────────────────────────────────────────────────────
 def nalsa_csv_export() -> dict:
     """Export the NALSA registry to a dated CSV file."""
@@ -267,6 +360,7 @@ def main():
             status = result.get("status", "?")
             ok_sym = "✓" if status in ("ok", "no_recipients", "partial") else "✗"
             print(f"  {ok_sym} {job}: {result}")
+            _record_last_run(job, result)
             if status == "partial" and result.get("errors"):
                 for err in result["errors"][:5]:
                     print(f"    ⚠ {err}")

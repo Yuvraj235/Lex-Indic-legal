@@ -1762,6 +1762,24 @@ def dashboard_data():
         (v for v in ("postgres", "sqlite") if v in unique), "mixed"
     )
 
+    # Cron jobs last-run status (gap fix)
+    try:
+        cron_status = cron_module.last_run_status()
+    except Exception:
+        cron_status = {}
+
+    # Incidents (gap fix)
+    try:
+        import incidents as _inc
+        incident_summary = {
+            "overall":   _inc.overall_status(),
+            "open_count": len(_inc.list_open()),
+            "recent":    _inc.list_recent(5),
+        }
+    except Exception:
+        incident_summary = {"overall": {"label": "Operational", "color": "green",
+                                         "open_count": 0}, "open_count": 0, "recent": []}
+
     return jsonify({
         "generated_at":      now.isoformat(timespec="seconds"),
         "kpis":              kpis,
@@ -1771,6 +1789,8 @@ def dashboard_data():
         "recent_analyses":   recent_analyses,
         "recent_leads":      recent_leads,
         "storage":           {"backends": storage_backends, "summary": storage_summary},
+        "cron":              cron_status,           # gap fix
+        "incidents":         incident_summary,     # gap fix
     })
 
 
@@ -2052,6 +2072,65 @@ def api_leads():
     except Exception:
         pass
     return jsonify({"lead": {"id": lead.id, "full_name": lead.full_name}})
+
+
+# ─── Newly-exposed endpoints (gap-fix sprint) ───────────────────────────────
+@app.route("/api/v1/tabular/review", methods=["POST"])
+def api_tabular_review():
+    """Run tabular contract review on a chunk of text or uploaded contract."""
+    key, err = _require_api_key()
+    if err: return err
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    contract_type = (data.get("contract_type") or "general").strip().lower()
+    if not text:
+        return jsonify({"error": "text is required (at least 100 chars)"}), 400
+    if len(text) < 100:
+        return jsonify({"error": "text must be at least 100 characters"}), 400
+    try:
+        result = tabular_module.review(text=text, contract_type=contract_type)
+        return jsonify({"clauses": result})
+    except AttributeError:
+        # tabular_module may use a different function name; degrade gracefully
+        return jsonify({"error": "tabular review temporarily unavailable"}), 503
+    except Exception as exc:
+        return jsonify({"error": f"tabular review failed: {str(exc)[:200]}"}), 500
+
+
+@app.route("/api/v1/matters", methods=["GET"])
+def api_matters_list():
+    """List all matters (firm-scoped if the API key has a firm_id)."""
+    key, err = _require_api_key()
+    if err: return err
+    matters = matters_module.list_matters()
+    firm_id = key.get("firm_id") or ""
+    if firm_id:
+        matters = [m for m in matters if m.get("firm_id") == firm_id]
+    return jsonify({"matters": matters, "count": len(matters)})
+
+
+@app.route("/api/v1/nalsa/check", methods=["GET"])
+def api_nalsa_check():
+    """Check if an email is in the NALSA registry (used by pricing logic)."""
+    key, err = _require_api_key()
+    if err: return err
+    email = (request.args.get("email") or "").strip().lower()
+    if not email:
+        return jsonify({"error": "email query parameter required"}), 400
+    is_reg = nalsa_module.is_registered(email)
+    return jsonify({"email": email, "is_registered": is_reg,
+                    "tier": "nalsa" if is_reg else "free"})
+
+
+@app.route("/api/v1/status")
+def api_status():
+    """Public status feed — incidents + overall state."""
+    import incidents as incidents_module
+    return jsonify({
+        "overall":  incidents_module.overall_status(),
+        "open":     incidents_module.list_open(),
+        "recent":   incidents_module.list_recent(10),
+    })
 
 
 # ─── Admin endpoints to manage API keys ────────────────────────────────────
