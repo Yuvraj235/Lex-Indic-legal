@@ -1148,3 +1148,198 @@ class TestBilling:
         signed = f"{ts}.{payload.decode()}"
         sig = hmac.new(b"whsec_test_xyz", signed.encode(), hashlib.sha256).hexdigest()
         assert not billing.verify_webhook_signature(payload, f"t={ts},v1={sig}")
+
+
+# ────────────────────────────── Day 32: Billing webhook events ────────────
+class TestBillingWebhookEvents:
+    def test_cancel_subscription_emits_event(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("billing._SUBSCRIPTIONS_FILE", tmp_path / "subs.json")
+        import billing
+        billing.activate_subscription(user_id="usr_w", user_email="w@a.in", tier="firm")
+        cancelled = billing.cancel_subscription(user_id="usr_w", reason="test")
+        assert cancelled
+        assert cancelled["status"] == "cancelled"
+        assert cancelled["cancellation_reason"] == "test"
+
+    def test_cancel_nonexistent_returns_none(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("billing._SUBSCRIPTIONS_FILE", tmp_path / "subs.json")
+        import billing
+        assert billing.cancel_subscription(user_id="usr_nope") is None
+
+    def test_record_payment_failure_does_not_crash(self, monkeypatch):
+        import billing
+        # Should not raise even if no webhooks subscribers
+        billing.record_payment_failure(user_id="usr_p", reason="card declined")
+
+
+# ────────────────────────────── Day 33: Billing KPIs ──────────────────────
+class TestBillingKPIs:
+    def test_empty_kpis(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("billing._SUBSCRIPTIONS_FILE", tmp_path / "subs.json")
+        import billing
+        k = billing.billing_kpis()
+        assert k["mrr_inr"] == 0
+        assert k["active_total"] == 0
+        assert k["recent"] == []
+
+    def test_mrr_aggregation(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("billing._SUBSCRIPTIONS_FILE", tmp_path / "subs.json")
+        import billing
+        billing.activate_subscription(user_id="u1", user_email="u1@a.in", tier="firm")
+        billing.activate_subscription(user_id="u2", user_email="u2@a.in", tier="firm")
+        k = billing.billing_kpis()
+        assert k["mrr_inr"] == 1000   # ₹500 × 2
+        assert k["active_total"] == 2
+        assert k["by_tier"]["firm"] == 2
+
+    def test_churn_tracking(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("billing._SUBSCRIPTIONS_FILE", tmp_path / "subs.json")
+        import billing
+        billing.activate_subscription(user_id="u3", user_email="u3@a.in", tier="firm")
+        billing.cancel_subscription(user_id="u3", reason="moved")
+        k = billing.billing_kpis()
+        assert k["active_total"] == 0
+        assert k["churn_30d"] == 1
+
+
+# ────────────────────────────── Day 34: Notification preferences ───────────
+class TestPrefs:
+    def test_default_prefs_for_new_user(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("prefs._PREFS_FILE", tmp_path / "prefs.json")
+        import prefs
+        p = prefs.get_prefs("new@user.com")
+        assert p["digest_frequency"] == "weekly"
+        assert p["language"] == "en"
+        assert p["sms_alerts"] is False
+
+    def test_set_and_get_round_trip(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("prefs._PREFS_FILE", tmp_path / "prefs.json")
+        import prefs
+        prefs.set_prefs("x@y.in", digest_frequency="daily", sms_alerts=True, language="hi")
+        p = prefs.get_prefs("x@y.in")
+        assert p["digest_frequency"] == "daily"
+        assert p["sms_alerts"] is True
+        assert p["language"] == "hi"
+
+    def test_invalid_frequency_raises(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("prefs._PREFS_FILE", tmp_path / "prefs.json")
+        import prefs, pytest
+        with pytest.raises(ValueError):
+            prefs.set_prefs("x@y.in", digest_frequency="hourly")
+
+    def test_wants_digest_off_returns_false(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("prefs._PREFS_FILE", tmp_path / "prefs.json")
+        import prefs
+        prefs.set_prefs("off@a.in", digest_frequency="off")
+        assert not prefs.wants_digest("off@a.in")
+        assert not prefs.wants_digest("off@a.in", when="weekly_monday")
+
+    def test_wants_digest_weekly_only_on_monday(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("prefs._PREFS_FILE", tmp_path / "prefs.json")
+        import prefs
+        prefs.set_prefs("week@a.in", digest_frequency="weekly")
+        assert not prefs.wants_digest("week@a.in", when="daily")
+        assert prefs.wants_digest("week@a.in", when="weekly_monday")
+
+    def test_default_user_gets_weekly_only(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("prefs._PREFS_FILE", tmp_path / "prefs.json")
+        import prefs
+        # No prefs set — defaults apply
+        assert not prefs.wants_digest("unknown@a.in", when="daily")
+        assert prefs.wants_digest("unknown@a.in", when="weekly_monday")
+
+    def test_stats(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("prefs._PREFS_FILE", tmp_path / "prefs.json")
+        import prefs
+        prefs.set_prefs("a@a.in", digest_frequency="daily")
+        prefs.set_prefs("b@a.in", digest_frequency="off", sms_alerts=True)
+        prefs.set_prefs("c@a.in", language="hi")
+        s = prefs.stats()
+        assert s["total"] == 3
+        assert s["daily_digest"] == 1
+        assert s["off_digest"] == 1
+        assert s["sms_alerts"] == 1
+        assert s["hindi_language"] == 1
+
+
+# ────────────────────────────── Day 35: File uploads ──────────────────────
+class TestUploads:
+    def test_add_and_list_file(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("uploads._MATTERS_DIR", tmp_path / "matters")
+        import uploads
+        meta = uploads.add_file(
+            matter_id="TEST/2026/0001",
+            original_name="FIR.pdf",
+            file_bytes=b"%PDF-1.4 fake pdf body",
+            content_type="application/pdf",
+            uploaded_by="lawyer@firm.in",
+            description="First FIR copy",
+        )
+        assert meta["id"].startswith("file_")
+        files = uploads.list_files("TEST/2026/0001")
+        assert len(files) == 1
+        assert files[0]["original_name"] == "FIR.pdf"
+
+    def test_path_traversal_sanitized(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("uploads._MATTERS_DIR", tmp_path / "matters")
+        import uploads
+        meta = uploads.add_file(
+            matter_id="TEST/2026/0002",
+            original_name="../../../etc/passwd",
+            file_bytes=b"malicious",
+        )
+        # Original name on disk doesn't contain ../ — sanitized
+        assert "passwd" in meta["original_name"]
+        assert ".." not in meta["original_name"]
+
+    def test_disallowed_extension_rejected(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("uploads._MATTERS_DIR", tmp_path / "matters")
+        import uploads, pytest
+        with pytest.raises(ValueError, match="not allowed"):
+            uploads.add_file(
+                matter_id="TEST/2026/0003",
+                original_name="malware.exe",
+                file_bytes=b"MZ...",
+            )
+
+    def test_oversize_rejected(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("uploads._MATTERS_DIR", tmp_path / "matters")
+        monkeypatch.setattr("uploads.MAX_UPLOAD_MB", 1)  # 1 MB cap
+        import uploads, pytest
+        big = b"x" * (2 * 1024 * 1024)   # 2 MB
+        with pytest.raises(ValueError, match="too large"):
+            uploads.add_file(
+                matter_id="TEST/2026/0004",
+                original_name="big.pdf",
+                file_bytes=big,
+            )
+
+    def test_delete_file(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("uploads._MATTERS_DIR", tmp_path / "matters")
+        import uploads
+        meta = uploads.add_file(
+            matter_id="TEST/2026/0005",
+            original_name="doc.pdf",
+            file_bytes=b"%PDF body",
+        )
+        assert uploads.delete_file("TEST/2026/0005", meta["id"])
+        assert uploads.list_files("TEST/2026/0005") == []
+
+    def test_invalid_matter_id_rejected(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("uploads._MATTERS_DIR", tmp_path / "matters")
+        import uploads, pytest
+        with pytest.raises(ValueError, match="matter_id"):
+            uploads.add_file(matter_id="invalid_no_slash",
+                              original_name="x.pdf", file_bytes=b"x")
+
+    def test_storage_stats(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("uploads._MATTERS_DIR", tmp_path / "matters")
+        import uploads
+        uploads.add_file(matter_id="A/2026/0001", original_name="a.pdf",
+                          file_bytes=b"a" * 1000)
+        uploads.add_file(matter_id="B/2026/0001", original_name="b.pdf",
+                          file_bytes=b"b" * 2000)
+        s = uploads.total_storage_used()
+        assert s["total_files"] == 2
+        assert s["matters_with_files"] == 2
+        assert s["total_bytes"] >= 3000

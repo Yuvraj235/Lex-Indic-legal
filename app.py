@@ -253,6 +253,8 @@ import cron as cron_module          # Day 24
 import sms as sms_module            # Day 25
 import erasure as erasure_module    # Day 28 (DPDP)
 import billing as billing_module    # Day 31 (Stripe)
+import prefs as prefs_module         # Day 34 (notification preferences)
+import uploads as uploads_module     # Day 35 (per-matter document storage)
 
 
 @app.route("/monitors")
@@ -544,6 +546,108 @@ def matters_restore(matter_id):
     ok = matters_module.restore_matter(matter_id)
     return (jsonify({"ok": True, "matter_id": matter_id}) if ok
             else (jsonify({"error": "Matter not found."}), 404))
+
+
+# ─── Day 35: per-matter file storage ────────────────────────────────────────
+@app.route("/matters/api/<path:matter_id>/files", methods=["GET", "POST"])
+def matters_files(matter_id):
+    """GET = list files for matter. POST = upload one (multipart/form-data)."""
+    # Verify the matter exists first
+    matter = matters_module.get_matter(matter_id)
+    if not matter:
+        return jsonify({"error": "Matter not found."}), 404
+
+    if request.method == "GET":
+        return jsonify({"matter_id": matter_id,
+                         "files": uploads_module.list_files(matter_id)})
+
+    # POST — multipart upload
+    if "file" not in request.files:
+        return jsonify({"error": "Provide a file in the 'file' field."}), 400
+    f = request.files["file"]
+    user = _current_user() or {}
+    try:
+        meta = uploads_module.add_file(
+            matter_id=matter_id,
+            original_name=f.filename or "untitled",
+            file_bytes=f.read(),
+            content_type=f.content_type or "application/octet-stream",
+            uploaded_by=user.get("email", ""),
+            description=request.form.get("description", ""),
+        )
+        return jsonify({"file": meta}), 201
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/matters/api/<path:matter_id>/files/<file_id>", methods=["GET", "DELETE"])
+def matters_file_detail(matter_id, file_id):
+    """GET = download file. DELETE = remove (admin only)."""
+    if request.method == "DELETE":
+        guard = _require_admin()
+        if guard: return guard
+        ok = uploads_module.delete_file(matter_id, file_id)
+        return (jsonify({"ok": True}) if ok
+                else (jsonify({"error": "File not found."}), 404))
+    # GET — serve the file
+    path = uploads_module.get_file_path(matter_id, file_id)
+    if not path or not path.exists():
+        return ("File not found.", 404)
+    meta = uploads_module.get_file_meta(matter_id, file_id)
+    return send_from_directory(path.parent, path.name,
+                                  as_attachment=True,
+                                  download_name=(meta or {}).get("original_name", path.name))
+
+
+@app.route("/admin/uploads/stats")
+def admin_uploads_stats():
+    guard = _require_admin()
+    if guard: return guard
+    return jsonify(uploads_module.total_storage_used())
+
+
+# ─── Day 36: per-matter analysis history (read audit log filtered by matter_id) ─
+@app.route("/matters/api/<path:matter_id>/history", methods=["GET"])
+def matters_history(matter_id):
+    """Returns every /analyze + /chat call ever made with matter_id=<id>.
+    Reads from outputs/audit/audit-*.log."""
+    matter = matters_module.get_matter(matter_id)
+    if not matter:
+        return jsonify({"error": "Matter not found."}), 404
+
+    audit_dir = Path("outputs/audit")
+    entries: list[dict] = []
+    if audit_dir.exists():
+        for log_file in sorted(audit_dir.glob("audit-*.log"))[-30:]:  # last 30 days
+            try:
+                for line in log_file.read_text(encoding="utf-8").splitlines():
+                    if not line.strip():
+                        continue
+                    try:
+                        rec = json.loads(line)
+                    except Exception:
+                        continue
+                    if (rec.get("extra") or {}).get("matter_id") == matter_id:
+                        entries.append({
+                            "request_id":   rec.get("request_id"),
+                            "ts":           rec.get("ts"),
+                            "endpoint":     rec.get("endpoint"),
+                            "status":       rec.get("status"),
+                            "duration_ms":  rec.get("duration_ms"),
+                            "pdf_filename": rec.get("pdf_filename"),
+                            "story_hash":   rec.get("story_hash"),
+                            "sources":      len(rec.get("sources") or []),
+                            "tier":         (rec.get("extra") or {}).get("pricing_tier"),
+                        })
+            except Exception:
+                continue
+    entries.sort(key=lambda x: x.get("ts", ""), reverse=True)
+    return jsonify({
+        "matter_id":     matter_id,
+        "client_name":   matter.get("client_name"),
+        "history_count": len(entries),
+        "history":       entries[:100],   # cap at 100 most recent
+    })
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1832,6 +1936,14 @@ def dashboard_data():
         incident_summary = {"overall": {"label": "Operational", "color": "green",
                                          "open_count": 0}, "open_count": 0, "recent": []}
 
+    # Day 33: billing KPIs
+    try:
+        billing_summary = billing_module.billing_kpis()
+    except Exception:
+        billing_summary = {"mrr_inr": 0, "active_total": 0, "by_tier": {},
+                            "activations_30d": 0, "churn_30d": 0, "churn_rate_pct": 0,
+                            "recent": []}
+
     return jsonify({
         "generated_at":      now.isoformat(timespec="seconds"),
         "kpis":              kpis,
@@ -1843,6 +1955,7 @@ def dashboard_data():
         "storage":           {"backends": storage_backends, "summary": storage_summary},
         "cron":              cron_status,           # gap fix
         "incidents":         incident_summary,     # gap fix
+        "billing":           billing_summary,      # Day 33
     })
 
 
@@ -1900,6 +2013,32 @@ def cron_erasure_sweep():
 def profile_page():
     """Day 30: User profile page (login + tier + usage + delete account)."""
     return render_template("profile.html")
+
+
+# ─── Day 34: notification preferences API ───────────────────────────────────
+@app.route("/profile/prefs", methods=["GET", "POST"])
+def profile_prefs():
+    """GET = current prefs. POST = update them."""
+    user = _current_user()
+    if not user:
+        return jsonify({"error": "Not logged in."}), 401
+    email = user.get("email", "")
+    if request.method == "GET":
+        return jsonify(prefs_module.get_prefs(email))
+    data = request.get_json(silent=True) or {}
+    try:
+        updated = prefs_module.set_prefs(email, **data)
+        return jsonify(updated)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/admin/prefs/stats")
+def admin_prefs_stats():
+    """Operator view of how users have set their preferences."""
+    guard = _require_admin()
+    if guard: return guard
+    return jsonify(prefs_module.stats())
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1968,17 +2107,40 @@ def billing_stripe_webhook():
     if not billing_module.verify_webhook_signature(payload, sig):
         return ("Bad signature.", 400)
     event = billing_module.parse_webhook_event(payload)
-    if event.get("handled") and event["type"] == "checkout.session.completed":
-        try:
+    if not event.get("handled"):
+        return ("", 204)
+    try:
+        if event["type"] == "checkout.session.completed":
             billing_module.activate_subscription(
                 user_id=event["user_id"],
                 user_email=event["user_email"],
                 tier=event["tier"] or "firm",
                 stripe_session_id=event["stripe_session_id"],
             )
-        except Exception as exc:
-            return (f"Webhook handler error: {exc}", 500)
+        elif event["type"] == "customer.subscription.deleted":
+            billing_module.cancel_subscription(
+                user_id=event["user_id"], reason="stripe_subscription_deleted"
+            )
+        elif event["type"] == "invoice.payment_failed":
+            billing_module.record_payment_failure(
+                user_id=event["user_id"], reason="stripe_invoice_payment_failed"
+            )
+    except Exception as exc:
+        return (f"Webhook handler error: {exc}", 500)
     return ("", 204)
+
+
+@app.route("/billing/cancel", methods=["POST"])
+def billing_cancel():
+    """User-facing: cancel my active subscription."""
+    user = _current_user()
+    if not user:
+        return jsonify({"error": "Not logged in."}), 401
+    data = request.get_json(silent=True) or {}
+    cancelled = billing_module.cancel_subscription(
+        user_id=user["id"], reason=data.get("reason", "user_requested"),
+    )
+    return jsonify({"ok": bool(cancelled), "cancelled": cancelled})
 
 
 @app.route("/billing/api/subscriptions")

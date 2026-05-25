@@ -72,20 +72,43 @@
       <div id="keysList" class="empty">Loading…</div>
     </div>
 
-    <!-- Preferences -->
+    <!-- Preferences (Day 34: real per-user prefs via /profile/prefs) -->
     <div class="card">
-      <h2>Preferences</h2>
-      <div class="row" style="margin-bottom:10px">
-        <label class="kv">Language:</label>
+      <h2>Notification preferences</h2>
+      <div class="row" style="margin-bottom:10px;gap:14px">
+        <label class="kv" style="min-width:140px"><b>Language:</b></label>
         <select id="prefLang" onchange="savePref('language', this.value)">
           <option value="en">English</option>
           <option value="hi">हिन्दी (Hindi)</option>
         </select>
       </div>
-      <div class="row">
-        <label class="kv">Daily digest email:</label>
-        <input type="checkbox" id="prefDigest" onchange="savePref('digest_email', this.checked)">
+      <div class="row" style="margin-bottom:10px;gap:14px">
+        <label class="kv" style="min-width:140px"><b>SC digest frequency:</b></label>
+        <select id="prefFreq" onchange="savePref('digest_frequency', this.value)">
+          <option value="off">Off (don't send)</option>
+          <option value="daily">Daily (07:00 IST)</option>
+          <option value="weekly" selected>Weekly (Mondays only)</option>
+        </select>
       </div>
+      <div class="row" style="margin-bottom:10px;gap:14px">
+        <label class="kv" style="min-width:140px"><b>Digest channel:</b></label>
+        <select id="prefChannel" onchange="savePref('digest_channel', this.value)">
+          <option value="email" selected>Email</option>
+          <option value="whatsapp">WhatsApp</option>
+          <option value="sms">SMS</option>
+        </select>
+      </div>
+      <div class="row" style="margin-bottom:10px;gap:14px">
+        <label class="kv" style="min-width:140px"><b>SMS alerts:</b></label>
+        <input type="checkbox" id="prefSms" onchange="savePref('sms_alerts', this.checked)">
+        <span class="kv" style="color:#888">Urgent SC ruling alerts (rate-limited)</span>
+      </div>
+      <div class="row" style="gap:14px">
+        <label class="kv" style="min-width:140px"><b>Product updates:</b></label>
+        <input type="checkbox" id="prefUpdates" onchange="savePref('product_updates', this.checked)" checked>
+        <span class="kv" style="color:#888">Monthly newsletter</span>
+      </div>
+      <p class="kv" id="prefSavedStatus" style="margin-top:8px;color:#888;font-style:italic">Loading…</p>
     </div>
 
     <!-- DPDP data export (Day 28) -->
@@ -223,19 +246,46 @@
       }
     }
 
-    function savePref(key, value) {
-      localStorage.setItem('lex_pref_' + key, JSON.stringify(value));
-      toast(`Saved: ${key} = ${value}`);
+    // Day 34: real preferences via /profile/prefs
+    async function savePref(key, value) {
+      try {
+        const r = await fetch('/profile/prefs', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({[key]: value}),
+        });
+        const d = await r.json();
+        if (r.ok) {
+          document.getElementById('prefSavedStatus').textContent =
+            `Saved: ${key} = ${value} at ${(d.updated_at||'').slice(11,19)}`;
+          toast(`✓ ${key} saved`);
+        } else {
+          toast(`Failed: ${d.error || 'unknown'}`, true);
+        }
+      } catch (e) {
+        toast('Network error: ' + e.message, true);
+      }
     }
 
-    // Load saved prefs
-    try {
-      const lang = JSON.parse(localStorage.getItem('lex_pref_language') || '"en"');
-      const digest = JSON.parse(localStorage.getItem('lex_pref_digest_email') || 'false');
-      document.getElementById('prefLang').value = lang;
-      document.getElementById('prefDigest').checked = digest;
-    } catch (e) {}
+    async function loadPrefs() {
+      try {
+        const r = await fetch('/profile/prefs');
+        if (!r.ok) {
+          document.getElementById('prefSavedStatus').textContent = 'Not logged in.';
+          return;
+        }
+        const p = await r.json();
+        document.getElementById('prefLang').value     = p.language || 'en';
+        document.getElementById('prefFreq').value     = p.digest_frequency || 'weekly';
+        document.getElementById('prefChannel').value  = p.digest_channel || 'email';
+        document.getElementById('prefSms').checked    = !!p.sms_alerts;
+        document.getElementById('prefUpdates').checked = p.product_updates !== false;
+        document.getElementById('prefSavedStatus').textContent =
+          p.updated_at ? `Last saved: ${p.updated_at.replace('T',' ')}` : 'Using defaults';
+      } catch (e) {}
+    }
 
+    loadPrefs();
     load();
   </script>
 </body>

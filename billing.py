@@ -215,7 +215,8 @@ def create_checkout_session(
 def activate_subscription(*, user_id: str, user_email: str, tier: str,
                           stripe_session_id: str = "") -> dict:
     """Called after successful payment (Stripe webhook OR stub-confirm).
-    Records the subscription and bumps the user's API key tier."""
+    Records the subscription and bumps the user's API key tier.
+    Day 32: emits 'firm.subscribed' webhook event."""
     if tier not in TIERS or tier in ("free", "nalsa"):
         raise ValueError(f"Invalid activation tier: {tier}")
 
@@ -232,9 +233,11 @@ def activate_subscription(*, user_id: str, user_email: str, tier: str,
     }
     subs = _load_subs()
     # Cancel any previous active sub for this user (one tier at a time)
+    was_upgrade = False
     for s in subs:
         if s["user_id"] == user_id and s["status"] == "active":
             s["status"] = "superseded"
+            was_upgrade = True
     subs.append(sub)
     _save_subs(subs)
 
@@ -247,7 +250,78 @@ def activate_subscription(*, user_id: str, user_email: str, tier: str,
     except Exception:
         pass
 
+    # Day 32: emit webhook event (fire-and-forget)
+    try:
+        import webhooks as webhooks_module
+        event = "subscription.tier_changed" if was_upgrade else "firm.subscribed"
+        webhooks_module.emit(event, {
+            "subscription_id": sub["id"],
+            "user_id":         user_id,
+            "user_email":      user_email,
+            "tier":            tier,
+            "monthly_inr":     sub["monthly_inr"],
+            "activated_at":    sub["activated_at"],
+        })
+    except Exception:
+        pass
+
     return sub
+
+
+def cancel_subscription(*, user_id: str, reason: str = "") -> dict | None:
+    """Day 32: cancel an active subscription + emit 'firm.cancelled' event."""
+    subs = _load_subs()
+    cancelled = None
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    for s in subs:
+        if s["user_id"] == user_id and s["status"] == "active":
+            s["status"] = "cancelled"
+            s["cancelled_at"] = now
+            s["cancellation_reason"] = reason[:200] if reason else ""
+            cancelled = s
+            break
+    if not cancelled:
+        return None
+    _save_subs(subs)
+
+    # Downgrade API keys back to free tier
+    try:
+        import api_keys as api_keys_module
+        for key in api_keys_module.list_keys(user_id=user_id):
+            if hasattr(api_keys_module, "update_tier"):
+                api_keys_module.update_tier(key["key_id"], "free")
+    except Exception:
+        pass
+
+    # Emit webhook
+    try:
+        import webhooks as webhooks_module
+        webhooks_module.emit("firm.cancelled", {
+            "subscription_id": cancelled["id"],
+            "user_id":         user_id,
+            "user_email":      cancelled.get("user_email", ""),
+            "tier":            cancelled["tier"],
+            "cancelled_at":    cancelled["cancelled_at"],
+            "reason":          cancelled.get("cancellation_reason", ""),
+        })
+    except Exception:
+        pass
+
+    return cancelled
+
+
+def record_payment_failure(*, user_id: str, reason: str = "") -> None:
+    """Day 32: emit a payment.failed event without changing subscription state.
+    Operator can react in Slack/Jira via webhook."""
+    try:
+        import webhooks as webhooks_module
+        webhooks_module.emit("payment.failed", {
+            "user_id":  user_id,
+            "reason":   reason[:200],
+            "ts":       datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        })
+    except Exception:
+        pass
 
 
 def active_subscription(user_id: str) -> dict | None:
@@ -259,6 +333,50 @@ def active_subscription(user_id: str) -> dict | None:
 
 def all_subscriptions() -> list[dict]:
     return _load_subs()
+
+
+# ─── Day 33: KPI computation for /dashboard ──────────────────────────────────
+def billing_kpis() -> dict:
+    """
+    Aggregate billing metrics for the operator dashboard:
+      - MRR (monthly recurring revenue) in INR
+      - Active subscriptions by tier
+      - Churn count (cancellations) in last 30 days
+      - 5 most-recent activations
+    """
+    from datetime import datetime, timezone, timedelta
+    subs = _load_subs()
+    now = datetime.now(timezone.utc)
+    cutoff_30d = (now - timedelta(days=30)).isoformat(timespec="seconds")
+
+    by_tier:  dict[str, int] = {}
+    mrr_inr = 0
+    for s in subs:
+        if s.get("status") == "active":
+            tier = s.get("tier", "firm")
+            by_tier[tier] = by_tier.get(tier, 0) + 1
+            mrr_inr += int(s.get("monthly_inr", 0) or 0)
+
+    churn_30d = [s for s in subs
+                  if s.get("status") == "cancelled"
+                  and (s.get("cancelled_at") or "") >= cutoff_30d]
+
+    activations_30d = [s for s in subs
+                        if (s.get("activated_at") or "") >= cutoff_30d]
+
+    recent = sorted(subs, key=lambda s: s.get("activated_at",""), reverse=True)[:5]
+
+    return {
+        "mrr_inr":           mrr_inr,
+        "active_total":      sum(by_tier.values()),
+        "by_tier":           by_tier,
+        "activations_30d":   len(activations_30d),
+        "churn_30d":         len(churn_30d),
+        "churn_rate_pct":    round(
+            (len(churn_30d) / max(len(activations_30d), 1)) * 100, 1
+        ),
+        "recent":            recent,
+    }
 
 
 # ─── Stripe live mode (HTTP via stdlib — no SDK needed) ──────────────────────

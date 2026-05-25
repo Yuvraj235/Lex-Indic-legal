@@ -302,6 +302,9 @@
 
       <!-- Incidents (gap fix) -->
       ${d.incidents ? incidentsCard(d.incidents) : ''}
+
+      <!-- Billing KPIs (Day 33) -->
+      ${d.billing ? billingCard(d.billing) : ''}
     `;
     $('content').innerHTML = html;
   }
@@ -330,6 +333,47 @@
           <thead><tr><th>Job</th><th>Status</th><th>When (UTC)</th><th>Details</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
+      </div>`;
+  }
+
+  function billingCard(b){
+    const tierRows = Object.entries(b.by_tier || {}).map(([t, n]) => `
+      <tr>
+        <td style="padding:5px 12px 5px 0"><span class="badge ${t==='firm'?'gold':t==='enterprise'?'blue':'green'}">${escapeHtml(t)}</span></td>
+        <td style="font-weight:600">${n} active</td>
+      </tr>`).join('');
+    const recentRows = (b.recent || []).map(s => `
+      <tr>
+        <td class="compact" style="color:#888">${escapeHtml((s.activated_at||'').slice(0,16).replace('T',' '))}</td>
+        <td>${escapeHtml(s.tier||'?')}</td>
+        <td style="color:#aaa">${escapeHtml((s.user_email||'').slice(0,40))}</td>
+        <td>₹${s.monthly_inr||0}/mo</td>
+      </tr>`).join('');
+    return `
+      <div class="card" style="margin-top:20px;border-left:4px solid #6bca90">
+        <h2>Billing
+          <span style="float:right;font-size:14px">
+            <strong style="color:#6bca90">₹${(b.mrr_inr||0).toLocaleString('en-IN')}/mo MRR</strong>
+            <span style="color:#aaa;margin-left:12px">${b.active_total||0} active subs</span>
+          </span>
+        </h2>
+        <div class="row" style="display:flex;gap:24px;margin-top:8px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <h3 style="font-size:12px;color:#888;margin:0 0 6px;text-transform:uppercase">By tier</h3>
+            <table style="border-collapse:collapse">${tierRows || '<tr><td style="color:#888;font-style:italic">No active subs yet</td></tr>'}</table>
+          </div>
+          <div style="flex:1;min-width:200px">
+            <h3 style="font-size:12px;color:#888;margin:0 0 6px;text-transform:uppercase">Last 30 days</h3>
+            <div style="font-size:13px">+${b.activations_30d||0} new · -${b.churn_30d||0} churned</div>
+            <div style="font-size:11px;color:#888;margin-top:3px">Churn rate: ${b.churn_rate_pct||0}%</div>
+          </div>
+        </div>
+        ${recentRows ? `
+          <h3 style="font-size:12px;color:#888;margin:14px 0 6px;text-transform:uppercase">Recent activations</h3>
+          <table style="border-collapse:collapse;width:100%">
+            <thead><tr><th>When (UTC)</th><th>Tier</th><th>Email</th><th>MRR</th></tr></thead>
+            <tbody>${recentRows}</tbody>
+          </table>` : ''}
       </div>`;
   }
 

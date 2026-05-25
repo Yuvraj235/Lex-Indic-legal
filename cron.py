@@ -55,6 +55,7 @@ import mailer as mailer_module
 import auth as auth_module
 import sc_scraper as sc_scraper_module   # Day 27
 import erasure as erasure_module          # Day 28
+import prefs as prefs_module               # Day 34
 
 _LAST_RUN_PATH = Path("outputs") / "cron" / "last_run.json"
 
@@ -107,6 +108,14 @@ def digest_email(*, dry_run: bool = False) -> dict:
     else:
         recipients = _get_digest_recipients()
 
+    # Day 34: filter by user preferences. Default if no prefs set = include
+    # in 'weekly_monday'. Daily / off respected verbatim.
+    today = datetime.now(timezone.utc)
+    when = "weekly_monday" if today.weekday() == 0 else "daily"
+    before_count = len(recipients)
+    recipients = [r for r in recipients if prefs_module.wants_digest(r, when=when)]
+    filtered_out = before_count - len(recipients)
+
     if not recipients:
         return {"status": "no_recipients", "hits": total_hits, "sent": 0}
 
@@ -138,6 +147,7 @@ def digest_email(*, dry_run: bool = False) -> dict:
         "hits":   total_hits,
         "matters_with_hits": matters_with_hits,
         "sent":   sent,
+        "filtered_out_by_prefs": filtered_out,    # Day 34
         "errors": errors,
         "date":   digest["date"],
     }
