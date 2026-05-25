@@ -133,9 +133,19 @@ def _scrape_stub() -> list[ScrapedRuling]:
 
 
 # ─── livelaw RSS provider ─────────────────────────────────────────────────────
+# Verified working feeds (probed May 2026). LiveLaw's main /rss.xml returns 404;
+# the working endpoint is the per-category feed.
+_FEED_URLS = {
+    "livelaw":    "https://www.livelaw.in/category/top-stories/feed",
+    "barandbench":"https://www.barandbench.com/feed",
+    "scconline":  "https://www.scconline.com/blog/feed",
+    "lawbeat":    "https://www.lawbeat.in/feed",
+}
+
+
 def _scrape_livelaw(max_items: int = 25) -> list[ScrapedRuling]:
-    """Parse LiveLaw RSS feed for Supreme Court rulings."""
-    feed_url = os.getenv("LIVELAW_RSS_URL", "https://www.livelaw.in/rss.xml")
+    """Parse LiveLaw (or any other Indian-legal RSS) for Supreme Court rulings."""
+    feed_url = os.getenv("LIVELAW_RSS_URL", _FEED_URLS["livelaw"])
     try:
         req = urllib.request.Request(
             feed_url,
@@ -239,10 +249,22 @@ def _scrape_indiankanoon(max_items: int = 25) -> list[ScrapedRuling]:
 def scrape(provider: str | None = None) -> list[ScrapedRuling]:
     """Scrape latest SC rulings using the configured provider."""
     p = (provider or get_provider()).lower()
-    if p == "livelaw":
-        return _scrape_livelaw()
     if p == "indiankanoon":
         return _scrape_indiankanoon()
+    if p in _FEED_URLS:
+        # livelaw / barandbench / scconline / lawbeat — all share the same RSS parser
+        os.environ["LIVELAW_RSS_URL"] = _FEED_URLS[p]
+        return _scrape_livelaw()
+    if p == "all_rss":
+        # Aggregate from every working feed
+        all_items = []
+        for name, url in _FEED_URLS.items():
+            os.environ["LIVELAW_RSS_URL"] = url
+            try:
+                all_items.extend(_scrape_livelaw(max_items=10))
+            except Exception:
+                continue
+        return all_items
     return _scrape_stub()
 
 

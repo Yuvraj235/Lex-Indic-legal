@@ -331,5 +331,61 @@
     "source_url": "https://example.invalid/stub-2",
     "ratio": "Stub ruling. Court clarifies scope of BNS 111 (organised crime) vis-à-vis pre-existing MCOCA provisions in Maharashtra.",
     "practice_impact": "MCOCA cases pending post-July 2024 should be re-examined."
+  },
+  {
+    "id": "scr_livelaw_28ec8750d7",
+    "title": "Supreme Court Takes Suo Motu Cognisance Over Twisha Sharma Dowry Death Case",
+    "court": "Supreme Court of India",
+    "date": "2026-05-24",
+    "neutral_citation": "",
+    "sections": [],
+    "tags": [
+      "dowry"
+    ],
+    "source_url": "https://www.livelaw.in/top-stories/supreme-court-takes-suo-motu-cognisance-over-twisha-sharma-dowry-death-case-535468",
+    "ratio": "",
+    "practice_impact": "(extracted automatically — review for accuracy)"
+  },
+  {
+    "id": "scr_livelaw_c7eeed252a",
+    "title": "Supreme Court To List Over 7,300 Cases During Partial Court Working Days; Fresh Matters Including Bail Pleas To Be Taken Up",
+    "court": "Supreme Court of India",
+    "date": "2026-05-23",
+    "neutral_citation": "",
+    "sections": [],
+    "tags": [
+      "bail"
+    ],
+    "source_url": "https://www.livelaw.in/top-stories/supreme-court-to-list-over-7300-cases-during-partial-court-working-days-fresh-matters-including-bail-pleas-to-be-taken-up-535460",
+    "ratio": "",
+    "practice_impact": "(extracted automatically — review for accuracy)"
+  },
+  {
+    "id": "scr_livelaw_5c662f4bd9",
+    "title": "Fraternity Cannot Justify Violence or Denial of Legal Remedies: Supreme Court on Lawyers’ Boycott",
+    "court": "Supreme Court of India",
+    "date": "2026-05-23",
+    "neutral_citation": "",
+    "sections": [],
+    "tags": [
+      "bail"
+    ],
+    "source_url": "https://lawbeat.in/supreme-court-judgments/fraternity-cannot-justify-violence-or-denial-of-legal-remedies-supreme-court-on-lawyers-boycott-1595101",
+    "ratio": "The Supreme Court noted intimidation by members of the Barabanki bar created such fear that accused were denied access to lawyers, bail remedies and a fair trial in Uttar Pradesh.",
+    "practice_impact": "(extracted automatically — review for accuracy)"
+  },
+  {
+    "id": "scr_livelaw_9d1ab1606b",
+    "title": "Court Cannot Quash Forgery FIR Before Handwriting Expert’s Report Comes: Supreme Court",
+    "court": "Supreme Court of India",
+    "date": "2026-05-23",
+    "neutral_citation": "",
+    "sections": [],
+    "tags": [
+      "writ"
+    ],
+    "source_url": "https://lawbeat.in/supreme-court-judgments/court-cannot-quash-forgery-fir-before-handwriting-experts-report-comes-supreme-court-1595008",
+    "ratio": "The Supreme Court said when an FIR contains specific allegations of forgery and disputed documents are being examined by handwriting experts, the high court should not quash the case before the expert report is received.",
+    "practice_impact": "(extracted automatically — review for accuracy)"
   }
 ]
