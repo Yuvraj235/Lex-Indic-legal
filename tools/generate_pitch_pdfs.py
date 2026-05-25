@@ -71,7 +71,7 @@ class LexPdf(FPDF):
         self.set_auto_page_break(auto=True, margin=22)
         self.alias_nb_pages()
         self.set_creator("Lex-Indic")
-        self.set_author("Lex-Indic / Yuvraj Pratap Singh")
+        self.set_author("Lex-Indic / Hrishita Panjetha + Yuvraj Pratap Singh")
         self.set_title(doc_title)
 
     def header(self):
@@ -313,7 +313,7 @@ def build_sales_pitch_pdf():
     pdf.set_xy(45, 252)
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(*BLACK)
-    pdf.cell(0, 5, _s("sales@lex-indic.in   |   github.com/Yuvraj235/Lex-Indic-legal"))
+    pdf.cell(0, 5, _s("github.com/Yuvraj235/Lex-Indic-legal   |   reach the founders via the repository"))
 
     pdf.set_y(275)
     pdf.set_font("Helvetica", "I", 8)
@@ -386,7 +386,7 @@ def build_sales_pitch_pdf():
         pdf.bullet(b)
 
     pdf.h2("Commercial summary")
-    pdf.kv("Founders",       "Yuvraj Pratap Singh (sole founder, ex-engineering)")
+    pdf.kv("Founders",       "Hrishita Panjetha (co-founder, engineering) and Yuvraj Pratap Singh (co-founder, engineering)")
     pdf.kv("Location",       "Delhi NCR (operations) - infra in Mumbai (AWS ap-south-1 / Hetzner FRA)")
     pdf.kv("Stack",          "Python 3.13 + Flask + ChromaDB + Gemini 1.5 Pro + fpdf2 (production)")
     pdf.kv("LOC",            "~25,000 (Python) + 12,000 (HTML/JS) + 80 automated tests")
@@ -985,20 +985,18 @@ def build_sales_pitch_pdf():
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(*BLACK)
     pdf.multi_cell(pdf.w - 50, 6, _s(
-        "1. 15-minute live demo on Google Meet - book at sales@lex-indic.in.\n"
-        "2. Sandbox API key (no credit card) - request at api-trial@lex-indic.in.\n"
-        "3. On-prem evaluation kit (Docker compose) - request at enterprise@lex-indic.in."
+        "1. 15-minute live demo on Google Meet - request a slot via a GitHub issue on the repository.\n"
+        "2. Sandbox API key (no credit card) - request via a GitHub issue tagged 'api-trial'.\n"
+        "3. On-prem evaluation kit (Docker compose) - clone the repo and follow docs/DEPLOY.md."
     ))
 
     pdf.ln(20)
     pdf.h2("Direct contacts")
-    pdf.kv("Founder & technical lead",  "Yuvraj Pratap Singh - yuvraj@lex-indic.in - +91 9XXX-XXXXXX")
-    pdf.kv("Sales (Tier 1-3)",           "sales@lex-indic.in")
-    pdf.kv("Enterprise / International", "enterprise@lex-indic.in")
-    pdf.kv("NALSA / SLSA partnerships",  "nalsa@lex-indic.in")
-    pdf.kv("Security disclosures",        "security@lex-indic.in (PGP key on website)")
+    pdf.kv("Co-founder (engineering)",   "Hrishita Panjetha")
+    pdf.kv("Co-founder (engineering)",   "Yuvraj Pratap Singh")
     pdf.kv("Code repository",             "github.com/Yuvraj235/Lex-Indic-legal")
-    pdf.kv("Status page",                 "status.lex-indic.in")
+    pdf.kv("Issue tracker / contact",   "Open an issue on the GitHub repository for all sales, enterprise, NALSA partnership, and security questions")
+    pdf.kv("Custom domain + email",      "Coming soon. Until then, the GitHub repository is the canonical contact channel.")
 
     pdf.h2("Suggested next step for your firm")
     pdf.bullet("If you are a Tier-1 / Tier-2 firm: nominate the head of your criminal-litigation practice for a 15-minute demo. We will tailor the demo around 2-3 of your live (anonymised) matters.")
@@ -1515,7 +1513,7 @@ def build_technical_deepdive_pdf():
         ["SMTP_PORT", "587", "SMTP port"],
         ["SMTP_USER", "(required for smtp)", "SMTP username"],
         ["SMTP_PASS", "(required for smtp)", "SMTP password"],
-        ["MAIL_FROM", "noreply@lex-indic.in", "From address for outgoing mail"],
+        ["MAIL_FROM", "noreply@example.com", "From address for outgoing mail (set this to your real domain when configured)"],
         ["AWS_REGION", "ap-south-1", "AWS region for SES"],
         ["SMS_PROVIDER", "stdout", "stdout | msg91 | twilio"],
         ["MSG91_AUTH_KEY", "(required for msg91)", "MSG91 API auth key"],
@@ -2245,7 +2243,7 @@ def build_user_guide_pdf():
 
     pdf.h2("Step by step")
     pdf.bullet("Go to /auth/login or click 'Login' in the top-right of any page")
-    pdf.bullet("Type your email address (e.g. yuvraj@lex-indic.in)")
+    pdf.bullet("Type your email address (e.g. your.name@example.com)")
     pdf.bullet("Click 'Send code'")
     pdf.bullet("Check your inbox (or your terminal, if MAIL_PROVIDER=stdout in dev)")
     pdf.bullet("Type the 6-digit code into the next form")
