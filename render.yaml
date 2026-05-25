@@ -1,6 +1,9 @@
 # ════════════════════════════════════════════════════════════════════════════
 #  Lex-Indic — Render.com deployment blueprint
 #  Deploy:  Connect this repo at https://dashboard.render.com/blueprints
+#  Free tier sleeps after 15 min idle. Upgrade plan to 'starter' ($7/mo)
+#  for always-on.  Free tier does NOT support persistent disk — outputs/
+#  resets on every restart (fine for demo, set DATABASE_URL for persistence).
 # ════════════════════════════════════════════════════════════════════════════
 
 services:
@@ -8,19 +11,27 @@ services:
     name:     lex-indic
     region:   singapore                # closest to India among Render's regions
     runtime:  docker
-    plan:     starter                  # $7/mo; bump to standard for >1 instance
+    plan:     free                     # free tier; change to 'starter' for $7/mo always-on
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/v1/health
     autoDeploy:  true                  # redeploy on every push to main
-    disk:
-      name:       lex-outputs
-      mountPath:  /app/outputs
-      sizeGB:     5
     envVars:
-      # Set the secrets in the Render dashboard (NOT in this file):
+      # Sync from a Render env-group (preferred) OR set in dashboard manually:
       #   GEMINI_API_KEY, GROQ_API_KEY, ADMIN_TOKEN, AUDIT_HASH_SALT,
-      #   MAIL_PROVIDER, SMTP_*, LEAD_NOTIFY_EMAIL, ...
+      #   DISABLE_RATE_LIMITS, MAIL_PROVIDER, SMTP_*, LEAD_NOTIFY_EMAIL, ...
       - key:    PYTHONUNBUFFERED
         value:  "1"
       - key:    FLASK_APP
         value:  "app"
+      - key:    PORT
+        value:  "8080"
+      - key:    GEMINI_API_KEY
+        sync:   false                  # paste value in Render dashboard
+      - key:    GROQ_API_KEY
+        sync:   false
+      - key:    ADMIN_TOKEN
+        sync:   false
+      - key:    AUDIT_HASH_SALT
+        sync:   false
+      - key:    DISABLE_RATE_LIMITS
+        sync:   false
