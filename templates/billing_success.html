@@ -32,7 +32,7 @@
     <div class="card">
       <div class="kv"><b>Subscription ID:</b> {{ subscription.id }}</div>
       <div class="kv"><b>Tier:</b> <span class="tier-pill">{{ subscription.tier }}</span></div>
-      <div class="kv"><b>Monthly:</b> ₹{{ subscription.monthly_inr }}</div>
+      <div class="kv"><b>Monthly:</b> ₹{{ "{:,}".format(subscription.monthly_inr|int) }}</div>
       <div class="kv"><b>Activated:</b> {{ subscription.activated_at }}</div>
       <div class="kv"><b>Status:</b> {{ subscription.status }}</div>
     </div>

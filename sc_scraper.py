@@ -273,6 +273,10 @@ def merge_into_corpus(new_rulings: list[ScrapedRuling]) -> dict:
     """
     Append new rulings to data/monitor_corpus/sc_rulings.json without
     creating duplicates (matched by id).
+
+    HARDENED: refuses to write stub-flagged rulings into the production
+    corpus. Stubs are useful for tests but must never pollute real data.
+    Set ALLOW_STUB_IN_CORPUS=1 to override (test fixtures only).
     """
     _RULINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
     if _RULINGS_FILE.exists():
@@ -280,9 +284,17 @@ def merge_into_corpus(new_rulings: list[ScrapedRuling]) -> dict:
     else:
         existing = []
 
+    # SAFETY: filter out stub-flagged rulings unless explicitly allowed
+    allow_stubs = os.getenv("ALLOW_STUB_IN_CORPUS", "").strip() == "1"
+    real_rulings = new_rulings if allow_stubs else [
+        r for r in new_rulings
+        if not r.id.startswith("scr_stub_") and not r.id.startswith("scr_test_")
+    ]
+    skipped_stubs = len(new_rulings) - len(real_rulings)
+
     existing_ids = {r.get("id") for r in existing}
     added = 0
-    for r in new_rulings:
+    for r in real_rulings:
         if r.id in existing_ids:
             continue
         existing.append(asdict(r))
@@ -294,7 +306,12 @@ def merge_into_corpus(new_rulings: list[ScrapedRuling]) -> dict:
             encoding="utf-8",
         )
 
-    return {"added": added, "total": len(existing), "provider": get_provider()}
+    return {
+        "added":        added,
+        "total":        len(existing),
+        "provider":     get_provider(),
+        "skipped_stubs": skipped_stubs,
+    }
 
 
 def run_daily_scrape(provider: str | None = None) -> dict:

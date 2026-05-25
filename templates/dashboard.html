@@ -347,7 +347,7 @@
         <td class="compact" style="color:#888">${escapeHtml((s.activated_at||'').slice(0,16).replace('T',' '))}</td>
         <td>${escapeHtml(s.tier||'?')}</td>
         <td style="color:#aaa">${escapeHtml((s.user_email||'').slice(0,40))}</td>
-        <td>₹${s.monthly_inr||0}/mo</td>
+        <td>₹${(s.monthly_inr||0).toLocaleString('en-IN')}/mo</td>
       </tr>`).join('');
     return `
       <div class="card" style="margin-top:20px;border-left:4px solid #6bca90">

@@ -56,6 +56,25 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.jinja_env.auto_reload = True
 
 
+# ─── Polish: request_id middleware ──────────────────────────────────────────
+import uuid as _uuid_mod
+@app.before_request
+def _attach_request_id():
+    request.request_id = (
+        request.headers.get("X-Request-Id")
+        or f"req_{_uuid_mod.uuid4().hex[:14]}"
+    )
+
+
+@app.after_request
+def _emit_request_id(response):
+    """Set X-Request-Id header on every response so the user can quote it
+    when filing a bug report."""
+    if hasattr(request, "request_id"):
+        response.headers["X-Request-Id"] = request.request_id
+    return response
+
+
 # ─── Friendly error pages (polish sprint) ───────────────────────────────────
 @app.errorhandler(404)
 def page_not_found(e):
@@ -420,22 +439,34 @@ def matters_firms():
       GET  — anonymous: returns all firms (demo).
              authenticated: returns only the user's firm.
       POST — anyone can create a firm; if user is authenticated and has
-             no firm_id yet, auto-bind them to the new firm as 'partner'."""
+             no firm_id yet, auto-bind them to the new firm as 'partner'.
+      Polish: stricter input validation (no HTML/JS/null bytes, length caps)."""
     u = _current_user()
     if request.method == "GET":
         firms = matters_module.list_firms()
         if u and u.get("firm_id"):
             firms = [f for f in firms if f["id"] == u["firm_id"]]
         return jsonify({"firms": firms})
-    data = request.get_json() or {}
+
+    data = request.get_json(silent=True) or {}
+    # Validate inputs
+    import response_helpers as _rh
+    name, err = _rh.require_string(data, "name", min_len=2, max_len=120)
+    if err:
+        return _rh.error(err, status=422, code="validation_failed")
+    address = (data.get("address") or "").strip()[:200]
+    # Reject HTML-shaped inputs (basic XSS guard)
+    if "<" in name or ">" in name or "<" in address or ">" in address:
+        return _rh.error("Firm name and address cannot contain '<' or '>'.",
+                          status=422, code="invalid_characters")
+
     try:
-        firm = matters_module.add_firm(data.get("name", ""), data.get("address", ""))
-        # Auto-bind the creating user to the new firm on first create
+        firm = matters_module.add_firm(name, address)
         if u and not u.get("firm_id"):
             auth_module.bind_user_to_firm(u["id"], firm["id"], role="partner")
-        return jsonify({"firm": firm})
+        return jsonify({"ok": True, "firm": firm})
     except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        return _rh.error(str(e), status=409, code="duplicate")
 
 
 @app.route("/matters/api/lawyers", methods=["GET", "POST"])

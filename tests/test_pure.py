@@ -945,12 +945,24 @@ class TestSCScraper:
 
     def test_run_daily_scrape_stub(self, tmp_path, monkeypatch):
         monkeypatch.delenv("SC_SCRAPER_PROVIDER", raising=False)
+        monkeypatch.setenv("ALLOW_STUB_IN_CORPUS", "1")   # tests can opt-in
         monkeypatch.setattr("sc_scraper._RULINGS_FILE", tmp_path / "rulings.json")
         import sc_scraper
         result = sc_scraper.run_daily_scrape(provider="stub")
         assert result["status"] == "ok"
         assert result["scraped"] == 2
         assert result["added"] == 2
+
+    def test_stubs_blocked_from_production_corpus(self, tmp_path, monkeypatch):
+        """SAFETY: stubs must never land in real corpus by accident."""
+        monkeypatch.delenv("ALLOW_STUB_IN_CORPUS", raising=False)
+        monkeypatch.setattr("sc_scraper._RULINGS_FILE", tmp_path / "rulings.json")
+        import sc_scraper
+        result = sc_scraper.run_daily_scrape(provider="stub")
+        assert result["status"] == "ok"
+        assert result["scraped"] == 2     # provider returned 2
+        assert result["added"] == 0       # but 0 made it to corpus
+        assert result["skipped_stubs"] == 2
 
 
 # ────────────────────────────── Day 28: DPDP erasure ──────────────────────
@@ -1343,3 +1355,134 @@ class TestUploads:
         assert s["total_files"] == 2
         assert s["matters_with_files"] == 2
         assert s["total_bytes"] >= 3000
+
+
+# ────────────────────────────── Polish: response_helpers + validation ──────
+class TestResponseHelpers:
+    def test_fmt_inr_indian_grouping(self):
+        import response_helpers as rh
+        assert rh.fmt_inr(0) == "₹0"
+        assert rh.fmt_inr(500) == "₹500"
+        assert rh.fmt_inr(1500) == "₹1,500"
+        assert rh.fmt_inr(100000) == "₹1,00,000"      # 1 lakh
+        assert rh.fmt_inr(10000000) == "₹1,00,00,000" # 1 crore
+        assert rh.fmt_inr(None) == "—"
+
+    def test_fmt_inr_handles_garbage(self):
+        import response_helpers as rh
+        assert rh.fmt_inr("abc") == "abc"
+
+    def test_now_iso_returns_utc(self):
+        import response_helpers as rh
+        s = rh.now_iso()
+        # Format: 2026-05-25T18:34:23+00:00
+        assert "T" in s
+        assert s.endswith("+00:00") or s.endswith("Z")
+
+    def test_safe_str_handles_none(self):
+        import response_helpers as rh
+        assert rh.safe_str(None) == "—"
+        assert rh.safe_str("") == "—"
+        assert rh.safe_str("hello") == "hello"
+        assert rh.safe_str(0) == "0"
+        assert rh.safe_str(None, fallback="N/A") == "N/A"
+
+    def test_require_string_empty(self):
+        import response_helpers as rh
+        val, err = rh.require_string({}, "name")
+        assert val is None
+        assert "required" in err
+
+    def test_require_string_too_short(self):
+        import response_helpers as rh
+        val, err = rh.require_string({"name": "x"}, "name", min_len=2)
+        assert val is None
+        assert "at least 2" in err
+
+    def test_require_string_strips_whitespace(self):
+        import response_helpers as rh
+        val, err = rh.require_string({"name": "  hello  "}, "name")
+        assert val == "hello"
+        assert err is None
+
+    def test_require_string_rejects_control_chars(self):
+        import response_helpers as rh
+        val, err = rh.require_string({"name": "hello\x00world"}, "name")
+        assert val is None
+        assert "control" in err.lower()
+
+    def test_require_email_valid(self):
+        import response_helpers as rh
+        val, err = rh.require_email({"email": "a@b.in"})
+        assert val == "a@b.in"
+        assert err is None
+
+    def test_require_email_invalid(self):
+        import response_helpers as rh
+        val, err = rh.require_email({"email": "not-an-email"})
+        assert val is None
+        assert err
+
+    def test_require_email_lowercases(self):
+        import response_helpers as rh
+        val, err = rh.require_email({"email": "Mixed@CASE.IN"})
+        assert val == "mixed@case.in"
+
+    def test_require_phone_indian(self):
+        import response_helpers as rh
+        val, err = rh.require_phone({"phone": "+91 98765 43210"})
+        assert val
+        assert err is None
+
+    def test_require_phone_rejects_short(self):
+        import response_helpers as rh
+        val, err = rh.require_phone({"phone": "123"})
+        assert val is None
+
+    def test_require_enum_valid(self):
+        import response_helpers as rh
+        val, err = rh.require_enum({"role": "partner"},
+                                     "role", ("partner", "associate"))
+        assert val == "partner"
+        assert err is None
+
+    def test_require_enum_invalid(self):
+        import response_helpers as rh
+        val, err = rh.require_enum({"role": "ceo"},
+                                     "role", ("partner", "associate"))
+        assert val is None
+        assert "one of" in err
+
+    def test_require_positive_int_negative_rejected(self):
+        import response_helpers as rh
+        val, err = rh.require_positive_int({"age": -5}, "age", min_val=0)
+        assert val is None
+        assert ">= 0" in err
+
+    def test_require_positive_int_garbage_rejected(self):
+        import response_helpers as rh
+        val, err = rh.require_positive_int({"age": "twenty"}, "age")
+        assert val is None
+        assert "integer" in err
+
+    def test_require_list_of_strings_too_many(self):
+        import response_helpers as rh
+        val, err = rh.require_list_of_strings(
+            {"tags": ["a"] * 100}, "tags", max_items=10
+        )
+        assert val is None
+        assert "at most 10" in err
+
+    def test_require_list_of_strings_filters_empty(self):
+        import response_helpers as rh
+        val, err = rh.require_list_of_strings(
+            {"tags": ["a", "", "  ", "b"]}, "tags"
+        )
+        assert val == ["a", "b"]  # empty strings dropped, whitespace stripped
+        assert err is None
+
+    def test_require_list_of_strings_rejects_non_string(self):
+        import response_helpers as rh
+        val, err = rh.require_list_of_strings({"tags": ["a", 42]}, "tags")
+        assert val is None
+        assert "must be a string" in err
