@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f2850"/>
+      <stop offset="100%" stop-color="#1a3a6e"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0a500"/>
+      <stop offset="100%" stop-color="#d99000"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="0" y="618" width="1200" height="12" fill="url(#gold)"/>
+  <text x="80" y="170" font-family="-apple-system,Helvetica,sans-serif"
+        font-weight="900" font-size="68" fill="#f0a500">LEX-INDIC</text>
+  <text x="80" y="220" font-family="Helvetica,sans-serif" font-weight="400"
+        font-size="26" fill="#ffffff" opacity="0.85">THE BNS TRANSITION ENGINE · INDIA</text>
+  <text x="80" y="350" font-family="-apple-system,Helvetica,sans-serif"
+        font-weight="700" font-size="58" fill="#ffffff">AI Junior Associate</text>
+  <text x="80" y="420" font-family="-apple-system,Helvetica,sans-serif"
+        font-weight="700" font-size="58" fill="#ffffff">for Indian Law Firms</text>
+  <text x="80" y="510" font-family="Helvetica,sans-serif" font-weight="400"
+        font-size="22" fill="#ffffff" opacity="0.7">Bharatiya Nyaya Sanhita · BNSS · BSA · DPDP-compliant audit · White-label PDFs</text>
+  <text x="80" y="565" font-family="Helvetica,sans-serif" font-weight="600"
+        font-size="22" fill="#f0a500">github.com/Yuvraj235/Lex-Indic-legal</text>
+  <!-- Decorative legal scales icon -->
+  <g transform="translate(950, 260)">
+    <circle cx="0" cy="0" r="130" fill="none" stroke="#f0a500" stroke-width="3" opacity="0.4"/>
+    <text x="0" y="20" text-anchor="middle" font-size="180" fill="#f0a500" opacity="0.7">⚖</text>
+  </g>
+</svg>

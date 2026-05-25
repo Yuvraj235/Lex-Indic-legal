@@ -192,7 +192,13 @@
     const data = await (await fetch('/matters/api/firms')).json();
     const list = $('firmList');
     if (!data.firms.length){
-      list.innerHTML = '<div class="empty">No firms registered yet.</div>';
+      list.innerHTML = `
+        <div class="lex-empty">
+          <div class="lex-empty-icon">🏛️</div>
+          <h3>No firms registered yet</h3>
+          <p>Start by adding your firm. You can then add lawyers and matters under it. Conflict-of-interest checks fire automatically when you create a new matter.</p>
+          <a href="#firmForm" onclick="document.getElementById('firmName').focus()" class="btn">+ Add your first firm</a>
+        </div>`;
     } else {
       list.innerHTML = data.firms.map(f => `
         <div class="list-item">
@@ -227,7 +233,12 @@
     _lawyers = data.lawyers;
     const list = $('lawyerList');
     if (!_lawyers.length){
-      list.innerHTML = '<div class="empty">No lawyers added yet.</div>';
+      list.innerHTML = `
+        <div class="lex-empty">
+          <div class="lex-empty-icon">👨‍⚖️</div>
+          <h3>No lawyers added yet</h3>
+          <p>Add the lawyers in your firm. Each lawyer has a role (partner / senior associate / associate / paralegal) and a Bar Council number.</p>
+        </div>`;
     } else {
       list.innerHTML = _lawyers.map(l => `
         <div class="list-item">
@@ -270,7 +281,12 @@
     const data = await (await fetch('/matters/api/matters')).json();
     const list = $('matterList');
     if (!data.matters.length){
-      list.innerHTML = '<div class="empty">No matters yet.</div>';
+      list.innerHTML = `
+        <div class="lex-empty">
+          <div class="lex-empty-icon">📂</div>
+          <h3>No matters yet</h3>
+          <p>A matter is a single case file. Each one gets a human-friendly ID like <code>FIRM/2026/0042</code> and links to a lawyer in your firm. Conflict-of-interest checks fire automatically.</p>
+        </div>`;
       return;
     }
     list.innerHTML = data.matters.slice().reverse().map(m => `

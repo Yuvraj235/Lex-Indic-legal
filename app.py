@@ -55,6 +55,34 @@ app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.jinja_env.auto_reload = True
 
+
+# ─── Friendly error pages (polish sprint) ───────────────────────────────────
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template("error.html",
+        code=404,
+        title="Page not found",
+        message="The URL you requested doesn't exist. Try one of the links below."
+    ), 404
+
+
+@app.errorhandler(500)
+def internal_error(e):
+    return render_template("error.html",
+        code=500,
+        title="Something broke",
+        message="An internal error occurred. The team has been notified. Try again in a moment."
+    ), 500
+
+
+@app.errorhandler(429)
+def rate_limited(e):
+    return render_template("error.html",
+        code=429,
+        title="Rate limit hit",
+        message="You're going too fast. Wait a moment and try again, or upgrade your tier at /pricing."
+    ), 429
+
 # ── Global state: build the knowledge base ONCE at startup ───────────────────
 # This avoids re-embedding 79 documents on every request (would be very slow)
 print("\n  Lex-Indic Web Server — Starting up...")

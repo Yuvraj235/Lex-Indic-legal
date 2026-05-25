@@ -296,7 +296,13 @@
     const data = await resp.json();
     const el = document.getElementById('matterList');
     if (!data.matters.length){
-      el.innerHTML = '<div class="empty-state">No active watches yet. Add one on the left.</div>';
+      el.innerHTML = `
+        <div class="lex-empty">
+          <div class="lex-empty-icon">🔭</div>
+          <h3>No watch-matters yet</h3>
+          <p>Tell the system which legal topics you care about. Every day at 07:00 IST it scans new Supreme Court rulings and emails you any matches.</p>
+          <p style="font-size:11.5px;color:#aaa">Example: label "Dowry cases", keywords "dowry, 498A, matrimonial cruelty", sections "BNS 85, BNS 80"</p>
+        </div>`;
       return;
     }
     el.innerHTML = data.matters.map(m => `

@@ -1,8 +1,22 @@
 <!--
-  Lex-Indic shared top-navigation bar.
+  Lex-Indic shared top-navigation bar + favicon + Open Graph meta.
   Include in every template with the standard Jinja include directive.
   Highlights the active page via data-current-path.
 -->
+
+<!-- Favicon + Open Graph + Twitter Card (polish sprint) -->
+<link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
+<link rel="apple-touch-icon" href="/static/img/favicon.svg">
+<meta property="og:title" content="Lex-Indic — AI Junior Associate for Indian Law">
+<meta property="og:description" content="The BNS Transition Engine. Citation-traceable legal analysis, DPDP-compliant audit, white-label PDFs. Free for NALSA panel advocates.">
+<meta property="og:image" content="/static/img/og-card.svg">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://lex-indic.in">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Lex-Indic — AI Junior Associate for Indian Law">
+<meta name="twitter:description" content="BNS / BNSS / BSA — citation-traceable, DPDP-compliant. 31 days shipped.">
+<meta name="twitter:image" content="/static/img/og-card.svg">
+<meta name="theme-color" content="#0f2850">
 <style>
   .lex-topbar {
     position: sticky;
@@ -77,8 +91,29 @@
   @media (max-width: 900px) {
     .lex-nav-divider, .lex-brand { display: none; }
     .lex-nav-admin { margin-left: 0; }
-    .lex-topbar-inner { padding: 7px 10px; }
+    .lex-topbar-inner { padding: 7px 10px; gap: 2px; }
+    .lex-nav-link { padding: 5px 8px; font-size: 12.5px; }
   }
+  @media (max-width: 600px) {
+    .lex-nav-link { padding: 5px 7px; font-size: 12px; }
+    .lex-nav-admin .lex-nav-link { font-size: 11px; }
+  }
+
+  /* Shared empty-state styling — used by /matters /monitors /webhooks etc. */
+  .lex-empty {
+    text-align: center;
+    padding: 40px 22px;
+    color: #888;
+    background: rgba(15,40,80,0.03);
+    border: 2px dashed rgba(15,40,80,0.15);
+    border-radius: 10px;
+    margin: 16px 0;
+  }
+  .lex-empty .lex-empty-icon { font-size: 42px; margin-bottom: 10px; opacity: 0.5; }
+  .lex-empty h3 { color: #0f2850; font-size: 17px; margin: 0 0 6px; }
+  .lex-empty p { font-size: 13px; margin: 0 0 14px; max-width: 380px; margin-left: auto; margin-right: auto; }
+  .lex-empty .btn { display: inline-block; padding: 9px 16px; background: #0f2850; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; }
+  .lex-empty .btn:hover { background: #1a3a6e; color: #fff; }
 </style>
 
 <nav class="lex-topbar" id="lexTopbar" data-current-path="{{ request.path if request else '/' }}">

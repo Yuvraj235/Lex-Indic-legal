@@ -8,6 +8,15 @@
   <style>
     body { background: #f7f7fb; color: #222; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; }
     .pricing-shell { max-width: 1180px; margin: 30px auto; padding: 0 18px; }
+    @media (max-width: 600px) {
+      .pricing-shell { margin: 16px auto; padding: 0 12px; }
+      h1 { font-size: 22px; }
+      .tier-card { padding: 18px; }
+      .tier-price { font-size: 26px; }
+      .tier-features li { font-size: 12.5px; padding: 5px 0; }
+      .mode-banner { font-size: 12px; padding: 8px 12px; }
+      .faq { margin: 30px auto; }
+    }
     h1 { color: #0f2850; text-align: center; margin: 30px 0 10px; }
     p.lead { text-align: center; color: #666; margin-bottom: 40px; }
     .tier-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
