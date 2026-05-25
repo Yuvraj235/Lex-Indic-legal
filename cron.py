@@ -53,6 +53,8 @@ import monitors as monitors_module
 import nalsa as nalsa_module
 import mailer as mailer_module
 import auth as auth_module
+import sc_scraper as sc_scraper_module   # Day 27
+import erasure as erasure_module          # Day 28
 
 _LAST_RUN_PATH = Path("outputs") / "cron" / "last_run.json"
 
@@ -325,13 +327,16 @@ def main():
     parser.add_argument(
         "job",
         nargs="?",
-        choices=["digest_email", "nalsa_csv", "cleanup", "all"],
+        choices=["digest_email", "nalsa_csv", "cleanup", "sc_scrape",
+                  "erasure_sweep", "all"],
         default="all",
         help=(
             "digest_email  — Run SC monitor digest + send emails\n"
             "nalsa_csv     — Export NALSA registry to CSV\n"
             "cleanup       — Delete old audit logs\n"
-            "all           — Run all three (default)"
+            "sc_scrape     — Day 27: pull latest SC rulings into the monitor corpus\n"
+            "erasure_sweep — Day 28: hard-delete users past their 7-day grace\n"
+            "all           — Run all five (default)"
         ),
     )
     parser.add_argument("--dry-run", action="store_true",
@@ -342,7 +347,8 @@ def main():
     print(f"[{ts}] Lex-Indic cron — job={args.job} dry_run={args.dry_run}")
 
     jobs_to_run = (
-        ["digest_email", "nalsa_csv", "cleanup"] if args.job == "all" else [args.job]
+        ["sc_scrape", "digest_email", "erasure_sweep", "nalsa_csv", "cleanup"]
+        if args.job == "all" else [args.job]
     )
 
     exit_code = 0
@@ -354,6 +360,10 @@ def main():
                 result = nalsa_csv_export()
             elif job == "cleanup":
                 result = cleanup_audit()
+            elif job == "sc_scrape":
+                result = sc_scraper_module.run_daily_scrape()
+            elif job == "erasure_sweep":
+                result = erasure_module.hard_delete_due()
             else:
                 result = {"status": "unknown_job"}
 

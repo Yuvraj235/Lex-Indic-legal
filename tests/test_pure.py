@@ -900,3 +900,251 @@ class TestDeepLinks:
         assert deep_links.is_supported_statute("bnss_173")
         assert deep_links.is_supported_statute("bsa_61")
         assert not deep_links.is_supported_statute("case_001")
+
+
+# ────────────────────────────── Day 27: SC scraper ────────────────────────
+class TestSCScraper:
+    def test_stub_returns_two_rulings(self, monkeypatch):
+        monkeypatch.delenv("SC_SCRAPER_PROVIDER", raising=False)
+        import sc_scraper
+        rulings = sc_scraper._scrape_stub()
+        assert len(rulings) == 2
+        assert all(r.id.startswith("scr_stub_") for r in rulings)
+        assert all(r.sections for r in rulings)
+
+    def test_extract_sections(self):
+        import sc_scraper
+        text = "Accused charged under BNS 85 and IPC 498A; bail granted under BNSS 480."
+        secs = sc_scraper.extract_sections(text)
+        assert "BNS 85" in secs
+        assert "IPC 498A" in secs
+        assert "BNSS 480" in secs
+
+    def test_extract_tags(self):
+        import sc_scraper
+        tags = sc_scraper.extract_tags("Court grants bail in dowry harassment case.")
+        assert "bail" in tags
+        assert "dowry" in tags
+        assert "harassment" in tags
+
+    def test_merge_into_corpus_no_duplicates(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("sc_scraper._RULINGS_FILE", tmp_path / "rulings.json")
+        # Seed with empty file
+        import sc_scraper
+        r1 = sc_scraper.ScrapedRuling(id="X", title="Test 1")
+        r2 = sc_scraper.ScrapedRuling(id="Y", title="Test 2")
+        out1 = sc_scraper.merge_into_corpus([r1, r2])
+        assert out1["added"] == 2
+        # Second merge with same IDs adds nothing
+        out2 = sc_scraper.merge_into_corpus([r1, r2])
+        assert out2["added"] == 0
+        # New ruling adds 1
+        r3 = sc_scraper.ScrapedRuling(id="Z", title="Test 3")
+        out3 = sc_scraper.merge_into_corpus([r3])
+        assert out3["added"] == 1
+
+    def test_run_daily_scrape_stub(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("SC_SCRAPER_PROVIDER", raising=False)
+        monkeypatch.setattr("sc_scraper._RULINGS_FILE", tmp_path / "rulings.json")
+        import sc_scraper
+        result = sc_scraper.run_daily_scrape(provider="stub")
+        assert result["status"] == "ok"
+        assert result["scraped"] == 2
+        assert result["added"] == 2
+
+
+# ────────────────────────────── Day 28: DPDP erasure ──────────────────────
+class TestErasure:
+    def test_request_creates_pending_record(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("erasure._REQUESTS_FILE", tmp_path / "requests.json")
+        import erasure
+        req = erasure.request_deletion(
+            user_id="usr_test1",
+            user_email="test@firm.example",
+            reason="account cleanup",
+        )
+        assert req["status"] == "pending"
+        assert req["scheduled_for"] > req["requested_at"]
+        assert "usr_test1" in req["user_id"]
+
+    def test_cancel_within_grace(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("erasure._REQUESTS_FILE", tmp_path / "requests.json")
+        import erasure
+        erasure.request_deletion(user_id="usr_x", user_email="x@a.in")
+        assert erasure.cancel_deletion(user_id="usr_x")
+        # No more pending
+        assert not any(r["user_id"] == "usr_x" for r in erasure.pending_requests())
+
+    def test_idempotent_repeated_request(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("erasure._REQUESTS_FILE", tmp_path / "requests.json")
+        import erasure
+        erasure.request_deletion(user_id="usr_y", user_email="y@a.in")
+        erasure.request_deletion(user_id="usr_y", user_email="y@a.in")
+        pending = [r for r in erasure.pending_requests() if r["user_id"] == "usr_y"]
+        # Second request cancels first → only the new one is pending
+        assert len(pending) == 1
+
+    def test_hard_delete_skips_future_scheduled(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("erasure._REQUESTS_FILE", tmp_path / "requests.json")
+        monkeypatch.setattr("erasure._SALT_FILE",     tmp_path / "salt.json")
+        monkeypatch.chdir(tmp_path)
+        import erasure
+        erasure.request_deletion(user_id="usr_future", user_email="f@a.in")
+        result = erasure.hard_delete_due()
+        assert result["status"] == "ok"
+        assert result["completed"] == 0   # 7 days in future
+
+    def test_get_request_for_user(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("erasure._REQUESTS_FILE", tmp_path / "requests.json")
+        import erasure
+        erasure.request_deletion(user_id="usr_get", user_email="g@a.in")
+        req = erasure.get_request_for_user("usr_get")
+        assert req
+        assert req["user_id"] == "usr_get"
+        assert erasure.get_request_for_user("usr_doesnotexist") is None
+
+
+# ────────────────────────────── Day 29: Tenant isolation ──────────────────
+class TestTenantIsolation:
+    def _setup_two_firms(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        monkeypatch.setattr("matters._MATTERS_PATH", tmp_path / "matters.json")
+        monkeypatch.setattr("matters._FIRMS_PATH",    tmp_path / "firms.json")
+        monkeypatch.setattr("matters._LAWYERS_PATH",  tmp_path / "lawyers.json")
+        import matters
+        firm_a = matters.add_firm("Firm Alpha", "Mumbai")
+        firm_b = matters.add_firm("Firm Beta",  "Delhi")
+        lwy_a = matters.add_lawyer(firm_a["id"], "Lawyer Alpha", role="partner")
+        lwy_b = matters.add_lawyer(firm_b["id"], "Lawyer Beta",  role="partner")
+        m_a = matters.add_matter(firm_a["id"], lwy_a["id"], "Client Alpha",
+                                  opposing_party="Opp A", matter_type="criminal")
+        m_b = matters.add_matter(firm_b["id"], lwy_b["id"], "Client Beta",
+                                  opposing_party="Opp B", matter_type="contract")
+        return firm_a, firm_b, m_a, m_b, matters
+
+    def test_firm_can_only_see_own_matters(self, tmp_path, monkeypatch):
+        firm_a, firm_b, m_a, m_b, matters = self._setup_two_firms(tmp_path, monkeypatch)
+        a_list = matters.list_matters(firm_id=firm_a["id"])
+        b_list = matters.list_matters(firm_id=firm_b["id"])
+        assert len(a_list) == 1
+        assert a_list[0]["id"] == m_a["id"]
+        assert len(b_list) == 1
+        assert b_list[0]["id"] == m_b["id"]
+        # Cross-tenant ID lookup blocked
+        assert matters.get_matter_for_firm(m_b["id"], firm_a["id"]) is None
+        assert matters.get_matter_for_firm(m_a["id"], firm_b["id"]) is None
+
+    def test_firm_can_lookup_own_matter_by_id(self, tmp_path, monkeypatch):
+        firm_a, firm_b, m_a, m_b, matters = self._setup_two_firms(tmp_path, monkeypatch)
+        assert matters.get_matter_for_firm(m_a["id"], firm_a["id"])["id"] == m_a["id"]
+
+    def test_firm_lawyers_isolation(self, tmp_path, monkeypatch):
+        firm_a, firm_b, m_a, m_b, matters = self._setup_two_firms(tmp_path, monkeypatch)
+        a_lawyers = matters.list_lawyers_for_firm(firm_a["id"])
+        b_lawyers = matters.list_lawyers_for_firm(firm_b["id"])
+        assert len(a_lawyers) == 1
+        assert a_lawyers[0]["firm_id"] == firm_a["id"]
+        assert len(b_lawyers) == 1
+        assert b_lawyers[0]["firm_id"] == firm_b["id"]
+
+    def test_empty_firm_id_returns_no_lawyers(self, tmp_path, monkeypatch):
+        firm_a, firm_b, m_a, m_b, matters = self._setup_two_firms(tmp_path, monkeypatch)
+        assert matters.list_lawyers_for_firm("") == []
+
+    def test_no_firm_id_returns_all_matters_admin_view(self, tmp_path, monkeypatch):
+        firm_a, firm_b, m_a, m_b, matters = self._setup_two_firms(tmp_path, monkeypatch)
+        # Admin-style query (no firm_id) returns everything
+        all_matters = matters.list_matters()
+        assert len(all_matters) == 2
+
+
+# ────────────────────────────── Day 31: Stripe billing ────────────────────
+class TestBilling:
+    def test_stub_mode_default(self, monkeypatch):
+        monkeypatch.delenv("STRIPE_MODE", raising=False)
+        monkeypatch.delenv("STRIPE_SECRET_KEY", raising=False)
+        import billing
+        assert billing.get_mode() == "stub"
+        assert not billing.is_live()
+
+    def test_tier_catalogue_has_4_tiers(self):
+        import billing
+        cat = billing.tier_catalogue()
+        assert set(cat.keys()) == {"free", "nalsa", "firm", "enterprise"}
+        assert cat["firm"]["price_inr"] == 500
+        assert cat["nalsa"]["daily_limit"] is None
+
+    def test_checkout_session_stub_mode(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("STRIPE_MODE", raising=False)
+        monkeypatch.setattr("billing._CHECKOUT_LOG_FILE", tmp_path / "log.json")
+        import billing
+        cs = billing.create_checkout_session(
+            user_id="usr_test", user_email="t@a.in", tier="firm",
+        )
+        assert cs.mode == "stub"
+        assert "/billing/stub-confirm" in cs.checkout_url
+        assert cs.tier == "firm"
+
+    def test_checkout_free_tier_rejected(self, monkeypatch):
+        monkeypatch.delenv("STRIPE_MODE", raising=False)
+        import billing, pytest
+        with pytest.raises(ValueError, match="already free"):
+            billing.create_checkout_session(
+                user_id="x", user_email="x@a.in", tier="free",
+            )
+
+    def test_checkout_enterprise_rejected(self, monkeypatch):
+        monkeypatch.delenv("STRIPE_MODE", raising=False)
+        import billing, pytest
+        with pytest.raises(ValueError, match="custom"):
+            billing.create_checkout_session(
+                user_id="x", user_email="x@a.in", tier="enterprise",
+            )
+
+    def test_activate_subscription(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("billing._SUBSCRIPTIONS_FILE", tmp_path / "subs.json")
+        import billing
+        sub = billing.activate_subscription(
+            user_id="usr_act", user_email="a@a.in", tier="firm",
+        )
+        assert sub["status"] == "active"
+        assert sub["tier"] == "firm"
+        # active_subscription returns it
+        cur = billing.active_subscription("usr_act")
+        assert cur and cur["id"] == sub["id"]
+
+    def test_activate_supersedes_previous_for_same_user(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("billing._SUBSCRIPTIONS_FILE", tmp_path / "subs.json")
+        import billing
+        sub1 = billing.activate_subscription(user_id="usr_s", user_email="s@a.in", tier="firm")
+        sub2 = billing.activate_subscription(user_id="usr_s", user_email="s@a.in", tier="firm")
+        # Only the second one is active
+        actives = [s for s in billing.all_subscriptions()
+                    if s["user_id"] == "usr_s" and s["status"] == "active"]
+        assert len(actives) == 1
+        assert actives[0]["id"] == sub2["id"]
+
+    def test_webhook_signature_rejects_missing_secret(self, monkeypatch):
+        monkeypatch.delenv("STRIPE_WEBHOOK_SECRET", raising=False)
+        import billing
+        assert not billing.verify_webhook_signature(b'{}', "t=1,v1=abc")
+
+    def test_webhook_signature_round_trip(self, monkeypatch):
+        import billing, hmac, hashlib, time
+        monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", "whsec_test_xyz")
+        ts = str(int(time.time()))
+        payload = b'{"type":"checkout.session.completed"}'
+        signed = f"{ts}.{payload.decode()}"
+        sig = hmac.new(b"whsec_test_xyz", signed.encode(), hashlib.sha256).hexdigest()
+        assert billing.verify_webhook_signature(payload, f"t={ts},v1={sig}")
+
+    def test_webhook_signature_rejects_old_timestamp(self, monkeypatch):
+        import billing, hmac, hashlib
+        monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", "whsec_test_xyz")
+        # 10 minutes old
+        import time
+        ts = str(int(time.time()) - 600)
+        payload = b'{"type":"x"}'
+        signed = f"{ts}.{payload.decode()}"
+        sig = hmac.new(b"whsec_test_xyz", signed.encode(), hashlib.sha256).hexdigest()
+        assert not billing.verify_webhook_signature(payload, f"t={ts},v1={sig}")

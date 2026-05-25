@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricing · Lex-Indic</title>
+  <link rel="stylesheet" href="/static/lex-design-system.css" />
+  <style>
+    body { background: #f7f7fb; color: #222; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; }
+    .pricing-shell { max-width: 1180px; margin: 30px auto; padding: 0 18px; }
+    h1 { color: #0f2850; text-align: center; margin: 30px 0 10px; }
+    p.lead { text-align: center; color: #666; margin-bottom: 40px; }
+    .tier-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+    .tier-card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; flex-direction: column; position: relative; transition: transform .15s; }
+    .tier-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+    .tier-card.featured { border: 2px solid #f0a500; }
+    .tier-card.featured::before { content: "MOST POPULAR"; position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #f0a500; color: #fff; padding: 3px 12px; border-radius: 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+    .tier-name { color: #0f2850; font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    .tier-price { font-size: 32px; font-weight: 700; color: #0f2850; }
+    .tier-price .currency { font-size: 16px; font-weight: 400; color: #666; }
+    .tier-price .period { font-size: 12px; font-weight: 400; color: #888; }
+    .tier-card.free .tier-price, .tier-card.nalsa .tier-price { color: #6bca90; }
+    .tier-features { list-style: none; padding: 0; margin: 20px 0; flex: 1; }
+    .tier-features li { font-size: 13px; color: #444; padding: 6px 0; border-bottom: 1px dashed #eee; }
+    .tier-features li::before { content: "✓ "; color: #6bca90; font-weight: 700; }
+    .tier-btn { display: block; text-align: center; padding: 12px 16px; background: #0f2850; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; text-decoration: none; transition: background .15s; }
+    .tier-btn:hover { background: #1a3a6e; color: #fff; }
+    .tier-btn.btn-gold { background: #f0a500; color: #fff; }
+    .tier-btn.btn-gold:hover { background: #d99000; }
+    .tier-btn.btn-ghost { background: transparent; color: #0f2850; border: 1.5px solid #0f2850; }
+    .tier-btn.btn-ghost:hover { background: rgba(15,40,80,0.05); color: #0f2850; }
+    .mode-banner { background: #fff5d5; border: 1px solid #f0a500; padding: 10px 16px; border-radius: 8px; margin: 0 auto 24px; max-width: 760px; text-align: center; font-size: 13px; color: #735200; }
+    .mode-banner.live { background: #d5f5d5; border-color: #6bca90; color: #2a652a; }
+    .faq { max-width: 760px; margin: 60px auto; }
+    .faq h2 { color: #0f2850; }
+    .faq-q { font-weight: 600; color: #0f2850; margin-top: 18px; }
+    .faq-a { color: #555; font-size: 14px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  {% include '_nav.html' %}
+
+  <div class="pricing-shell">
+    <h1>Simple, fair pricing</h1>
+    <p class="lead">Free forever for legal-aid lawyers. Paid only when you make money.</p>
+
+    {% if not is_live %}
+      <div class="mode-banner">
+        🚧 <b>Demo mode</b> — Stripe checkout is in stub mode (mode={{ mode }}).
+        Clicking subscribe activates the tier without taking real payment.
+        Switch <code>STRIPE_MODE=live</code> + add Stripe keys to enable real billing.
+      </div>
+    {% else %}
+      <div class="mode-banner live">
+        ✅ Live billing enabled. Real money flows through Stripe.
+      </div>
+    {% endif %}
+
+    <div class="tier-grid">
+
+      <!-- Free -->
+      <div class="tier-card free">
+        <div class="tier-name">Free</div>
+        <div class="tier-price">₹0</div>
+        <div class="tier-price"><span class="period">forever</span></div>
+        <ul class="tier-features">
+          {% for f in tiers.free.features %}<li>{{ f }}</li>{% endfor %}
+        </ul>
+        <a href="/auth/login" class="tier-btn btn-ghost">Sign up free</a>
+      </div>
+
+      <!-- NALSA -->
+      <div class="tier-card nalsa">
+        <div class="tier-name">NALSA Panel</div>
+        <div class="tier-price">₹0</div>
+        <div class="tier-price"><span class="period">free for empanelled advocates</span></div>
+        <ul class="tier-features">
+          {% for f in tiers.nalsa.features %}<li>{{ f }}</li>{% endfor %}
+        </ul>
+        <a href="/nalsa/register" class="tier-btn btn-ghost">Register your panel ID</a>
+      </div>
+
+      <!-- Firm (FEATURED) -->
+      <div class="tier-card firm featured">
+        <div class="tier-name">Firm</div>
+        <div class="tier-price"><span class="currency">₹</span>500</div>
+        <div class="tier-price"><span class="period">per seat / month</span></div>
+        <ul class="tier-features">
+          {% for f in tiers.firm.features %}<li>{{ f }}</li>{% endfor %}
+        </ul>
+        <button class="tier-btn btn-gold" onclick="subscribe('firm')">Start with Firm →</button>
+      </div>
+
+      <!-- Enterprise -->
+      <div class="tier-card enterprise">
+        <div class="tier-name">Enterprise</div>
+        <div class="tier-price"><span class="currency">Custom</span></div>
+        <div class="tier-price"><span class="period">on-prem + dedicated infra</span></div>
+        <ul class="tier-features">
+          {% for f in tiers.enterprise.features %}<li>{{ f }}</li>{% endfor %}
+        </ul>
+        <a href="https://github.com/Yuvraj235/Lex-Indic-legal/issues" target="_blank" class="tier-btn">Contact us</a>
+      </div>
+
+    </div>
+
+    <div class="faq">
+      <h2>FAQ</h2>
+      <div class="faq-q">Can I switch tiers later?</div>
+      <div class="faq-a">Yes — upgrade or downgrade anytime. Prorated billing handles the difference automatically.</div>
+
+      <div class="faq-q">Do you offer a money-back guarantee?</div>
+      <div class="faq-a">14-day refund, no questions asked. Just email us within 14 days of your first charge.</div>
+
+      <div class="faq-q">Why is NALSA free forever?</div>
+      <div class="faq-a">NALSA panel advocates handle India's legal-aid cases at ₹500-3,000 per matter. They can't afford tools. We're free for them because (a) it's the right thing to do, and (b) you're our distribution channel into India's mid-tier criminal bar.</div>
+
+      <div class="faq-q">Can I use my own LLM (Ollama, Llama, etc)?</div>
+      <div class="faq-a">Enterprise only. Set <code>LLM_PROVIDER=ollama</code> and we route your queries to your local model instead of Groq/Gemini.</div>
+
+      <div class="faq-q">What about data residency?</div>
+      <div class="faq-a">Default = AWS Mumbai (ap-south-1). Enterprise customers can choose on-prem, AWS Hyderabad, or your own VPC.</div>
+    </div>
+  </div>
+
+  <script>
+    async function subscribe(tier) {
+      const r = await fetch('/billing/checkout', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tier, user_id: 'browser_demo_' + Date.now()}),
+      });
+      if (!r.ok) {
+        alert('Could not start checkout. Please try again.');
+        return;
+      }
+      const d = await r.json();
+      window.location.href = d.checkout_url;
+    }
+  </script>
+</body>
+</html>

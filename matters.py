@@ -138,17 +138,48 @@ def list_lawyers() -> list[dict]:
     return [asdict(l) for l in _load(_LAWYERS_PATH, Lawyer)]
 
 
-def list_matters(*, include_deleted: bool = False) -> list[dict]:
-    """List matters. By default soft-deleted matters are excluded (Day 26)."""
+def list_matters(*, include_deleted: bool = False, firm_id: str = "") -> list[dict]:
+    """List matters. By default soft-deleted are excluded (Day 26).
+    Day 29: pass firm_id to enforce tenant isolation — only matters belonging
+    to that firm are returned."""
     if db.is_enabled():
         with db.session() as s:
-            rows = s.query(db.Matter).order_by(db.Matter.created_at.asc()).all()
+            q = s.query(db.Matter)
+            if firm_id:
+                q = q.filter(db.Matter.firm_id == firm_id)
+            rows = q.order_by(db.Matter.created_at.asc()).all()
             data = [asdict(_row_to_matter(r)) for r in rows]
     else:
-        data = [asdict(m) for m in _load(_MATTERS_PATH, Matter)]
+        all_matters = _load(_MATTERS_PATH, Matter)
+        if firm_id:
+            all_matters = [m for m in all_matters if m.firm_id == firm_id]
+        data = [asdict(m) for m in all_matters]
     if not include_deleted:
         data = [m for m in data if not m.get("deleted_at")]
     return data
+
+
+def list_lawyers_for_firm(firm_id: str) -> list[dict]:
+    """Day 29: tenant-scoped lawyer list. Returns only the firm's lawyers."""
+    if not firm_id:
+        return []
+    if db.is_enabled():
+        with db.session() as s:
+            rows = (s.query(db.Lawyer)
+                    .filter(db.Lawyer.firm_id == firm_id)
+                    .order_by(db.Lawyer.created_at.asc())
+                    .all())
+            return [asdict(_row_to_lawyer(r)) for r in rows]
+    return [asdict(l) for l in _load(_LAWYERS_PATH, Lawyer) if l.firm_id == firm_id]
+
+
+def get_matter_for_firm(matter_id: str, firm_id: str) -> dict | None:
+    """Day 29: returns matter ONLY if it belongs to the given firm.
+    Prevents URL-tampering cross-tenant attacks (firm A guessing firm B's matter ID)."""
+    m = get_matter(matter_id)
+    if not m or m.get("firm_id") != firm_id:
+        return None
+    return m
 
 
 # ─── Firm CRUD ──────────────────────────────────────────────────────────────

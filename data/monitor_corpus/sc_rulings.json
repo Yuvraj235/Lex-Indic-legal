@@ -293,5 +293,43 @@
     ],
     "ratio": "Audio threats recorded as WhatsApp voice notes attract BNS 351 (criminal intimidation) and may also invoke BNS 79 (intent to outrage modesty) where directed at a woman. The audio's authenticity must be proven via the BSA 65B certificate from the recipient's device.",
     "practice_impact": "Always preserve the original recording with metadata; do not forward voice notes (changes file hash). Get a section 65B certificate from the recipient before charge-sheet."
+  },
+  {
+    "id": "scr_stub_2026-05-25_001",
+    "title": "State of Karnataka v. M.R. Singh (Stub Daily Ruling 1)",
+    "court": "Supreme Court of India",
+    "date": "2026-05-25",
+    "neutral_citation": "2026 INSC STUB-001",
+    "sections": [
+      "BNS 85",
+      "BNS 80",
+      "BNSS 35"
+    ],
+    "tags": [
+      "dowry",
+      "498a",
+      "matrimonial"
+    ],
+    "source_url": "https://example.invalid/stub-1",
+    "ratio": "Stub ruling for testing. Court reaffirms that BNS 85 (matrimonial cruelty) requires notice under BNSS 35 before arrest, extending the Arnesh Kumar (2014) protections.",
+    "practice_impact": "Re-confirm every BNS 85 case has a documented 35 notice before filing the chargesheet."
+  },
+  {
+    "id": "scr_stub_2026-05-25_002",
+    "title": "Union of India v. ABC Industries (Stub Daily Ruling 2)",
+    "court": "Supreme Court of India",
+    "date": "2026-05-25",
+    "neutral_citation": "2026 INSC STUB-002",
+    "sections": [
+      "BNS 111",
+      "BNS 113"
+    ],
+    "tags": [
+      "organised crime",
+      "cybercrime"
+    ],
+    "source_url": "https://example.invalid/stub-2",
+    "ratio": "Stub ruling. Court clarifies scope of BNS 111 (organised crime) vis-à-vis pre-existing MCOCA provisions in Maharashtra.",
+    "practice_impact": "MCOCA cases pending post-July 2024 should be re-examined."
   }
 ]

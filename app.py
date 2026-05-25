@@ -223,6 +223,8 @@ import openapi_spec as openapi_spec_module
 import pricing as pricing_module   # Day 23
 import cron as cron_module          # Day 24
 import sms as sms_module            # Day 25
+import erasure as erasure_module    # Day 28 (DPDP)
+import billing as billing_module    # Day 31 (Stripe)
 
 
 @app.route("/monitors")
@@ -1844,6 +1846,193 @@ def cron_cleanup():
     if guard: return guard
     result = cron_module.cleanup_audit()
     return jsonify(result)
+
+
+@app.route("/cron/sc_scrape", methods=["POST"])
+def cron_sc_scrape():
+    """Day 27: trigger SC ruling scraper (defaults to stub provider)."""
+    guard = _require_admin()
+    if guard: return guard
+    import sc_scraper
+    provider = request.args.get("provider")  # 'livelaw' / 'indiankanoon' / 'stub'
+    result = sc_scraper.run_daily_scrape(provider=provider)
+    return jsonify(result)
+
+
+@app.route("/cron/erasure_sweep", methods=["POST"])
+def cron_erasure_sweep():
+    """Day 28: hard-delete users whose 7-day grace has expired."""
+    guard = _require_admin()
+    if guard: return guard
+    return jsonify(erasure_module.hard_delete_due())
+
+
+# ─── DPDP §13(2)(d) right-to-erasure endpoints ──────────────────────────────
+@app.route("/profile")
+def profile_page():
+    """Day 30: User profile page (login + tier + usage + delete account)."""
+    return render_template("profile.html")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROUTES — Stripe self-serve billing (Day 31).
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.route("/pricing")
+def pricing_page():
+    """Public pricing page with the 4 tiers."""
+    return render_template("pricing.html",
+                           tiers=billing_module.tier_catalogue(),
+                           is_live=billing_module.is_live(),
+                           mode=billing_module.get_mode())
+
+
+@app.route("/billing/checkout", methods=["POST"])
+def billing_checkout():
+    """Create a Stripe Checkout session and redirect the user."""
+    user = _current_user()
+    data = request.get_json(silent=True) or {}
+    tier = (data.get("tier") or request.form.get("tier") or "firm").lower()
+    # In dev mode without auth, allow specifying user_id via body for testing
+    user_id    = (user or {}).get("id")    or data.get("user_id")    or "anon_demo"
+    user_email = (user or {}).get("email") or data.get("user_email") or "anon@demo"
+    try:
+        cs = billing_module.create_checkout_session(
+            user_id=user_id, user_email=user_email, tier=tier,
+            success_url=request.url_root + "billing/success",
+            cancel_url=request.url_root + "pricing",
+        )
+        return jsonify({"checkout_url": cs.checkout_url, "session_id": cs.id, "mode": cs.mode})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/billing/stub-confirm")
+def billing_stub_confirm():
+    """Stub-mode landing — pretends the user paid and activates them.
+    Hit only when STRIPE_MODE != 'live'."""
+    if billing_module.is_live():
+        return ("Stub flow disabled in live mode.", 400)
+    user = (request.args.get("user") or "").strip()
+    tier = (request.args.get("tier") or "firm").strip().lower()
+    if not user:
+        return ("Missing user.", 400)
+    sub = billing_module.activate_subscription(
+        user_id=user, user_email=user + "@stub.invalid", tier=tier,
+        stripe_session_id=request.args.get("session", ""),
+    )
+    return render_template("billing_success.html", subscription=sub,
+                           mode="stub", tier=tier)
+
+
+@app.route("/billing/success")
+def billing_success():
+    """Real Stripe success-redirect target."""
+    return render_template("billing_success.html", subscription=None,
+                           mode=billing_module.get_mode(),
+                           tier=request.args.get("tier", "firm"))
+
+
+@app.route("/billing/stripe-webhook", methods=["POST"])
+def billing_stripe_webhook():
+    """Stripe sends events here on every payment/cancellation."""
+    payload = request.get_data() or b""
+    sig = request.headers.get("Stripe-Signature", "")
+    if not billing_module.verify_webhook_signature(payload, sig):
+        return ("Bad signature.", 400)
+    event = billing_module.parse_webhook_event(payload)
+    if event.get("handled") and event["type"] == "checkout.session.completed":
+        try:
+            billing_module.activate_subscription(
+                user_id=event["user_id"],
+                user_email=event["user_email"],
+                tier=event["tier"] or "firm",
+                stripe_session_id=event["stripe_session_id"],
+            )
+        except Exception as exc:
+            return (f"Webhook handler error: {exc}", 500)
+    return ("", 204)
+
+
+@app.route("/billing/api/subscriptions")
+def billing_list_subscriptions():
+    """Admin-only: list every subscription on the system."""
+    guard = _require_admin()
+    if guard: return guard
+    return jsonify({"subscriptions": billing_module.all_subscriptions()})
+
+
+@app.route("/profile/delete", methods=["POST"])
+def profile_delete():
+    """User-facing: request account deletion (7-day grace period)."""
+    user = _current_user()
+    if not user:
+        return jsonify({"error": "Not logged in."}), 401
+    data = request.get_json(silent=True) or {}
+    reason = data.get("reason", "")
+    try:
+        req = erasure_module.request_deletion(
+            user_id=user["id"],
+            user_email=user.get("email", ""),
+            reason=reason,
+        )
+        # Fire-and-forget confirmation email
+        try:
+            mailer_module.send(
+                to=user["email"],
+                subject="Lex-Indic — account deletion scheduled",
+                text=(
+                    f"Your Lex-Indic account is scheduled for permanent deletion "
+                    f"on {req['scheduled_for']} ({erasure_module.GRACE_DAYS}-day grace period).\n\n"
+                    f"You can cancel within the grace period via /profile/delete/cancel.\n\n"
+                    f"After deletion, the salted hash that links your past audit-log "
+                    f"entries to your account will be rotated, making historical entries "
+                    f"un-correlatable. Matters (case files) are soft-preserved per Bar "
+                    f"Council records-retention rules but become unlinked from your "
+                    f"identity.\n\nIf this was a mistake, cancel immediately."
+                ),
+            )
+        except Exception:
+            pass
+        return jsonify(req)
+    except Exception as exc:
+        return jsonify({"error": f"Could not schedule erasure: {str(exc)[:200]}"}), 500
+
+
+@app.route("/profile/delete/cancel", methods=["POST"])
+def profile_delete_cancel():
+    """User-facing: cancel a pending deletion within the grace period."""
+    user = _current_user()
+    if not user:
+        return jsonify({"error": "Not logged in."}), 401
+    ok = erasure_module.cancel_deletion(user_id=user["id"])
+    return jsonify({"ok": ok, "cancelled": ok})
+
+
+@app.route("/profile/export", methods=["GET"])
+def profile_export():
+    """DPDP §11(1) right-to-access — download all your data as JSON."""
+    user = _current_user()
+    if not user:
+        return jsonify({"error": "Not logged in."}), 401
+    data = erasure_module.export_user_data(
+        user_id=user["id"],
+        user_email=user.get("email", ""),
+    )
+    resp = make_response(json.dumps(data, indent=2, ensure_ascii=False))
+    resp.headers["Content-Type"] = "application/json"
+    resp.headers["Content-Disposition"] = 'attachment; filename="my-lex-indic-data.json"'
+    return resp
+
+
+@app.route("/admin/erasure/pending")
+def admin_erasure_pending():
+    """Operator view of all pending erasure requests in their grace period."""
+    guard = _require_admin()
+    if guard: return guard
+    return jsonify({
+        "pending": erasure_module.pending_requests(),
+        "grace_days": erasure_module.GRACE_DAYS,
+    })
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

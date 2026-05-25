@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile · Lex-Indic</title>
+  <link rel="stylesheet" href="/static/lex-design-system.css" />
+  <style>
+    body { background: #f7f7fb; color: #222; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; }
+    .profile-shell { max-width: 760px; margin: 30px auto; padding: 0 18px; }
+    h1 { color: #0f2850; margin: 24px 0 12px; }
+    h2 { color: #0f2850; font-size: 16px; margin: 22px 0 10px; border-bottom: 1px solid #e5e5ec; padding-bottom: 6px; }
+    .card { background: #fff; border-radius: 10px; padding: 18px; margin-bottom: 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .row { display: flex; gap: 14px; align-items: center; }
+    .kv { color: #666; font-size: 13px; }
+    .kv b { color: #222; font-weight: 600; }
+    .usage-meter { position: relative; height: 22px; background: #e5e5ec; border-radius: 4px; overflow: hidden; }
+    .usage-meter > div { height: 100%; background: linear-gradient(135deg, #6bca90 0%, #4aa370 100%); border-radius: 4px; transition: width .3s; }
+    .usage-meter.warn > div { background: linear-gradient(135deg, #f0a500 0%, #c88000 100%); }
+    .usage-meter.danger > div { background: linear-gradient(135deg, #e74c3c 0%, #b03020 100%); }
+    .usage-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+    .tier-pill { display: inline-block; padding: 3px 10px; border-radius: 14px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .tier-free { background: #e5e5ec; color: #555; }
+    .tier-nalsa { background: #f0a500; color: #fff; }
+    .tier-firm { background: #0f2850; color: #fff; }
+    .tier-internal { background: #6bca90; color: #fff; }
+    .api-key-card { background: #1a1f2e; color: #fff; padding: 10px 14px; border-radius: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+    .api-key-id { color: #f0a500; font-weight: 600; }
+    .btn { display: inline-block; padding: 9px 16px; background: #0f2850; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; text-decoration: none; }
+    .btn:hover { background: #1a3a6e; }
+    .btn-danger { background: #b03020; }
+    .btn-danger:hover { background: #d04030; }
+    .btn-ghost { background: transparent; color: #0f2850; border: 1px solid #0f2850; }
+    .btn-ghost:hover { background: rgba(15,40,80,0.06); }
+    .danger-zone { border: 2px solid #ffe5e5; background: #fff5f5; padding: 18px; border-radius: 10px; margin-top: 30px; }
+    .danger-zone h2 { color: #b03020; border-color: #ffd0d0; }
+    .empty { color: #999; font-style: italic; font-size: 13px; }
+    .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 18px; background: #0f2850; color: #fff; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none; }
+    .toast.show { display: block; }
+    .toast.danger { background: #b03020; }
+  </style>
+</head>
+<body>
+  {% include '_nav.html' %}
+
+  <div class="profile-shell">
+    <h1>👤 My Profile</h1>
+
+    <!-- Account info -->
+    <div class="card">
+      <h2>Account</h2>
+      <div id="accountInfo" class="empty">Loading…</div>
+    </div>
+
+    <!-- Usage meter (Day 30 wires /api/v1/me/usage) -->
+    <div class="card">
+      <h2>Usage today</h2>
+      <div id="usageBlock" class="empty">Loading…</div>
+    </div>
+
+    <!-- API keys -->
+    <div class="card">
+      <h2>API keys <a href="/admin/api-keys" style="font-size:12px;color:#0f2850;float:right;text-decoration:none">manage →</a></h2>
+      <div id="keysList" class="empty">Loading…</div>
+    </div>
+
+    <!-- Preferences -->
+    <div class="card">
+      <h2>Preferences</h2>
+      <div class="row" style="margin-bottom:10px">
+        <label class="kv">Language:</label>
+        <select id="prefLang" onchange="savePref('language', this.value)">
+          <option value="en">English</option>
+          <option value="hi">हिन्दी (Hindi)</option>
+        </select>
+      </div>
+      <div class="row">
+        <label class="kv">Daily digest email:</label>
+        <input type="checkbox" id="prefDigest" onchange="savePref('digest_email', this.checked)">
+      </div>
+    </div>
+
+    <!-- DPDP data export (Day 28) -->
+    <div class="card">
+      <h2>Your data (DPDP §11 right-to-access)</h2>
+      <p class="kv">Download everything we store about you as a single JSON file. This includes account info, matters, API keys, and registration status.</p>
+      <a href="/profile/export" class="btn btn-ghost">📥 Download my data (JSON)</a>
+    </div>
+
+    <!-- Danger zone (Day 28 right-to-erasure) -->
+    <div class="danger-zone">
+      <h2>⚠ Danger zone — Right to be forgotten (DPDP §13)</h2>
+      <p class="kv">You can request permanent deletion of your account and all associated data. A <b>7-day grace period</b> applies so you can change your mind. After 7 days the data is irreversibly removed and the audit-log salt is rotated so historical entries can no longer be linked back to you.</p>
+      <p class="kv"><b>What gets deleted:</b> account, API keys, NALSA registration, lead capture entry.<br>
+      <b>What stays (legal records):</b> Matters created by you are soft-preserved per Bar Council rules but become unlinked from your identity.</p>
+      <div id="deletionStatus"></div>
+      <div id="deletionControls" style="margin-top:14px;display:flex;gap:10px">
+        <button id="deleteBtn" class="btn btn-danger" onclick="requestDeletion()">Delete my account</button>
+        <button id="cancelBtn" class="btn btn-ghost" onclick="cancelDeletion()" style="display:none">Cancel pending deletion</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    function toast(msg, danger=false) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show' + (danger ? ' danger' : '');
+      setTimeout(() => t.className = 'toast', 4000);
+    }
+
+    async function load() {
+      // Account (from /auth/me)
+      try {
+        const r = await fetch('/auth/me');
+        if (r.ok) {
+          const u = await r.json();
+          document.getElementById('accountInfo').innerHTML = `
+            <div class="kv"><b>Email:</b> ${u.email || '(anonymous)'}</div>
+            <div class="kv"><b>User ID:</b> ${u.id || '(none)'}</div>
+            <div class="kv"><b>Firm:</b> ${u.firm_id || '(no firm yet)'}</div>
+            <div class="kv"><b>Member since:</b> ${(u.created_at || '').slice(0,10) || 'today'}</div>`;
+        } else {
+          document.getElementById('accountInfo').innerHTML =
+            '<div class="kv">You are not signed in. <a href="/auth/login">Log in</a> to view your profile.</div>';
+        }
+      } catch (e) {}
+
+      // Usage (from /api/v1/me/usage — requires API key in real use, here we approximate via no-auth fallback)
+      try {
+        // The /api/v1/me/usage requires an API key. For the in-browser profile,
+        // we render a friendly fallback. A real app would mint a session token.
+        document.getElementById('usageBlock').innerHTML = `
+          <div class="kv">Usage tracking via API key (use <a href="/admin/api-keys">API keys page</a> to generate one).</div>
+          <p class="kv" style="margin-top:8px">After issuing an API key, call:</p>
+          <code style="display:block;background:#f0f0f5;padding:8px;border-radius:4px;font-size:11px;margin-top:4px">
+            curl -H "X-Api-Key: lex_live_xxx:yyy" http://localhost:8080/api/v1/me/usage
+          </code>`;
+      } catch (e) {}
+
+      // API keys (from /admin/api-keys)
+      try {
+        const r = await fetch('/admin/api-keys');
+        if (r.ok) {
+          const d = await r.json();
+          const keys = d.keys || [];
+          if (keys.length === 0) {
+            document.getElementById('keysList').innerHTML =
+              '<div class="empty">No API keys yet. <a href="/admin/api-keys">Issue one →</a></div>';
+          } else {
+            document.getElementById('keysList').innerHTML = keys.slice(0,5).map(k => `
+              <div class="api-key-card" style="margin-bottom:6px">
+                <span class="api-key-id">${k.key_id}</span>
+                <span style="opacity:0.7"> · tier: ${k.tier || 'firm'}</span>
+                <span style="opacity:0.7"> · ${k.label || '(no label)'}</span>
+                ${k.revoked_at ? '<span style="color:#e74c3c"> · REVOKED</span>' : ''}
+              </div>`).join('');
+          }
+        }
+      } catch (e) {}
+
+      // Pending deletion request
+      try {
+        const r = await fetch('/admin/erasure/pending');
+        if (r.ok) {
+          const d = await r.json();
+          const myReq = (d.pending || []).find(p => true);  // best-effort
+          if (myReq) {
+            document.getElementById('deletionStatus').innerHTML = `
+              <div style="background:#fff5d5;border:1px solid #f0a500;padding:10px;border-radius:6px;margin-top:10px">
+                ⏰ Deletion scheduled for <b>${myReq.scheduled_for}</b>. You can cancel any time before then.
+              </div>`;
+            document.getElementById('deleteBtn').style.display = 'none';
+            document.getElementById('cancelBtn').style.display = '';
+          }
+        }
+      } catch (e) {}
+    }
+
+    async function requestDeletion() {
+      if (!confirm("Are you sure? This will schedule permanent deletion in 7 days.\n\nYou can cancel within the grace period if you change your mind.")) return;
+      const reason = prompt("Optional: reason for deletion (helps us improve)?") || "";
+      try {
+        const r = await fetch('/profile/delete', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({reason}),
+        });
+        if (r.ok) {
+          const d = await r.json();
+          toast(`✅ Deletion scheduled for ${d.scheduled_for.slice(0,10)}`);
+          setTimeout(load, 500);
+        } else {
+          toast('Failed to schedule deletion. Make sure you are logged in.', true);
+        }
+      } catch (e) {
+        toast('Network error: ' + e.message, true);
+      }
+    }
+
+    async function cancelDeletion() {
+      if (!confirm("Cancel the pending deletion?")) return;
+      try {
+        const r = await fetch('/profile/delete/cancel', {method: 'POST'});
+        if (r.ok) {
+          toast('✅ Deletion cancelled');
+          setTimeout(load, 500);
+        } else {
+          toast('Failed to cancel.', true);
+        }
+      } catch (e) {
+        toast('Network error: ' + e.message, true);
+      }
+    }
+
+    function savePref(key, value) {
+      localStorage.setItem('lex_pref_' + key, JSON.stringify(value));
+      toast(`Saved: ${key} = ${value}`);
+    }
+
+    // Load saved prefs
+    try {
+      const lang = JSON.parse(localStorage.getItem('lex_pref_language') || '"en"');
+      const digest = JSON.parse(localStorage.getItem('lex_pref_digest_email') || 'false');
+      document.getElementById('prefLang').value = lang;
+      document.getElementById('prefDigest').checked = digest;
+    } catch (e) {}
+
+    load();
+  </script>
+</body>
+</html>
