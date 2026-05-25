@@ -43,8 +43,8 @@ jobs:
       - name: Push to Hugging Face Spaces
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_USERNAME: yuvraj235          # ← change to your HF username
-          HF_SPACE_NAME: lex-indic        # ← change to your Space name
+          HF_USERNAME: Yuvraj2319         # ← your HF username
+          HF_SPACE_NAME: lex-indic        # ← your Space name
         run: |
           if [ -z "$HF_TOKEN" ]; then
             echo "ERROR: HF_TOKEN secret is not set in this GitHub repo."
