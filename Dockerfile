@@ -41,7 +41,7 @@ WORKDIR /app
 COPY app.py main.py audit.py auth.py compliance.py ecourts.py i18n.py \
      ipc_bns_converter.py leads.py llm_provider.py mailer.py matters.py \
      monitors.py nalsa.py openapi_spec.py pdf_generator.py tabular.py \
-     webhooks.py api_keys.py ./
+     webhooks.py api_keys.py db.py pricing.py cron.py sms.py incidents.py ./
 COPY data/ ./data/
 COPY templates/ ./templates/
 COPY static/ ./static/

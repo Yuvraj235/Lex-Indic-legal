@@ -1,3 +1,15 @@
+---
+title: Lex-Indic
+emoji: ⚖️
+colorFrom: blue
+colorTo: yellow
+sdk: docker
+app_port: 8080
+pinned: true
+license: other
+short_description: AI Junior Associate for Indian law — BNS transition engine
+---
+
 # LEX-INDIC: The BNS Transition Engine
 
 ### AI-Powered Junior Associate for Indian Law Firms

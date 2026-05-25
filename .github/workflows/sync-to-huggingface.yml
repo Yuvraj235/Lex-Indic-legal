@@ -1,0 +1,59 @@
+name: Sync to Hugging Face Spaces
+
+# Auto-deploys the repo to a Hugging Face Docker Space every time main is
+# updated. The Space rebuilds + restarts within ~2-5 minutes of every push.
+#
+# ── ONE-TIME SETUP ─────────────────────────────────────────────────────────
+# 1. Create a Hugging Face account (free): https://huggingface.co/join
+# 2. Create a new Space:
+#      - Owner: your HF username (e.g. "yuvraj235")
+#      - Space name: lex-indic
+#      - License: Other
+#      - SDK: Docker → Blank
+#      - Visibility: Public (or Private if you prefer)
+# 3. Generate a write-access token:
+#      https://huggingface.co/settings/tokens → New token → Write
+# 4. Add the token to this GitHub repo:
+#      Settings → Secrets and variables → Actions → New repository secret
+#      Name:  HF_TOKEN
+#      Value: <paste the token>
+# 5. Update HF_USERNAME and HF_SPACE_NAME below to match your Space.
+# 6. (One-time) Set GEMINI_API_KEY as a Space secret:
+#      https://huggingface.co/spaces/<HF_USERNAME>/<HF_SPACE_NAME>/settings
+#      Add secret: GEMINI_API_KEY = <your key>
+# 7. (Optional) Set AUDIT_HASH_SALT and ADMIN_TOKEN as Space secrets too.
+# 8. Commit + push this file to main. The action will fire and your Space
+#    will be live at: https://huggingface.co/spaces/<HF_USERNAME>/<HF_SPACE_NAME>
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # also allow manual triggers from the Actions tab
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0       # full history needed for HF push
+          lfs: true
+
+      - name: Push to Hugging Face Spaces
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: yuvraj235          # ← change to your HF username
+          HF_SPACE_NAME: lex-indic        # ← change to your Space name
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "ERROR: HF_TOKEN secret is not set in this GitHub repo."
+            echo "Add it under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          git config user.email "actions@github.com"
+          git config user.name  "GitHub Actions"
+          git remote add hf \
+            https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE_NAME}
+          git push --force hf main
+          echo "✅ Synced to https://huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE_NAME}"
