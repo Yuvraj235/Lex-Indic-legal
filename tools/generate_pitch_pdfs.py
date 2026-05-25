@@ -388,7 +388,7 @@ def build_sales_pitch_pdf():
     pdf.h2("Commercial summary")
     pdf.kv("Founders",       "Hrishita Panjetha (co-founder, engineering) and Yuvraj Pratap Singh (co-founder, engineering)")
     pdf.kv("Location",       "Delhi NCR (operations) - infra in Mumbai (AWS ap-south-1 / Hetzner FRA)")
-    pdf.kv("Stack",          "Python 3.13 + Flask + ChromaDB + Gemini 1.5 Pro + fpdf2 (production)")
+    pdf.kv("Stack",          "Python 3.13 + Flask + ChromaDB + Groq Llama 3.3 70B (analysis) + Gemini embeddings + fpdf2")
     pdf.kv("LOC",            "~25,000 (Python) + 12,000 (HTML/JS) + 80 automated tests")
     pdf.kv("Status",         "v1.7 - 25-day Legora-teardown + scale-monetisation sprint complete")
     pdf.kv("Pricing",        "Free / NALSA / Firm / Enterprise (see Section 9)")
@@ -1184,8 +1184,8 @@ def build_technical_deepdive_pdf():
     pdf.kv("Frontend JS",    "Vanilla ES modules + Three.js (landing page WebGL only)")
     pdf.kv("CSS",            "Custom design-system.css with CSS variables")
     pdf.kv("RAG store",      "ChromaDB (in-memory by default; persistable via PREWARM_PATH)")
-    pdf.kv("Embeddings",     "sentence-transformers/all-MiniLM-L6-v2 (Chroma default)")
-    pdf.kv("LLM (default)", "Gemini 1.5 Pro via google-generativeai; alternates: Groq Llama 3.3 70B, Ollama")
+    pdf.kv("Embeddings",     "Google Gemini text-embedding-001 via google-generativeai")
+    pdf.kv("LLM (default)", "Groq Llama 3.3 70B via groq SDK (default); alternates: Gemini 1.5 Flash (chat), Ollama (local)")
     pdf.kv("PDF",            "fpdf2 2.7.9 (Helvetica core fonts, latin-1 safe)")
     pdf.kv("ORM",            "SQLAlchemy 2.0 (declarative, future=True)")
     pdf.kv("DB",             "Postgres (prod), SQLite (dev), JSON files (zero-config dev)")
@@ -1222,7 +1222,7 @@ def build_technical_deepdive_pdf():
         "3.  Story validation - length, language, attachments\n"
         "4.  ChromaDB semantic search - top 8 KB entries via MiniLM embeddings\n"
         "5.  Prompt assembly - structured prompt with story + retrieved sections + system prompt\n"
-        "6.  LLM call - Gemini 1.5 Pro (default) at temperature=0.2\n"
+        "6.  LLM call - Groq Llama 3.3 70B (default) at temperature=0.2\n"
         "7.  Section parser - splits AI response into the 6 standard sections\n"
         "8.  Citation badge wrapper - regex finds BNS NN refs that match retrieved sections, wraps in <span class='citation'>\n"
         "9.  Persist - txt to outputs/; PDF via pdf_generator.LexIndicPDF; audit log entry (JSONL)\n"
@@ -1501,7 +1501,7 @@ def build_technical_deepdive_pdf():
     pdf.h1("9. Environment Variables - Complete Reference")
     env_rows = [
         ["Variable", "Default", "Purpose"],
-        ["GEMINI_API_KEY", "(required)", "Gemini 1.5 Pro API key"],
+        ["GEMINI_API_KEY", "(required for embeddings)", "Gemini API key (used only for embeddings + LEXI chat fallback)"],
         ["GROQ_API_KEY",   "(optional)", "Groq Llama 3.3 70B key"],
         ["LLM_PROVIDER", "groq", "groq | ollama | gemini"],
         ["OLLAMA_HOST",  "http://localhost:11434", "Ollama endpoint when LLM_PROVIDER=ollama"],
@@ -1942,7 +1942,7 @@ def build_user_guide_pdf():
     )
     pdf.bullet("Looks up the 8 most relevant BNS sections from its knowledge base")
     pdf.bullet("Builds a prompt with the story + the 8 sections + a system instruction")
-    pdf.bullet("Sends it to Gemini 1.5 Pro")
+    pdf.bullet("Sends it to Groq Llama 3.3 70B (default) or to your chosen LLM provider")
     pdf.bullet("Waits for the response (usually 10-15 seconds)")
     pdf.bullet("Parses the response into 6 sections")
     pdf.bullet("Generates a downloadable PDF")
