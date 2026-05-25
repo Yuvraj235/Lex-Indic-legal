@@ -798,3 +798,105 @@ class TestCronLastRun:
         assert "digest_email" in data
         assert data["digest_email"]["status"] == "ok"
         assert data["cleanup"]["summary"]["deleted"] == 0
+
+
+# ────────────────────────────── Day 26: Soft-delete matters ───────────────
+class TestMattersSoftDelete:
+    def test_soft_delete_hides_from_default_list(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        monkeypatch.setattr("matters._MATTERS_PATH", tmp_path / "matters.json")
+        monkeypatch.setattr("matters._FIRMS_PATH",    tmp_path / "firms.json")
+        monkeypatch.setattr("matters._LAWYERS_PATH",  tmp_path / "lawyers.json")
+        import matters
+        firm = matters.add_firm("Test Firm A", "Mumbai")
+        lwy  = matters.add_lawyer(firm["id"], "Test Lawyer", role="associate")
+        m = matters.add_matter(firm["id"], lwy["id"], "Client X",
+                                opposing_party="Defendant Y", matter_type="criminal")
+        # Default list shows the matter
+        assert any(x["id"] == m["id"] for x in matters.list_matters())
+        # Soft-delete it
+        assert matters.soft_delete_matter(m["id"], reason="created by mistake")
+        # Default list now hides it
+        assert not any(x["id"] == m["id"] for x in matters.list_matters())
+        # include_deleted=True still shows it
+        all_matters = matters.list_matters(include_deleted=True)
+        deleted = [x for x in all_matters if x["id"] == m["id"]]
+        assert len(deleted) == 1
+        assert deleted[0]["deleted_at"]
+        assert deleted[0]["deleted_reason"] == "created by mistake"
+
+    def test_restore_matter_makes_it_visible_again(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        monkeypatch.setattr("matters._MATTERS_PATH", tmp_path / "matters.json")
+        monkeypatch.setattr("matters._FIRMS_PATH",    tmp_path / "firms.json")
+        monkeypatch.setattr("matters._LAWYERS_PATH",  tmp_path / "lawyers.json")
+        import matters
+        firm = matters.add_firm("Test Firm B", "Delhi")
+        lwy  = matters.add_lawyer(firm["id"], "Lawyer 2", role="partner")
+        m = matters.add_matter(firm["id"], lwy["id"], "Client Z",
+                                opposing_party="Opposing W", matter_type="contract")
+        matters.soft_delete_matter(m["id"], reason="oops")
+        assert not any(x["id"] == m["id"] for x in matters.list_matters())
+        # Restore
+        assert matters.restore_matter(m["id"])
+        # Default list shows it again
+        restored = [x for x in matters.list_matters() if x["id"] == m["id"]]
+        assert len(restored) == 1
+        assert restored[0]["deleted_at"] == ""
+
+    def test_soft_delete_unknown_returns_false(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        monkeypatch.setattr("matters._MATTERS_PATH", tmp_path / "matters.json")
+        monkeypatch.setattr("matters._FIRMS_PATH",    tmp_path / "firms.json")
+        monkeypatch.setattr("matters._LAWYERS_PATH",  tmp_path / "lawyers.json")
+        import matters
+        assert matters.soft_delete_matter("DOESNOT/2026/0099") is False
+
+
+# ────────────────────────────── Day 26: Deep-link generator ────────────────
+class TestDeepLinks:
+    def test_bns_link(self):
+        import deep_links
+        url = deep_links.deep_link_for("bns_85")
+        assert url
+        assert "indiacode.nic.in" in url
+        assert "#page=" in url
+        assert "a2023-45" in url   # BNS act number
+
+    def test_bnss_link(self):
+        import deep_links
+        url = deep_links.deep_link_for("bnss_173")
+        assert url
+        assert "a2023-46" in url   # BNSS act number
+
+    def test_bsa_link(self):
+        import deep_links
+        url = deep_links.deep_link_for("bsa_61")
+        assert url
+        assert "a2023-47" in url   # BSA act number
+
+    def test_unknown_returns_none(self):
+        import deep_links
+        assert deep_links.deep_link_for("case_001") is None
+        assert deep_links.deep_link_for("circular_xyz") is None
+        assert deep_links.deep_link_for("garbage") is None
+
+    def test_alpha_suffix_section(self):
+        """Sections like '85A' should still produce a valid link."""
+        import deep_links
+        url = deep_links.deep_link_for("bns_85A")
+        assert url
+        assert "#page=" in url
+
+    def test_label_friendly_text(self):
+        import deep_links
+        assert "BNS" in deep_links.deep_link_label("bns_85")
+        assert "85"  in deep_links.deep_link_label("bns_85")
+        assert deep_links.deep_link_label("unknown_x") is None
+
+    def test_is_supported_statute(self):
+        import deep_links
+        assert deep_links.is_supported_statute("bns_85")
+        assert deep_links.is_supported_statute("bnss_173")
+        assert deep_links.is_supported_statute("bsa_61")
+        assert not deep_links.is_supported_statute("case_001")

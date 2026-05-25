@@ -21,8 +21,11 @@ outputs/
 # ChromaDB local storage
 chroma_db/
 
-# Embedding cache (auto-regenerated)
-data/legal_corpus/embedding_cache.json
+# Embedding cache (Day 26: committed to git so Docker deploys ship with it
+# pre-warmed — kills the 90-sec cold start on Render / HF / Fly etc.
+# Regenerate locally with: python3 tools/prewarm_embeddings.py
+# Then `git add data/legal_corpus/embedding_cache.json && git commit`
+# data/legal_corpus/embedding_cache.json    ← ALLOWED IN GIT NOW
 
 # macOS
 .DS_Store

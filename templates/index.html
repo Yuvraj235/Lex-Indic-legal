@@ -881,8 +881,58 @@
           <strong>Verified Sources</strong>
           <span class="text-muted ms-2 small">— every section cited below was retrieved from this curated knowledge base. Click any card to view the verified text.</span>
         </div>
+        <!-- Day 26: Statute filter chips -->
+        <div id="statuteFilters" class="statute-filters" style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap">
+          <button type="button" class="statute-chip active" data-statute="all" onclick="filterStatute('all')">All</button>
+          <button type="button" class="statute-chip" data-statute="bns" onclick="filterStatute('bns')">BNS</button>
+          <button type="button" class="statute-chip" data-statute="bnss" onclick="filterStatute('bnss')">BNSS</button>
+          <button type="button" class="statute-chip" data-statute="bsa" onclick="filterStatute('bsa')">BSA</button>
+          <button type="button" class="statute-chip" data-statute="case" onclick="filterStatute('case')">Cases</button>
+          <button type="button" class="statute-chip" data-statute="circular" onclick="filterStatute('circular')">Circulars</button>
+        </div>
         <div id="sourcesList" class="sources-list"></div>
       </div>
+
+      <style>
+        .statute-chip {
+          background: rgba(15,40,80,0.08);
+          color: var(--colour-navy, #0f2850);
+          border: 1px solid rgba(15,40,80,0.2);
+          padding: 4px 12px;
+          border-radius: 14px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .statute-chip:hover { background: rgba(15,40,80,0.15); }
+        .statute-chip.active {
+          background: var(--colour-navy, #0f2850);
+          color: #fff;
+          border-color: var(--colour-navy, #0f2850);
+        }
+        .source-card.hidden-by-filter { display: none; }
+      </style>
+
+      <script>
+        // Day 26: filter source cards by statute prefix
+        function filterStatute(statute) {
+          document.querySelectorAll('.statute-chip').forEach(c => {
+            c.classList.toggle('active', c.dataset.statute === statute);
+          });
+          document.querySelectorAll('#sourcesList .source-card').forEach(card => {
+            const sid = (card.dataset.sourceId || '').toLowerCase();
+            const matches =
+              statute === 'all' ||
+              (statute === 'bns'  && sid.startsWith('bns_')) ||
+              (statute === 'bnss' && sid.startsWith('bnss_')) ||
+              (statute === 'bsa'  && sid.startsWith('bsa_')) ||
+              (statute === 'case' && sid.startsWith('case_')) ||
+              (statute === 'circular' && sid.startsWith('circular_'));
+            card.classList.toggle('hidden-by-filter', !matches);
+          });
+        }
+      </script>
 
       <!-- Source detail modal -->
       <div id="sourceModal" class="resource-modal-overlay" onclick="if(event.target===this)this.classList.remove('modal-show')">
@@ -1455,6 +1505,7 @@ function renderSources(sources) {
 
     return `
       <div class="source-card" onclick="openSourceDetail(${i})" role="button" tabindex="0"
+           data-source-id="${escapeHtml(s.id || '')}"
            onkeydown="if(event.key==='Enter')openSourceDetail(${i})">
         <div>
           <span class="source-card-rank">#${s.rank}</span>

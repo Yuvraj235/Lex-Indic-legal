@@ -63,6 +63,8 @@ class Matter:
     description: str = ""
     created_at: str = ""
     updated_at: str = ""
+    deleted_at: str = ""       # Day 26: soft-delete (admin-only). Non-empty = hidden but recoverable.
+    deleted_reason: str = ""   # Why it was deleted (audit trail)
 
 
 # ─── JSON-file backend helpers ──────────────────────────────────────────────
@@ -104,6 +106,10 @@ def _row_to_matter(row) -> Matter:
         status=row.status or "open",
         created_at=row.created_at.isoformat(timespec="seconds") if row.created_at else "",
         updated_at=row.updated_at.isoformat(timespec="seconds") if row.updated_at else "",
+        # Day 26: soft-delete fields (DB might not have columns; default empty)
+        deleted_at=(getattr(row, "deleted_at", None).isoformat(timespec="seconds")
+                     if getattr(row, "deleted_at", None) else ""),
+        deleted_reason=getattr(row, "deleted_reason", "") or "",
     )
 
 
@@ -132,12 +138,17 @@ def list_lawyers() -> list[dict]:
     return [asdict(l) for l in _load(_LAWYERS_PATH, Lawyer)]
 
 
-def list_matters() -> list[dict]:
+def list_matters(*, include_deleted: bool = False) -> list[dict]:
+    """List matters. By default soft-deleted matters are excluded (Day 26)."""
     if db.is_enabled():
         with db.session() as s:
             rows = s.query(db.Matter).order_by(db.Matter.created_at.asc()).all()
-            return [asdict(_row_to_matter(r)) for r in rows]
-    return [asdict(m) for m in _load(_MATTERS_PATH, Matter)]
+            data = [asdict(_row_to_matter(r)) for r in rows]
+    else:
+        data = [asdict(m) for m in _load(_MATTERS_PATH, Matter)]
+    if not include_deleted:
+        data = [m for m in data if not m.get("deleted_at")]
+    return data
 
 
 # ─── Firm CRUD ──────────────────────────────────────────────────────────────
@@ -408,3 +419,69 @@ def check_conflict(firm_id: str, client_name: str,
                 "reason": f"You previously represented {m.client_name} (now the opposing party)",
             })
     return hits
+
+
+# ─── Day 26: Soft-delete with admin override ────────────────────────────────
+def soft_delete_matter(matter_id: str, reason: str = "") -> bool:
+    """Hide a matter without losing the record (legal-records preservation).
+    Admin-only. To restore, call restore_matter()."""
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    clean_reason = (reason or "").strip()[:300]
+
+    if db.is_enabled():
+        with db.session() as s:
+            row = s.query(db.Matter).filter(db.Matter.id == matter_id).first()
+            if not row:
+                return False
+            # ORM might not have deleted_at column on older schemas; fall back to
+            # status='deleted' as a marker.  Setting the attribute works either way.
+            try:
+                row.deleted_at = datetime.now(timezone.utc)
+                row.deleted_reason = clean_reason
+            except Exception:
+                row.status = "deleted"
+            row.updated_at = datetime.now(timezone.utc)
+        return True
+
+    matters = _load(_MATTERS_PATH, Matter)
+    found = False
+    for m in matters:
+        if m.id == matter_id:
+            m.deleted_at = now
+            m.deleted_reason = clean_reason
+            m.updated_at = now
+            found = True
+            break
+    if found:
+        _save(_MATTERS_PATH, matters)
+    return found
+
+
+def restore_matter(matter_id: str) -> bool:
+    """Reverse a soft_delete_matter(). Admin-only."""
+    if db.is_enabled():
+        with db.session() as s:
+            row = s.query(db.Matter).filter(db.Matter.id == matter_id).first()
+            if not row:
+                return False
+            try:
+                row.deleted_at = None
+                row.deleted_reason = ""
+            except Exception:
+                if row.status == "deleted":
+                    row.status = "open"
+            row.updated_at = datetime.now(timezone.utc)
+        return True
+
+    matters = _load(_MATTERS_PATH, Matter)
+    found = False
+    for m in matters:
+        if m.id == matter_id:
+            m.deleted_at = ""
+            m.deleted_reason = ""
+            m.updated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            found = True
+            break
+    if found:
+        _save(_MATTERS_PATH, matters)
+    return found

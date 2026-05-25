@@ -494,6 +494,28 @@ def matters_status(matter_id):
     return jsonify({"ok": True})
 
 
+@app.route("/matters/api/<path:matter_id>/soft-delete", methods=["POST"])
+def matters_soft_delete(matter_id):
+    """Day 26: Admin-only soft-delete (the matter stays in DB; hidden from lists)."""
+    guard = _require_admin()
+    if guard: return guard
+    data = request.get_json(silent=True) or {}
+    reason = data.get("reason", "")
+    ok = matters_module.soft_delete_matter(matter_id, reason=reason)
+    return (jsonify({"ok": True, "matter_id": matter_id, "reason": reason}) if ok
+            else (jsonify({"error": "Matter not found."}), 404))
+
+
+@app.route("/matters/api/<path:matter_id>/restore", methods=["POST"])
+def matters_restore(matter_id):
+    """Day 26: Admin-only restore — undoes soft-delete."""
+    guard = _require_admin()
+    if guard: return guard
+    ok = matters_module.restore_matter(matter_id)
+    return (jsonify({"ok": True, "matter_id": matter_id}) if ok
+            else (jsonify({"error": "Matter not found."}), 404))
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # ROUTES — Multi-tenant auth (Day-10).
 # Magic-link login: POST /auth/code, POST /auth/verify, GET /auth/me, /auth/logout.
@@ -2107,6 +2129,35 @@ def api_matters_list():
     if firm_id:
         matters = [m for m in matters if m.get("firm_id") == firm_id]
     return jsonify({"matters": matters, "count": len(matters)})
+
+
+@app.route("/api/v1/me/usage", methods=["GET"])
+def api_me_usage():
+    """Day 26: Return the current API key's tier, daily limit, used today, percent.
+    Used by the user profile / billing page (Day 30 prep)."""
+    key, err = _require_api_key()
+    if err: return err
+    tier = key.get("tier", "firm")
+    # Re-run pricing.check() to get used + limit without actually consuming
+    res = pricing_module.check(
+        client_ip=request.remote_addr or "",
+        api_key_id=key["key_id"],
+        api_key_tier=tier,
+    )
+    used  = res.get("used", 0)
+    limit = res.get("limit")
+    pct   = (used / limit * 100) if limit and limit > 0 else 0
+    return jsonify({
+        "key_id":          key["key_id"],
+        "tier":            tier,
+        "tier_label":      pricing_module.tier_label(tier),
+        "used_today":      used,
+        "daily_limit":     limit,
+        "percent_used":    round(pct, 1),
+        "allowed":         res.get("allowed", True),
+        "rate_per_min":    key.get("rate_per_min", 60),
+        "upgrade_url":     "/nalsa" if tier == "free" else None,
+    })
 
 
 @app.route("/api/v1/nalsa/check", methods=["GET"])
