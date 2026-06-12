@@ -534,12 +534,32 @@ def matters_matters():
         return jsonify({"error": str(e)}), 400
 
 
+def _matter_or_403(matter_id: str):
+    """Tenant guard for per-matter routes. Returns (matter, None) if the caller
+    may touch this matter, else (None, error_response). An authenticated firm
+    user is scoped to their own firm; a cross-tenant matter id returns 404 so its
+    existence isn't even revealed. Anonymous/unbound callers (dev/free tier) are
+    not firm-scoped."""
+    u = _current_user()
+    if u and u.get("firm_id"):
+        m = matters_module.get_matter_for_firm(matter_id, u["firm_id"])
+    else:
+        m = matters_module.get_matter(matter_id)
+    if not m:
+        return None, (jsonify({"error": "Matter not found."}), 404)
+    return m, None
+
+
 @app.route("/matters/api/conflict-check", methods=["POST"])
 def matters_conflict_check():
     """Pre-create conflict check — call before adding a matter."""
     data = request.get_json() or {}
+    u = _current_user()
+    # Authenticated firm users can only run conflict checks within their own
+    # firm — never probe another firm's client / opposing-party graph.
+    firm_id = u["firm_id"] if (u and u.get("firm_id")) else data.get("firm_id", "")
     hits = matters_module.check_conflict(
-        firm_id=data.get("firm_id", ""),
+        firm_id=firm_id,
         client_name=data.get("client_name", ""),
         opposing_party=data.get("opposing_party", ""),
     )
@@ -550,6 +570,9 @@ def matters_conflict_check():
 def matters_status(matter_id):
     if not re.match(r"^[A-Z]+/\d{4}/\d{4}$", matter_id):
         return jsonify({"error": "Invalid matter ID."}), 400
+    _, err = _matter_or_403(matter_id)   # block cross-tenant status writes
+    if err:
+        return err
     data = request.get_json() or {}
     ok = matters_module.update_matter_status(matter_id, data.get("status", ""))
     if not ok:
@@ -583,10 +606,9 @@ def matters_restore(matter_id):
 @app.route("/matters/api/<path:matter_id>/files", methods=["GET", "POST"])
 def matters_files(matter_id):
     """GET = list files for matter. POST = upload one (multipart/form-data)."""
-    # Verify the matter exists first
-    matter = matters_module.get_matter(matter_id)
-    if not matter:
-        return jsonify({"error": "Matter not found."}), 404
+    matter, err = _matter_or_403(matter_id)   # tenant-scoped: no cross-firm file access
+    if err:
+        return err
 
     if request.method == "GET":
         return jsonify({"matter_id": matter_id,
@@ -620,7 +642,10 @@ def matters_file_detail(matter_id, file_id):
         ok = uploads_module.delete_file(matter_id, file_id)
         return (jsonify({"ok": True}) if ok
                 else (jsonify({"error": "File not found."}), 404))
-    # GET — serve the file
+    # GET — serve the file (tenant-scoped: a firm can't download another's files)
+    _, err = _matter_or_403(matter_id)
+    if err:
+        return err
     path = uploads_module.get_file_path(matter_id, file_id)
     if not path or not path.exists():
         return ("File not found.", 404)
@@ -637,14 +662,24 @@ def admin_uploads_stats():
     return jsonify(uploads_module.total_storage_used())
 
 
+@app.route("/admin/readiness")
+def admin_readiness():
+    """Operator go-live checklist: which subsystems are demo (stub) vs live,
+    and what's left to flip before launch. Drives the demo/live UI badges too."""
+    guard = _require_admin()
+    if guard: return guard
+    import readiness
+    return jsonify(readiness.gather_readiness())
+
+
 # ─── Day 36: per-matter analysis history (read audit log filtered by matter_id) ─
 @app.route("/matters/api/<path:matter_id>/history", methods=["GET"])
 def matters_history(matter_id):
     """Returns every /analyze + /chat call ever made with matter_id=<id>.
     Reads from outputs/audit/audit-*.log."""
-    matter = matters_module.get_matter(matter_id)
-    if not matter:
-        return jsonify({"error": "Matter not found."}), 404
+    matter, err = _matter_or_403(matter_id)   # tenant-scoped analysis history
+    if err:
+        return err
 
     audit_dir = Path("outputs/audit")
     entries: list[dict] = []

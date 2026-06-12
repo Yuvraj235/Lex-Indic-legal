@@ -134,6 +134,14 @@
     border-top:1px solid var(--grey-300);background:var(--grey-100);
   }
   .source-stamp code{background:#fff;padding:1px 6px;border-radius:3px;border:1px solid var(--grey-300)}
+  .demo-banner{
+    background:#fff7e6;border:1px solid #f0c36d;color:#8a6d1a;
+    font-size:12.5px;padding:9px 16px;border-radius:8px;margin:0 24px 4px;
+  }
+  .live-banner{
+    background:#eafaf1;border:1px solid #8fd6ad;color:#1c7a48;
+    font-size:12.5px;padding:9px 16px;border-radius:8px;margin:0 24px 4px;
+  }
 </style>
 </head>
 <body>
@@ -226,6 +234,9 @@
     const out = $('result');
     out.innerHTML = `
       <div class="case-card">
+        ${c.source === 'stub'
+          ? `<div class="demo-banner">⚠ <strong>Demo data</strong> — a sample case for UI preview. Set <code>ECOURTS_PROVIDER=live</code> + <code>ECOURTS_API_KEY</code> for real e-Courts lookups.</div>`
+          : `<div class="live-banner">● <strong>Live</strong> — fetched from ${escapeHtml(c.source)}</div>`}
         <div class="case-head">
           <div class="cnr">${escapeHtml(c.cnr)}</div>
           <h2>${escapeHtml(c.petitioner)} v. ${escapeHtml(c.respondent)}</h2>
