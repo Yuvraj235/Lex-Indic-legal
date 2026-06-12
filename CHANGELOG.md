@@ -2,6 +2,10 @@
 
 All notable changes to Lex-Indic. Auto-generated from git log.
 
+## June 2026
+
+- **12 Jun** _(pending commit)_ — Day 26: local legal-model fine-tuning — `tools/generate_instruction_data.py` (KB → instruction pairs, Hindi, held-out split) + `tools/eval_model.py` (BNS-mapping accuracy harness) + `training/` QLoRA→GGUF recipe for Qwen 2.5 7B / Llama 3.1 8B + per-firm model service
+
 ## May 2026
 
 - **25 May** [`6429a0a`](https://github.com/Yuvraj235/Lex-Indic-legal/commit/6429a0a) — Day 25: SMS/WhatsApp alert channel — MSG91 + Twilio + stdout

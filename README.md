@@ -37,6 +37,16 @@ and within seconds the system produces a **complete legal case brief with 6 outp
 
 ---
 
+## What's New in v1.8
+
+| Area | Change | File(s) | Why it matters |
+|---|---|---|---|
+| **Knowledge base** | IPC→BNS map expanded 51 → 76, with repealed-section handling (377 / 497 / 124A show "no BNS equivalent" rather than a guess) | `data/legal_corpus/ipc_bns_mapping.json`, `ipc_bns_converter.py` | Higher converter coverage; honest output on sections the BNS dropped. |
+| **e-Courts** | Real, configurable CNR-lookup provider alongside the demo stub; in live mode it never falls back to demo data | `ecourts.py`, `.env.example` | `ECOURTS_PROVIDER=live` + `ECOURTS_API_KEY` returns real case status; the demo set stays clearly labelled. |
+| **Multi-tenant isolation** | Per-matter routes (conflict-check, status, files, history) scoped to the caller's firm | `app.py`, `matters.py` | A firm can't read or modify another firm's matters by guessing a matter ID. |
+| **Local-model tooling** | Instruction-data generator + held-out eval harness + full-pipeline answer eval; QLoRA→GGUF training recipe | `tools/generate_instruction_data.py`, `tools/eval_model.py`, `tools/eval_pipeline.py`, `training/` | Optional fine-tuned model for air-gapped (Ollama) deployments, with an objective accuracy gate. |
+| **Go-live readiness** | `/admin/readiness` + `tools/readiness.py` report which subsystems are demo vs live; `/ecourts` shows a "Demo data" badge | `readiness.py`, `templates/ecourts.html` | One glance shows what's stubbed before launch; prospects never see demo data unlabelled. |
+
 ## What's New in v1.7
 
 | Day | Feature | File | Why it matters |
@@ -598,6 +608,7 @@ circulars (MHA, SC, NHRC) — all retrievable via the same RAG pipeline.
 | **v1.5** | Deep-links, matter intake, multi-tenant auth, BNSS+BSA, e-Courts, Ollama, tabular review, status+webhooks | Done |
 | **v1.6** | REST API + OpenAPI, email sender (SES/SMTP), Dockerfile + fly.io + Render, operator dashboard, Postgres-ready ORM | Done |
 | **v1.7** | Dual-backend complete, webhook retry queue, pricing tiers, cron jobs, SMS/WhatsApp (MSG91 + Twilio) | Done |
+| **v1.8** | Optional local-model fine-tuning + evaluation tooling (`tools/`, `training/`) for air-gapped Ollama deployments; KB expansion (76 IPC→BNS mappings); e-Courts live provider; multi-tenant isolation hardening; go-live readiness audit. | In progress |
 | **v2.0** | Cut over each JSON-registry module to Postgres (using db.py); formal SOC 2 Type II via Vanta/Drata | Planned |
 | **v2.1** | BNS full-358 corpus, regional languages (Marathi, Tamil, Bengali), AppSource Word add-in submission | Planned |
 | **v2.0** | Postgres + multi-tenant auth, India-region deployment guide, BNSS + BSA corpora | Planned |

@@ -49,6 +49,21 @@ class TestIpcBnsConverter:
         assert _split_section_numbers("302, 304/307 & 498A and 34 r/w 120B") == \
             ["302", "304", "307", "498A", "34", "120B"]
 
+    def test_newly_added_mapping_converts(self):
+        """IPC 34 (common intention) was added to the KB — must now convert."""
+        from ipc_bns_converter import convert_text
+        annotated, summary = convert_text("read with Section 34 IPC")
+        assert "BNS 3(5)" in annotated
+        assert summary.total_matches == 1
+
+    def test_repealed_section_renders_no_equivalent(self):
+        """377/497/124A have no BNS successor — say so, don't invent or flag 'unknown'."""
+        from ipc_bns_converter import convert_text
+        annotated, summary = convert_text("Accused charged u/s 377 IPC.")
+        assert "no BNS equivalent" in annotated
+        assert summary.total_matches == 1
+        assert "377" not in summary.unmapped_section_numbers  # it IS mapped (to a repeal)
+
 
 # ────────────────────────────── audit ──────────────────────────────────────
 class TestAudit:
@@ -1069,6 +1084,19 @@ class TestTenantIsolation:
         all_matters = matters.list_matters()
         assert len(all_matters) == 2
 
+    def test_conflict_check_scoped_to_firm(self, tmp_path, monkeypatch):
+        """The /matters/api/conflict-check route now passes the AUTHENTICATED
+        firm_id (not a body-supplied one). This proves the underlying scan can't
+        leak another firm's client/opposing-party graph."""
+        firm_a, firm_b, m_a, m_b, matters = self._setup_two_firms(tmp_path, monkeypatch)
+        # Firm B probing Firm A's client ("Client Alpha") surfaces nothing…
+        assert matters.check_conflict(firm_id=firm_b["id"], client_name="X",
+                                      opposing_party="Client Alpha") == []
+        # …but within Firm A the same name is correctly flagged as a conflict.
+        a_hit = matters.check_conflict(firm_id=firm_a["id"], client_name="X",
+                                       opposing_party="Client Alpha")
+        assert a_hit and a_hit[0]["matter_id"] == m_a["id"]
+
 
 # ────────────────────────────── Day 31: Stripe billing ────────────────────
 class TestBilling:
@@ -1486,3 +1514,272 @@ class TestResponseHelpers:
         val, err = rh.require_list_of_strings({"tags": ["a", 42]}, "tags")
         assert val is None
         assert "must be a string" in err
+
+
+# ─────────────────────────── instruction-data generator ─────────────────────
+class TestInstructionData:
+    def test_ipc_code_extraction(self):
+        from tools.generate_instruction_data import ipc_code
+        assert ipc_code("IPC 302") == "302"
+        assert ipc_code("IPC Section 498A") == "498A"
+        assert ipc_code("IPC Section 304B") == "304B"
+        # BNSS/BSA records reference CrPC / Evidence Act, not the IPC
+        assert ipc_code("CrPC Section 154") is None
+        assert ipc_code("") is None
+
+    def test_bns_number_extraction(self):
+        from tools.generate_instruction_data import bns_number
+        assert bns_number("BNS 103") == "103"
+        assert bns_number("BNS Section 85") == "85"
+        assert bns_number("BNS 103(2)") == "103(2)"
+
+    def test_mapping_pairs_are_grounded(self):
+        from tools.generate_instruction_data import mapping_pairs
+        pairs = mapping_pairs("IPC 302",
+                              {"bns": "BNS 103", "title": "Murder",
+                               "change": "Same punishment, new section number"})
+        assert pairs
+        first = pairs[0]
+        assert "BNS 103" in first.answer
+        assert "302" in first.question
+        assert all(p.ipc == "302" for p in pairs)
+
+    def test_section_pairs_punishment_and_bailable(self):
+        from tools.generate_instruction_data import section_pairs
+        rec = {"section": "BNS Section 85", "old_ipc": "IPC Section 498A",
+               "title": "Cruelty", "punishment": "Up to 3 years imprisonment",
+               "bailable": "Non-bailable", "cognizable": "Yes",
+               "transition_note": "Replaces IPC 498A."}
+        pairs = section_pairs(rec)
+        answers = " ".join(p.answer for p in pairs)
+        assert "Up to 3 years imprisonment" in answers
+        assert "non-bailable" in answers          # verdict derived from KB field
+        assert all(p.ipc == "498A" for p in pairs)
+
+    def test_procedural_record_emits_no_bailable_pair(self):
+        """BNSS rows are N/A for bailable — must not invent a verdict."""
+        from tools.generate_instruction_data import section_pairs
+        rec = {"section": "BNSS Section 173", "old_ipc": "CrPC Section 154",
+               "title": "FIR Registration", "punishment": "N/A (procedural)",
+               "bailable": "N/A", "cognizable": "N/A"}
+        answers = " ".join(p.answer for p in section_pairs(rec)).lower()
+        assert "bailable" not in answers
+
+    def test_holdout_is_deterministic(self):
+        from tools.generate_instruction_data import select_holdout
+        keys = [f"IPC {n}" for n in range(100, 140)]
+        a = select_holdout(keys, 0.25, 7)
+        b = select_holdout(keys, 0.25, 7)
+        assert a == b                          # same seed → same split
+        assert len(a) == round(40 * 0.25)
+
+    def test_train_set_never_leaks_holdout(self):
+        """The headline accuracy number is only honest if eval IPC codes are
+        absent from training. This is the load-bearing invariant."""
+        import json
+        from tools.generate_instruction_data import (
+            build_dataset, select_holdout, MAPPING_PATH)
+        ds = build_dataset(hindi=True, holdout_frac=0.25, seed=7)
+        assert ds.train and ds.eval
+        mapping = json.loads(MAPPING_PATH.read_text(encoding="utf-8"))
+        holdout = select_holdout(list(mapping.keys()), 0.25, 7)
+        for p in ds.train:
+            assert p.ipc is None or p.ipc not in holdout
+        for g in ds.eval:
+            if g["kind"] == "mapping":
+                assert g["expected_ipc"] in holdout
+
+    def test_chat_example_shape_and_hindi_system(self):
+        from tools.generate_instruction_data import chat_example, Pair, SYSTEM_HI
+        en = chat_example(Pair("q", "a", lang="en"))
+        hi = chat_example(Pair("प्रश्न", "उत्तर", lang="hi"))
+        assert [m["role"] for m in en["messages"]] == ["system", "user", "assistant"]
+        assert hi["messages"][0]["content"] == SYSTEM_HI
+        assert en["messages"][0]["content"] != hi["messages"][0]["content"]
+
+    def test_repealed_mapping_pairs_teach_absence(self):
+        from tools.generate_instruction_data import mapping_pairs
+        pairs = mapping_pairs("IPC 124A", {
+            "bns": "—", "title": "Sedition — OMITTED (nearest: BNS 152)",
+            "change": "No direct equivalent. The nearest successor is BNS 152.",
+            "repealed": True})
+        assert pairs
+        joined = " ".join(p.answer for p in pairs).lower()
+        assert "no" in joined and ("equivalent" in joined or "152" in joined)
+        assert all(p.ipc == "124A" for p in pairs)
+
+    def test_new_mappings_present_and_wellformed(self):
+        import json
+        from tools.generate_instruction_data import MAPPING_PATH, bns_number
+        m = json.loads(MAPPING_PATH.read_text(encoding="utf-8"))
+        assert m["IPC 34"]["bns"] == "BNS 3(5)"
+        assert bns_number(m["IPC 494"]["bns"]) == "82(1)"
+        assert m["IPC 377"].get("repealed") is True
+        assert len(m) >= 76
+
+
+# ─────────────────────────────── eval harness ───────────────────────────────
+class TestEvalHarness:
+    def test_extract_bns_section(self):
+        from tools.eval_model import extract_bns_section
+        assert extract_bns_section("It maps to BNS 103.") == "103"
+        assert extract_bns_section("The answer is BNS Section 85.") == "85"
+        assert extract_bns_section("BNS 103(2) applies here") == "103(2)"
+        # no 'BNS' anchor → fall back to the first bare number
+        assert extract_bns_section("Section 103") == "103"
+        assert extract_bns_section("") is None
+        assert extract_bns_section("no number here") is None
+
+    def test_score_mapping(self):
+        from tools.eval_model import score_one
+        gold = {"kind": "mapping", "expected_bns": "103"}
+        assert score_one(gold, "That would be BNS 103.") is True
+        assert score_one(gold, "It is BNS 104.") is False
+
+    def test_score_fact_bailable_vs_non_bailable(self):
+        from tools.eval_model import score_one
+        nonb = {"kind": "fact", "expected_substring": "non-bailable"}
+        assert score_one(nonb, "The offence is non-bailable.") is True
+        assert score_one(nonb, "The offence is bailable.") is False
+        bail = {"kind": "fact", "expected_substring": "bailable"}
+        assert score_one(bail, "It is bailable.") is True
+        # 'bailable' must NOT be satisfied by 'non-bailable'
+        assert score_one(bail, "It is non-bailable.") is False
+
+
+# ─────────────────────────── e-Courts live provider ─────────────────────────
+class TestEcourtsLiveProvider:
+    def test_map_live_response_basic(self):
+        from ecourts import _map_live_response
+        payload = {"data": {"courtCaseData": {
+            "cnr": "DLND020047882015", "caseNumber": "CC/4788/2015",
+            "caseType": "Criminal Case",
+            "petitioners": ["State (NCT of Delhi)"],
+            "respondents": ["Rahul Verma"],
+            "judges": [{"name": "Sh. A. K. Jain, MM"}],
+            "caseStatus": "DISPOSED",
+            "filingDate": "2015-07-12", "decisionDate": "2018-03-04",
+            "historyOfCaseHearings": [
+                {"hearingDate": "2015-08-01", "purpose": "Summons",
+                 "description": "Notice issued"},
+            ],
+            "acts": [{"section": "BNS 318"}],
+            "district": "New Delhi", "state": "Delhi",
+        }}}
+        cs = _map_live_response(payload, "DLND020047882015", "webapi.ecourtsindia.com")
+        assert cs is not None
+        assert cs.cnr == "DLND020047882015"
+        assert cs.petitioner == "State (NCT of Delhi)"
+        assert cs.respondent == "Rahul Verma"
+        assert cs.status == "disposed"
+        assert cs.judge == "Sh. A. K. Jain, MM"
+        assert cs.source == "webapi.ecourtsindia.com"   # real source, never 'stub'
+        assert cs.hearings[0].purpose == "Summons"
+        assert "BNS 318" in cs.sections
+
+    def test_map_live_response_rejects_empty(self):
+        """A malformed/empty body becomes an honest None, not fabricated data."""
+        from ecourts import _map_live_response
+        assert _map_live_response({}, "X", "h") is None
+        assert _map_live_response({"data": {"meta": {}}}, "X", "h") is None
+        assert _map_live_response("not a dict", "X", "h") is None
+
+    def test_live_mode_never_falls_back_to_stub(self, monkeypatch):
+        """In live mode with no key, a CNR that EXISTS in the stub set must NOT
+        resolve — synthetic data is never served as real."""
+        import ecourts
+        monkeypatch.setenv("ECOURTS_PROVIDER", "live")
+        monkeypatch.delenv("ECOURTS_API_KEY", raising=False)
+        assert ecourts.fetch_cnr_status("MHCC010012342024") is None
+
+    def test_stub_mode_still_serves_demo_data(self, monkeypatch):
+        import ecourts
+        monkeypatch.setenv("ECOURTS_PROVIDER", "stub")
+        out = ecourts.fetch_cnr_status("MHCC010012342024")
+        assert out and out["source"] == "stub"
+
+
+# ─────────────────────── full-pipeline answer-quality eval ──────────────────
+class TestPipelineEval:
+    def test_known_bns_includes_kb_sections(self):
+        from tools.eval_pipeline import known_bns_sections
+        k = known_bns_sections()
+        assert {"85", "304", "318"} <= k
+
+    def test_cited_sections_extracts_numbers(self):
+        from tools.eval_pipeline import cited_sections
+        c = cited_sections("Apply BNS 85 and BNS Section 318; also BNS 103(2).")
+        assert {"85", "318", "103(2)"} <= c
+
+    def test_grade_good_analysis_scores_full(self):
+        from tools.eval_pipeline import grade_analysis, composite
+        sections = {f"section_{i}": "x" * 60 for i in range(1, 7)}
+        sections["section_2"] = ("The applicable provision is BNS 85 (cruelty), "
+                                 "addressing dowry harassment. " + "x" * 40)
+        sc = {"id": "t", "must_cite": ["85"], "must_mention": ["dowry", "cruelty"]}
+        g = grade_analysis(sections, sc, known={"85"})
+        assert g["sections_present"] == 6
+        assert g["citations"] == [1, 1] and g["mentions"] == [2, 2]
+        assert g["ungrounded_citations"] == []
+        assert composite(g) == 1.0
+
+    def test_grade_flags_ungrounded_citation(self):
+        """A cited section that's NOT in the KB is hallucinated — must be flagged."""
+        from tools.eval_pipeline import grade_analysis, composite
+        sections = {f"section_{i}": "x" * 60 for i in range(1, 7)}
+        sections["section_1"] = "The offence falls under BNS 999. " + "x" * 40
+        sc = {"id": "t", "must_cite": ["85"], "must_mention": []}
+        g = grade_analysis(sections, sc, known={"85"})
+        assert "999" in g["ungrounded_citations"]
+        assert "85" in g["missing_citations"]
+        assert composite(g) < 1.0
+
+    def test_incomplete_output_scores_zero(self):
+        from tools.eval_pipeline import grade_analysis, composite
+        g = grade_analysis({"section_1": "short"},
+                           {"id": "t", "must_cite": [], "must_mention": []},
+                           known=set())
+        assert g["sections_present"] == 0
+        assert composite(g) == 0.0
+
+
+# ─────────────────────────── go-live readiness audit ────────────────────────
+class TestReadiness:
+    _ALL = ["LLM_PROVIDER", "ECOURTS_PROVIDER", "STRIPE_MODE", "MAIL_PROVIDER",
+            "SMS_PROVIDER", "DATABASE_URL", "AUDIT_HASH_SALT", "ADMIN_TOKEN",
+            "GROQ_API_KEY", "ECOURTS_API_KEY", "STRIPE_SECRET_KEY"]
+
+    def test_stub_defaults_are_not_go_live(self, monkeypatch):
+        for v in self._ALL:
+            monkeypatch.delenv(v, raising=False)
+        import readiness
+        r = readiness.gather_readiness()
+        assert r["summary"]["go_live"] is False
+        modes = {i["subsystem"]: i["mode"] for i in r["items"]}
+        assert modes["e-Courts CNR lookup"] == "stub"
+        assert modes["Billing (Stripe)"] == "stub"
+        assert modes["Database"] == "json"
+
+    def test_fully_live_config_is_go_live(self, monkeypatch):
+        for k, v in {
+            "LLM_PROVIDER": "groq", "GROQ_API_KEY": "gsk_x",
+            "ECOURTS_PROVIDER": "live", "ECOURTS_API_KEY": "eci_live_x",
+            "STRIPE_MODE": "live", "STRIPE_SECRET_KEY": "sk_live_x",
+            "MAIL_PROVIDER": "ses", "SMS_PROVIDER": "msg91",
+            "DATABASE_URL": "postgres://u:p@h/db",
+            "AUDIT_HASH_SALT": "a-long-random-production-salt-abcdef123456",
+            "ADMIN_TOKEN": "adm",
+        }.items():
+            monkeypatch.setenv(k, v)
+        import readiness
+        r = readiness.gather_readiness()
+        assert r["summary"]["go_live"] is True
+        assert all(i["ready"] for i in r["items"])
+
+    def test_live_mode_without_key_is_not_ready(self, monkeypatch):
+        monkeypatch.setenv("ECOURTS_PROVIDER", "live")
+        monkeypatch.delenv("ECOURTS_API_KEY", raising=False)
+        import readiness
+        ec = next(i for i in readiness.gather_readiness()["items"]
+                  if i["subsystem"].startswith("e-Courts"))
+        assert ec["mode"] == "live" and ec["ready"] is False
