@@ -1,0 +1,21 @@
+{"id": "map_307", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 307? Answer with the BNS section number.", "expected_bns": "109", "expected_ipc": "307"}
+{"id": "map_323", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 323? Answer with the BNS section number.", "expected_bns": "115(1)", "expected_ipc": "323"}
+{"id": "map_359", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 359? Answer with the BNS section number.", "expected_bns": "136", "expected_ipc": "359"}
+{"id": "map_362", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 362? Answer with the BNS section number.", "expected_bns": "137", "expected_ipc": "362"}
+{"id": "map_363", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 363? Answer with the BNS section number.", "expected_bns": "138", "expected_ipc": "363"}
+{"id": "map_376D", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 376D? Answer with the BNS section number.", "expected_bns": "70", "expected_ipc": "376D"}
+{"id": "map_384", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 384? Answer with the BNS section number.", "expected_bns": "308(2)", "expected_ipc": "384"}
+{"id": "map_500", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 500? Answer with the BNS section number.", "expected_bns": "356(2)", "expected_ipc": "500"}
+{"id": "map_339", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 339? Answer with the BNS section number.", "expected_bns": "126(1)", "expected_ipc": "339"}
+{"id": "map_340", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 340? Answer with the BNS section number.", "expected_bns": "126(2)", "expected_ipc": "340"}
+{"id": "map_120B", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 120B? Answer with the BNS section number.", "expected_bns": "61(2)", "expected_ipc": "120B"}
+{"id": "map_304A", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 304A? Answer with the BNS section number.", "expected_bns": "106(1)", "expected_ipc": "304A"}
+{"id": "map_341", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 341? Answer with the BNS section number.", "expected_bns": "126(2)", "expected_ipc": "341"}
+{"id": "map_419", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 419? Answer with the BNS section number.", "expected_bns": "319(2)", "expected_ipc": "419"}
+{"id": "map_447", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 447? Answer with the BNS section number.", "expected_bns": "329(3)", "expected_ipc": "447"}
+{"id": "map_448", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 448? Answer with the BNS section number.", "expected_bns": "329(4)", "expected_ipc": "448"}
+{"id": "map_452", "kind": "mapping", "question": "What is the BNS section equivalent to IPC 452? Answer with the BNS section number.", "expected_bns": "333", "expected_ipc": "452"}
+{"id": "fact_137_bailable", "kind": "fact", "question": "Under BNS Section 137, is the offence bailable or non-bailable?", "expected_substring": "non-bailable"}
+{"id": "fact_115_bailable", "kind": "fact", "question": "Under BNS Section 115, is the offence bailable or non-bailable?", "expected_substring": "bailable"}
+{"id": "fact_109_bailable", "kind": "fact", "question": "Under BNS Section 109, is the offence bailable or non-bailable?", "expected_substring": "non-bailable"}
+{"id": "fact_106_bailable", "kind": "fact", "question": "Under BNS Section 106, is the offence bailable or non-bailable?", "expected_substring": "bailable"}

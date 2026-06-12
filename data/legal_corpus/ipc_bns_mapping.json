@@ -253,5 +253,133 @@
     "bns": "BNS 113",
     "title": "Terrorist Act (NEW)",
     "change": "BRAND NEW — Anti-terror provisions now in BNS"
+  },
+  "IPC 34": {
+    "bns": "BNS 3(5)",
+    "title": "Common Intention",
+    "change": "Acts done by several persons in furtherance of common intention. Renumbered."
+  },
+  "IPC 120B": {
+    "bns": "BNS 61(2)",
+    "title": "Criminal Conspiracy",
+    "change": "Punishment for criminal conspiracy. Substance retained."
+  },
+  "IPC 149": {
+    "bns": "BNS 190",
+    "title": "Unlawful Assembly — Common Object",
+    "change": "Every member of unlawful assembly guilty of offence committed in prosecution of common object."
+  },
+  "IPC 201": {
+    "bns": "BNS 238",
+    "title": "Causing Disappearance of Evidence",
+    "change": "Causing disappearance of evidence of an offence, or giving false information to screen an offender."
+  },
+  "IPC 279": {
+    "bns": "BNS 281",
+    "title": "Rash Driving on a Public Way",
+    "change": "Rash driving or riding on a public way."
+  },
+  "IPC 304A": {
+    "bns": "BNS 106(1)",
+    "title": "Death by Negligence",
+    "change": "Causing death by negligence. BNS 106(2) adds harsher liability for fleeing without reporting."
+  },
+  "IPC 341": {
+    "bns": "BNS 126(2)",
+    "title": "Wrongful Restraint — Punishment",
+    "change": "Punishment for wrongful restraint."
+  },
+  "IPC 353": {
+    "bns": "BNS 132",
+    "title": "Assault to Deter Public Servant",
+    "change": "Assault or criminal force to deter a public servant from discharging duty."
+  },
+  "IPC 363A": {
+    "bns": "BNS 139",
+    "title": "Kidnapping/Maiming a Child for Begging",
+    "change": "Kidnapping or maiming a child for the purpose of begging."
+  },
+  "IPC 364": {
+    "bns": "BNS 140(1)",
+    "title": "Kidnapping/Abducting in Order to Murder",
+    "change": "Kidnapping or abducting in order to murder."
+  },
+  "IPC 366A": {
+    "bns": "BNS 96",
+    "title": "Procuration of a Minor/Child",
+    "change": "Procuration of a child (minor) for illicit intercourse."
+  },
+  "IPC 411": {
+    "bns": "BNS 317(2)",
+    "title": "Receiving Stolen Property",
+    "change": "Dishonestly receiving stolen property."
+  },
+  "IPC 419": {
+    "bns": "BNS 319(2)",
+    "title": "Cheating by Personation — Punishment",
+    "change": "Punishment for cheating by personation."
+  },
+  "IPC 447": {
+    "bns": "BNS 329(3)",
+    "title": "Criminal Trespass — Punishment",
+    "change": "Punishment for criminal trespass."
+  },
+  "IPC 448": {
+    "bns": "BNS 329(4)",
+    "title": "House-Trespass — Punishment",
+    "change": "Punishment for house-trespass."
+  },
+  "IPC 452": {
+    "bns": "BNS 333",
+    "title": "House-Trespass After Preparation for Hurt",
+    "change": "House-trespass after preparation for hurt, assault or wrongful restraint."
+  },
+  "IPC 467": {
+    "bns": "BNS 338",
+    "title": "Forgery of Valuable Security/Will",
+    "change": "Forgery of a valuable security, will, or authority to make/transfer."
+  },
+  "IPC 468": {
+    "bns": "BNS 336(3)",
+    "title": "Forgery for Purpose of Cheating",
+    "change": "Forgery committed for the purpose of cheating."
+  },
+  "IPC 471": {
+    "bns": "BNS 340(2)",
+    "title": "Using a Forged Document as Genuine",
+    "change": "Fraudulently using as genuine a forged document or electronic record."
+  },
+  "IPC 489A": {
+    "bns": "BNS 178",
+    "title": "Counterfeiting Currency Notes",
+    "change": "Counterfeiting currency-notes or bank-notes."
+  },
+  "IPC 494": {
+    "bns": "BNS 82(1)",
+    "title": "Bigamy",
+    "change": "Marrying again during the lifetime of a husband or wife."
+  },
+  "IPC 511": {
+    "bns": "BNS 62",
+    "title": "Attempt to Commit Offences",
+    "change": "Punishment for attempting to commit offences punishable with imprisonment."
+  },
+  "IPC 377": {
+    "bns": "—",
+    "title": "Unnatural Offences — OMITTED in BNS",
+    "change": "No BNS equivalent. Read down for consensual adult acts (Navtej Singh Johar, 2018); the BNS omits the section. Non-consensual acts now fall under the rape/assault provisions.",
+    "repealed": true
+  },
+  "IPC 497": {
+    "bns": "—",
+    "title": "Adultery — STRUCK DOWN / OMITTED",
+    "change": "No BNS equivalent. Struck down as unconstitutional in Joseph Shine v Union of India (2018); the BNS does not re-enact it.",
+    "repealed": true
+  },
+  "IPC 124A": {
+    "bns": "—",
+    "title": "Sedition — OMITTED (nearest: BNS 152)",
+    "change": "No direct equivalent. 'Sedition' is not retained. The nearest successor is BNS 152 (acts endangering sovereignty, unity and integrity of India), which is broader and differently framed.",
+    "repealed": true
   }
 }

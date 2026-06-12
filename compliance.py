@@ -210,10 +210,12 @@ QUESTIONS: list[tuple[str, str, str]] = [
     # ─── 6. AI-specific ────────────────────────────────────────────────
     ("AI",
      "Will my data be used to train your models?",
-     "No. Lex-Indic does not train or fine-tune any model on customer "
-     "client stories. The Groq / Gemini sub-processor contracts require "
-     "the same. No training, no fine-tuning, no embedding-publishing "
-     "of customer text."),
+     "Not without your explicit instruction, and never across customers. "
+     "Client stories submitted to /analyze are never used for training — "
+     "the Groq / Gemini sub-processor contracts require the same. The only "
+     "training we offer is an OPT-IN, per-firm fine-tune: a local model "
+     "trained solely on your firm's own consented data, deployed on your "
+     "own server, and never pooled with any other customer's data."),
 
     ("AI",
      "What hallucination controls do you have?",

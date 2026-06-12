@@ -273,7 +273,11 @@ def convert_text(
         # Build the BNS marker (one per replacement, combined into one block)
         marker_parts = []
         for num, rep in zip(m.section_numbers, m.bns_replacements):
-            if rep:
+            if rep and rep.get("repealed"):
+                # IPC section with NO BNS successor (377, 497, 124A): say so
+                # explicitly rather than inventing a number or flagging "unknown".
+                marker_parts.append(f"[IPC {num} — {rep['title']} · no BNS equivalent]")
+            elif rep:
                 marker_parts.append(
                     marker_format.format(
                         bns=rep["bns"].replace("BNS ", ""),

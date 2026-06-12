@@ -45,3 +45,12 @@ certs/*.key
 # SOC 2 audit-log size baseline — auto-regenerated on every controls check.
 # Tracking it creates noisy commits.  The live file remains for auditor review.
 tools/soc2/evidence/audit_log_sizes.json
+
+# Fine-tuning data (Day 26). train.jsonl is large and fully regenerable from the
+# verified KB via tools/generate_instruction_data.py, so it stays out of git.
+# eval.jsonl + eval_report.* ARE committed — the held-out set is the audit artifact.
+data/finetune/train.jsonl
+data/finetune/review_sample.jsonl
+# Eval reports are regenerable evidence (change per model run) — keep eval.jsonl only.
+data/finetune/eval_report.*
+data/finetune/pipeline_eval_report.*

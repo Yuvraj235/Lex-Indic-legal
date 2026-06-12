@@ -18,24 +18,35 @@ project to every case filed in India.  Format:
 Examples:  MHCC010012342024 — Mumbai City Civil, case 1234/2024
            DLST020056782023 — Delhi Saket, case 5678/2023
 
-REAL INTEGRATION:
-  e-Courts publishes case-status data at https://services.ecourts.gov.in/
-  but no official JSON API exists yet — scraping or paid third-party
-  providers (ekosystems, courtroom IndIA) are the production paths.
-  This module exposes a `fetch_cnr_status()` function with a documented
-  hook (`_PROVIDER`) so the real scraper / API call can be wired in
-  without touching the rest of the app.
+PROVIDERS (set via ECOURTS_PROVIDER):
+  - 'stub' (default)  small synthetic dataset of plausible CNRs so the UI flow
+                      can be demoed offline.  Every row carries source='stub'.
+  - 'live'            a REAL lookup against a third-party e-Courts API.  Default
+                      target is ecourtsindia.com's partner API
+                      (webapi.ecourtsindia.com) — a JSON mirror of
+                      services.ecourts.gov.in case data.  It is keyed; new
+                      accounts get free signup credits (no card).  Configure:
+                          ECOURTS_PROVIDER=live
+                          ECOURTS_API_KEY=eci_live_xxxxxxxx
+                          ECOURTS_API_BASE=https://webapi.ecourtsindia.com  (optional)
+                          ECOURTS_API_PATH=/api/partner/case/{cnr}          (optional)
+                      In live mode there is NO stub fallback: a miss or failure
+                      returns "not found", so fake data is never shown as real.
 
-For dev / demo, we ship a small synthetic dataset of plausible CNRs so
-the UI flow can be developed and demoed without depending on a flaky
-network call.  Set ECOURTS_PROVIDER=stub (default) or 'live' (when a
-real adapter is registered).
+  No *official* free JSON API exists — the gov portal is CAPTCHA-gated.  Because
+  base/path/auth are env-configurable, a different provider (e.g.
+  court-api.kleopatra.io) can be swapped in without code changes.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import re
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -169,16 +180,127 @@ def _stub_lookup(cnr: str) -> Optional[CnrStatus]:
 # ════════════════════════════════════════════════════════════════════════════
 # Provider dispatch — swap _PROVIDER to 'live' once a real adapter ships.
 # ════════════════════════════════════════════════════════════════════════════
+def _live_api_config() -> tuple[str, Optional[str], str]:
+    base = os.getenv("ECOURTS_API_BASE", "https://webapi.ecourtsindia.com").rstrip("/")
+    token = os.getenv("ECOURTS_API_KEY")
+    path = os.getenv("ECOURTS_API_PATH", "/api/partner/case/{cnr}")
+    return base, token, path
+
+
+def _first(d: dict, *keys: str, default: str = "") -> str:
+    """First non-empty value among `keys`, coerced to a trimmed string."""
+    for k in keys:
+        v = d.get(k)
+        if isinstance(v, (str, int)) and str(v).strip():
+            return str(v).strip()
+    return default
+
+
+def _join_names(items: list) -> str:
+    """Provider returns parties/judges as either string arrays or {name:...}."""
+    out: list[str] = []
+    for x in items or []:
+        if isinstance(x, str) and x.strip():
+            out.append(x.strip())
+        elif isinstance(x, dict):
+            n = _first(x, "name", "fullName", "partyName")
+            if n:
+                out.append(n)
+    return "; ".join(out)
+
+
+def _map_live_response(payload: dict, cnr: str, source: str) -> Optional[CnrStatus]:
+    """
+    Map a provider's JSON envelope to CnrStatus.  Pure + defensive: returns None
+    if the payload has no recognizable case object, so a malformed/empty response
+    becomes an honest "not found" rather than fabricated data.
+
+    Field names follow the ecourtsindia.com partner-API docs (June 2026); the
+    `.get()` fallbacks tolerate minor shape differences across providers.
+    Validate against a real response on first use.
+    """
+    if not isinstance(payload, dict):
+        return None
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+    c = data.get("courtCaseData") or data.get("caseDetails") or data
+    if not isinstance(c, dict) or not (c.get("cnr") or c.get("caseNumber")):
+        return None
+
+    status_raw = _first(c, "caseStatus", "status").lower()
+    status = ("disposed" if "dispos" in status_raw
+              else "pending" if "pend" in status_raw
+              else (status_raw or "unknown"))
+
+    hearings: list[HearingEvent] = []
+    for h in (c.get("historyOfCaseHearings") or c.get("hearings") or []):
+        if isinstance(h, dict):
+            hearings.append(HearingEvent(
+                date=_first(h, "hearingDate", "businessDate", "date"),
+                purpose=_first(h, "purpose", "hearingPurpose", "stage"),
+                description=_first(h, "description", "businessOnDate", "cause"),
+            ))
+
+    sections: list[str] = []
+    for a in (c.get("acts") or c.get("actsAndSections") or []):
+        if isinstance(a, dict):
+            s = _first(a, "section", "under_section", "sections")
+            if s:
+                sections.append(s)
+        elif isinstance(a, str) and a.strip():
+            sections.append(a.strip())
+
+    court = (_first(c, "courtName", "court", "establishmentName")
+             or ", ".join(p for p in (_first(c, "district"), _first(c, "state")) if p))
+
+    return CnrStatus(
+        cnr=c.get("cnr") or cnr,
+        case_type=_first(c, "caseType", "type"),
+        case_number=_first(c, "caseNumber", "caseNo"),
+        filing_date=_first(c, "filingDate", "filing_date"),
+        next_hearing_date=_first(c, "nextHearingDate", "next_hearing_date"),
+        status=status,
+        court=court,
+        judge=_join_names(c.get("judges") or []) or _first(c, "judge"),
+        petitioner=_join_names(c.get("petitioners") or []),
+        respondent=_join_names(c.get("respondents") or []),
+        sections=sections,
+        hearings=hearings,
+        last_order_date=_first(c, "decisionDate", "lastHearingDate"),
+        last_order_summary=_first(c, "caseStage", "stage"),
+        source=source,
+    )
+
+
 def _live_lookup(cnr: str) -> Optional[CnrStatus]:
     """
-    Production hook.  Wire one of:
-      - Direct scrape of services.ecourts.gov.in (fragile, may need CAPTCHA solving)
-      - Paid third-party (Kanoon Pro, Civics, others)
-      - Internal e-Courts API once they publish JSON
-
-    Returns None if not configured so the UI gracefully falls back to the stub.
+    Real CNR lookup against the configured provider (default:
+    webapi.ecourtsindia.com).  Returns None on ANY failure — no key, network
+    error, 404, or unparseable body — so the route degrades to "not found"
+    instead of inventing data.
     """
-    return None
+    base, token, path = _live_api_config()
+    if not token:
+        print("[ecourts] ECOURTS_PROVIDER=live but ECOURTS_API_KEY is unset; "
+              "cannot perform a real lookup.", file=sys.stderr)
+        return None
+    url = base + path.format(cnr=cnr)
+    req = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+        "User-Agent": "Lex-Indic/1.0",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            print(f"[ecourts] live lookup HTTP {e.code} for {cnr}", file=sys.stderr)
+        return None
+    except Exception as e:  # noqa: BLE001 — network/JSON errors must not 500 the route
+        print(f"[ecourts] live lookup failed for {cnr}: {e}", file=sys.stderr)
+        return None
+    host = urllib.parse.urlparse(base).netloc or "live"
+    return _map_live_response(payload, cnr, host)
 
 
 def fetch_cnr_status(cnr: str) -> Optional[dict]:
@@ -188,10 +310,11 @@ def fetch_cnr_status(cnr: str) -> Optional[dict]:
         return None
 
     provider = os.getenv("ECOURTS_PROVIDER", "stub").lower()
-    result = None
     if provider == "live":
+        # NO stub fallback in live mode — a missed/failed real lookup returns
+        # "not found", so synthetic data is never presented as if it were real.
         result = _live_lookup(cnr)
-    if not result:
+    else:
         result = _stub_lookup(cnr)
     if not result:
         return None
