@@ -5,12 +5,12 @@
     "change": "Same punishment, new section number"
   },
   "IPC 304": {
-    "bns": "BNS 80",
-    "title": "Culpable Homicide not Murder",
-    "change": "Consolidated"
+    "bns": "BNS 105",
+    "title": "Culpable Homicide not Amounting to Murder — Punishment",
+    "change": "Similar penalty structure"
   },
   "IPC 304B": {
-    "bns": "BNS 84",
+    "bns": "BNS 80",
     "title": "Dowry Death",
     "change": "Minimum 7 years retained"
   },
@@ -60,9 +60,9 @@
     "change": "Death/life imprisonment"
   },
   "IPC 376C": {
-    "bns": "BNS 67",
-    "title": "Sexual intercourse by authority",
-    "change": "Expanded scope"
+    "bns": "BNS 68",
+    "title": "Sexual Intercourse by Person in Authority",
+    "change": "Same"
   },
   "IPC 498A": {
     "bns": "BNS 85",
@@ -80,24 +80,24 @@
     "change": "Consolidated"
   },
   "IPC 320": {
-    "bns": "BNS 114",
+    "bns": "BNS 116",
     "title": "Grievous Hurt (Definition)",
-    "change": "Expanded definition"
+    "change": "Same"
   },
   "IPC 323": {
-    "bns": "BNS 115(1)",
+    "bns": "BNS 115",
     "title": "Voluntarily Causing Hurt",
-    "change": "Fine increased to ₹10,000"
+    "change": "Fine increased to Rs 10,000"
   },
   "IPC 324": {
-    "bns": "BNS 115(2)",
-    "title": "Hurt by Dangerous Weapons",
-    "change": "Consolidated"
+    "bns": "BNS 118(1)",
+    "title": "Hurt by Dangerous Weapons or Means",
+    "change": "Same"
   },
   "IPC 325": {
-    "bns": "BNS 115(2)",
+    "bns": "BNS 117",
     "title": "Voluntarily Causing Grievous Hurt",
-    "change": "Consolidated with 323"
+    "change": "Separate section (no longer with simple hurt)"
   },
   "IPC 326A": {
     "bns": "BNS 124",
@@ -110,24 +110,24 @@
     "change": "Minimum 5 years"
   },
   "IPC 359": {
-    "bns": "BNS 136",
+    "bns": "BNS 137",
     "title": "Kidnapping (Definition)",
     "change": "Same"
   },
   "IPC 362": {
-    "bns": "BNS 137",
+    "bns": "BNS 138",
     "title": "Abduction",
     "change": "Same"
   },
   "IPC 363": {
-    "bns": "BNS 138",
+    "bns": "BNS 137",
     "title": "Punishment for Kidnapping",
     "change": "Similar"
   },
   "IPC 366": {
-    "bns": "BNS 141",
-    "title": "Kidnapping to force Marriage",
-    "change": "Expanded"
+    "bns": "BNS 87",
+    "title": "Kidnapping/Abducting Woman to Compel Marriage",
+    "change": "Same"
   },
   "IPC 376D": {
     "bns": "BNS 70",
@@ -205,9 +205,9 @@
     "change": "Up to 7 years for serious threats"
   },
   "IPC 507": {
-    "bns": "BNS 352",
-    "title": "Anonymous Threats",
-    "change": "Up to 2 additional years"
+    "bns": "BNS 351(4)",
+    "title": "Criminal Intimidation by Anonymous Communication",
+    "change": "Folded into BNS 351"
   },
   "IPC 339": {
     "bns": "BNS 126(1)",
@@ -215,8 +215,8 @@
     "change": "Same"
   },
   "IPC 340": {
-    "bns": "BNS 126(2)",
-    "title": "Wrongful Confinement",
+    "bns": "BNS 127",
+    "title": "Wrongful Confinement (Definition)",
     "change": "Same"
   },
   "IPC 342": {

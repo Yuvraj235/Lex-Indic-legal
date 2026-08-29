@@ -828,8 +828,13 @@ def build_police_report_page(pdf: LexIndicPDF, sections: dict):
                 pdf.multi_cell(0, 5.5, line, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
 
-def build_disclaimer_page(pdf: LexIndicPDF):
-    """Final page — Disclaimer, tech explanation, and contact."""
+def build_disclaimer_page(pdf: LexIndicPDF, verification: dict = None):
+    """Final page — Disclaimer, tech explanation, and contact.
+
+    `verification` is the verdict block from verifier.verify_analysis(); when
+    present a CITATION VERIFICATION panel (green pass / red attention) is
+    rendered above the legal disclaimer.
+    """
     pdf.add_page()
 
     # Navy top bar
@@ -848,7 +853,21 @@ def build_disclaimer_page(pdf: LexIndicPDF):
     pdf.set_y(38)
     pdf.set_text_color(*COLOUR["black"])
 
-    disclaimer_sections = [
+    disclaimer_sections = []
+    if verification:
+        import textwrap
+        from verifier import verification_stamp
+        passed = verification.get("all_verified") and not verification.get("ipc_without_bns")
+        stamp = "\n".join(textwrap.wrap(verification_stamp(verification), width=88))
+        disclaimer_sections.append((
+            "CITATION VERIFICATION",
+            COLOUR["green_light"] if passed else COLOUR["red_light"],
+            COLOUR["green"] if passed else COLOUR["red"],
+            stamp
+            + "\n\nEvery BNS/BNSS/BSA section cited above was checked against the"
+            "\nLex-Indic verified knowledge base at generation time.",
+        ))
+    disclaimer_sections += [
         (
             "LEGAL DISCLAIMER",
             COLOUR["red_light"],
@@ -941,12 +960,15 @@ For queries, customisation, or licensing:
 # ──────────────────────────────────────────────────────────────────────────────
 # MAIN FUNCTION
 # ──────────────────────────────────────────────────────────────────────────────
-def generate_pdf(input_txt_path: str) -> str:
+def generate_pdf(input_txt_path: str, verification: dict = None) -> str:
     """
     Reads a Lex-Indic text output file and generates a professional PDF Case Brief.
 
     Args:
         input_txt_path: Path to the case_analysis_*.txt file from main.py
+        verification:   Optional verdict block from verifier.verify_analysis();
+                        rendered as a CITATION VERIFICATION panel on the
+                        disclaimer page.
 
     Returns:
         Path to the generated PDF file
@@ -990,7 +1012,7 @@ def generate_pdf(input_txt_path: str) -> str:
     build_police_report_page(pdf, sections)
     print("    ✓ Police Help Report (Page 10)")
 
-    build_disclaimer_page(pdf)
+    build_disclaimer_page(pdf, verification=verification)
     print("    ✓ Disclaimer (Final page)")
 
     # ── Save PDF ──────────────────────────────────────────────────────────────

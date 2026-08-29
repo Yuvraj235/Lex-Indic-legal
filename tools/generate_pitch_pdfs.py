@@ -535,7 +535,7 @@ def build_sales_pitch_pdf():
     sample = (
         '{"request_id":"d761bc8f-2649-4914","ts":"2026-05-25T14:07:44Z","endpoint":"/analyze",\n'
         ' "client_ip":"127.0.0.1","story_hash":"sha256:9a9ef4d43f4c3c3bafaf8caa87eaacda",\n'
-        ' "story_length":208,"sources":["bns_351","bns_115","bns_78","bns_66","bns_356"],\n'
+        ' "story_length":208,"sources":["bns_351","bns_115","bns_78","bns_79","bns_356"],\n'
         ' "model":"llama-3.3-70b-versatile","status":"ok","duration_ms":12391,\n'
         ' "pdf_filename":"CaseBrief_20260525_193744.pdf"}'
     )

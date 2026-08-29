@@ -44,10 +44,29 @@ To push toward the 2,000–5,000-pair target, raise augmentation:
 `--n-augment 63` covers every section (×3 scenario questions each), and per-firm
 data adds more (see `build_firm_model.md`).
 
-### Step 2 — Train both models (on a rented GPU)
+### Step 2 — Train both models on a GPU
 
-Spin up a RunPod **A100 40GB** or **RTX 4090** (or Colab Pro). Upload `train.jsonl`
-and `training/`. Then:
+QLoRA (4-bit base + small trainable adapters) fits a 7–8B model in ~16 GB VRAM,
+so a single free T4 is enough. Two equivalent routes:
+
+#### Option A — Kaggle notebook (free, recommended)
+
+Open [`kaggle_finetune.ipynb`](kaggle_finetune.ipynb) on
+[kaggle.com](https://www.kaggle.com/code) (New Notebook → File → Import):
+
+1. **Phone-verify** your Kaggle account (Settings) — required for GPU + Internet.
+2. Right sidebar: **Accelerator = GPU T4 x2**, **Internet = On**.
+3. Upload `data/finetune/train.jsonl` as a Kaggle **Dataset** named
+   `lexindic-train`, then **Add** it to the notebook.
+4. Set `BASE = "qwen"`, **Run All**; then set `BASE = "llama"` and run again.
+
+Free quota is **30 h/week, 12 h/session** — one run is ~1–3 h, so both fit with
+room to retry. **Cost: 0.** Download each `.gguf` from the notebook's Output pane.
+(Colab free T4 works too, with shorter sessions.)
+
+#### Option B — Rented GPU / CLI (RunPod A100/4090, Colab Pro)
+
+Upload `train.jsonl` and `training/`, then:
 
 ```bash
 pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git" trl
@@ -55,9 +74,8 @@ python3 train_qlora.py --base-model qwen  --data train.jsonl --out lexindic-qwen
 python3 train_qlora.py --base-model llama --data train.jsonl --out lexindic-llama
 ```
 
-QLoRA (4-bit base + small trainable adapters) fits a 7–8B model in ~16 GB VRAM.
-Each run is **~1–2 hours / a few hundred ₹**. Each produces a merged
-`*.Q4_K_M.gguf`.
+Each run is **~1–2 hours / a few hundred ₹** and produces a merged
+`*.Q4_K_M.gguf`. The notebook and this script use identical hyperparameters.
 
 ### Step 3 — Package for Ollama
 
@@ -93,6 +111,16 @@ That gap (a fine-tuned 7B vs a generic 70B on BNS mapping, locally) is what the
 
 > You can run Step 4 against `groq` **today**, before any training, to capture the
 > generic baseline. Only the fine-tuned rows need the GPU.
+
+> **Groq token budget.** The full-pipeline eval (`tools/eval_pipeline.py`) sends
+> the whole 6-section analysis per scenario (~11k tokens each), so a 10-scenario
+> run (~110k) exceeds Groq's **free tier 100k tokens/day** and a 50-scenario
+> Week-4 report is impossible on free tier. Either enable **Groq Dev tier**
+> (pay-as-you-go at [console.groq.com/settings/billing](https://console.groq.com/settings/billing)
+> — a 50-scenario eval costs well under $1, removes the cap, same model/key), or
+> run the eval with `--resume` (it checkpoints after every scenario, so a free-tier
+> run continues across days until complete). `eval_model.py` on `ollama:*` models
+> is always free and uncapped.
 
 ### Step 5 — Ship the winner
 

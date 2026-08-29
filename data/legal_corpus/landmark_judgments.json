@@ -1,0 +1,259 @@
+{
+  "_note": "Landmark criminal-law judgments with good-law status. status: good_law | overruled | partly_overruled | superseded. status_note says by what. Curated 2026-07-20; holdings are settled landmarks. The RAG doc text carries the status so the model can warn when a cited case is no longer good law.",
+  "judgments": [
+    {"id": "lalita_kumari_2014", "case": "Lalita Kumari v. Govt. of U.P.", "citation": "(2014) 2 SCC 1", "court": "Supreme Court (Constitution Bench)", "status": "good_law", "status_note": "Binding Constitution Bench law.",
+     "ratio": "Registration of FIR is MANDATORY under (then) CrPC 154 — now BNSS 173 — if the information discloses a cognizable offence; preliminary inquiry is permissible only in limited categories (matrimonial, commercial, medical negligence, corruption, abnormal delay) and must conclude within 7 (extended to 14) days.",
+     "practice": "Cite when police refuse to register an FIR; pair with the writ/complaint remedy under BNSS 175(3).",
+     "sections": ["BNSS 173", "BNSS 175"], "keywords": ["FIR", "mandatory registration", "cognizable", "police refusal", "preliminary inquiry"]},
+
+    {"id": "arnesh_kumar_2014", "case": "Arnesh Kumar v. State of Bihar", "citation": "(2014) 8 SCC 273", "court": "Supreme Court", "status": "good_law", "status_note": "Reaffirmed and extended by Satender Kumar Antil (2022).",
+     "ratio": "For offences punishable up to 7 years, arrest is not to be made routinely; police must record reasons under (then) CrPC 41 — now BNSS 35 — and issue a notice of appearance (now BNSS 35(3)); Magistrates must not authorise detention mechanically.",
+     "practice": "The shield against automatic arrest in matrimonial-cruelty (BNS 85) and similar sub-7-year cases.",
+     "sections": ["BNSS 35", "BNS 85"], "keywords": ["arrest", "notice of appearance", "41A", "matrimonial", "automatic arrest", "seven years"]},
+
+    {"id": "satender_antil_2022", "case": "Satender Kumar Antil v. CBI", "citation": "(2022) 10 SCC 51", "court": "Supreme Court", "status": "good_law", "status_note": "Continuing mandamus; guidelines periodically enforced.",
+     "ratio": "Comprehensive bail guidelines by offence category; bail applications to be decided within two weeks; Arnesh Kumar compliance mandatory; separate bail application not needed at chargesheet stage in some categories.",
+     "practice": "The master bail-guidelines citation alongside BNSS 480-483.",
+     "sections": ["BNSS 480", "BNSS 483", "BNSS 35"], "keywords": ["bail guidelines", "undertrial", "bail timeline", "categories"]},
+
+    {"id": "dk_basu_1997", "case": "D.K. Basu v. State of West Bengal", "citation": "(1997) 1 SCC 416", "court": "Supreme Court", "status": "good_law", "status_note": "Guidelines largely codified into CrPC 41B/50/54 — now BNSS 36/47/53.",
+     "ratio": "Eleven mandatory safeguards on arrest and detention: identification of officers, arrest memo with witness, right to inform a relative, medical examination, etc. Breach invites contempt and departmental action.",
+     "practice": "Custodial-violence and illegal-detention matters; habeas corpus support.",
+     "sections": ["BNSS 36", "BNSS 47", "BNSS 53"], "keywords": ["custodial", "arrest memo", "detention safeguards", "police custody", "habeas corpus"]},
+
+    {"id": "bhajan_lal_1992", "case": "State of Haryana v. Bhajan Lal", "citation": "1992 Supp (1) SCC 335", "court": "Supreme Court", "status": "good_law", "status_note": "The seven quashing categories remain the standard.",
+     "ratio": "Seven categories where FIR/proceedings can be quashed under (then) CrPC 482 — now BNSS 528: no offence disclosed, absurd allegations, legal bar, mala fide prosecution, etc.",
+     "practice": "The foundation of every quashing petition.",
+     "sections": ["BNSS 528"], "keywords": ["quashing", "482", "mala fide FIR", "abuse of process", "inherent powers"]},
+
+    {"id": "gian_singh_2012", "case": "Gian Singh v. State of Punjab", "citation": "(2012) 10 SCC 303", "court": "Supreme Court", "status": "good_law", "status_note": "Followed in Narinder Singh (2014) and Laxmi Narayan (2019).",
+     "ratio": "High Court may quash non-compoundable offences of a private/civil flavour on settlement under inherent powers, but not heinous offences (murder, rape, dacoity) or offences against the State.",
+     "practice": "Settlement-based quashing of cheating/matrimonial FIRs.",
+     "sections": ["BNSS 528", "BNSS 359"], "keywords": ["settlement", "compounding", "quash on compromise", "non-compoundable"]},
+
+    {"id": "sushila_aggarwal_2020", "case": "Sushila Aggarwal v. State (NCT of Delhi)", "citation": "(2020) 5 SCC 1", "court": "Supreme Court (Constitution Bench)", "status": "good_law", "status_note": "Overruled Salauddin Shaikh line requiring time-limited anticipatory bail.",
+     "ratio": "Anticipatory bail (then CrPC 438 — now BNSS 482) need not be limited in time; it can continue till the end of trial unless cancelled.",
+     "practice": "Oppose attempts to time-limit anticipatory bail.",
+     "sections": ["BNSS 482"], "keywords": ["anticipatory bail", "no time limit", "constitution bench"]},
+
+    {"id": "salauddin_shaikh_1996", "case": "Salauddin Abdulsamad Shaikh v. State of Maharashtra", "citation": "(1996) 1 SCC 667", "court": "Supreme Court", "status": "overruled", "status_note": "OVERRULED by Sushila Aggarwal (2020) (Constitution Bench) — anticipatory bail need not be time-bound.",
+     "ratio": "(Historical) Anticipatory bail should be of limited duration, leaving the regular court to decide bail.",
+     "practice": "Do NOT cite for time-limiting anticipatory bail — cite Sushila Aggarwal instead.",
+     "sections": ["BNSS 482"], "keywords": ["anticipatory bail", "time limit", "overruled"]},
+
+    {"id": "arjun_panditrao_2020", "case": "Arjun Panditrao Khotkar v. Kailash Kushanrao Gorantyal", "citation": "(2020) 7 SCC 1", "court": "Supreme Court (3-judge)", "status": "good_law", "status_note": "Settled the 65B conflict; overruled Shafhi Mohammad; clarified Anvar P.V.",
+     "ratio": "The certificate under (then) IEA 65B(4) — now BSA 63(4) — is a condition precedent to admissibility of secondary electronic evidence; required unless the party is not in possession of the device; can be produced at trial with leave.",
+     "practice": "Every WhatsApp-screenshot/CCTV-clip case: file the BSA 63 certificate.",
+     "sections": ["BSA 63", "BSA 62"], "keywords": ["65B certificate", "electronic evidence", "WhatsApp", "CCTV", "admissibility"]},
+
+    {"id": "anvar_pv_2014", "case": "Anvar P.V. v. P.K. Basheer", "citation": "(2014) 10 SCC 473", "court": "Supreme Court (3-judge)", "status": "good_law", "status_note": "Affirmed by Arjun Panditrao (2020); overruled Navjot Sandhu on the 65B point.",
+     "ratio": "Electronic records are documentary evidence admissible only per the special procedure (then IEA 65A/65B — now BSA 62/63); the general secondary-evidence route is unavailable.",
+     "practice": "Foundation authority for the electronic-evidence certificate regime.",
+     "sections": ["BSA 62", "BSA 63"], "keywords": ["electronic record", "special procedure", "secondary evidence"]},
+
+    {"id": "shafhi_mohammad_2018", "case": "Shafhi Mohammad v. State of Himachal Pradesh", "citation": "(2018) 2 SCC 801", "court": "Supreme Court (2-judge)", "status": "overruled", "status_note": "OVERRULED by Arjun Panditrao Khotkar (2020) — the 65B certificate cannot be dispensed with on 'interest of justice' grounds.",
+     "ratio": "(Historical) The 65B certificate requirement is procedural and can be relaxed where the device is not in the party's possession.",
+     "practice": "Do NOT cite to avoid the BSA 63 certificate — cite Arjun Panditrao's possession exception instead.",
+     "sections": ["BSA 63"], "keywords": ["65B", "certificate waiver", "overruled"]},
+
+    {"id": "navjot_sandhu_2005", "case": "State (NCT of Delhi) v. Navjot Sandhu (Parliament Attack)", "citation": "(2005) 11 SCC 600", "court": "Supreme Court", "status": "partly_overruled", "status_note": "On electronic evidence (65B not mandatory) OVERRULED by Anvar P.V. (2014). Other holdings (conspiracy analysis) stand.",
+     "ratio": "(Historical, on evidence) Secondary evidence of electronic records admissible under general provisions even without 65B certificate.",
+     "practice": "Never cite for electronic-evidence admissibility.",
+     "sections": ["BSA 63"], "keywords": ["parliament attack", "65B", "partly overruled", "conspiracy"]},
+
+    {"id": "rajesh_sharma_2017", "case": "Rajesh Sharma v. State of U.P.", "citation": "(2018) 10 SCC 472", "court": "Supreme Court", "status": "partly_overruled", "status_note": "Family Welfare Committee mechanism STRUCK OUT by Social Action Forum for Manav Adhikar (2018); other safeguards modified.",
+     "ratio": "(Historical) Directed Family Welfare Committees to screen 498A complaints before arrest.",
+     "practice": "Do NOT cite the committee mechanism; use Arnesh Kumar + Social Action Forum for 498A/BNS 85 arrest safeguards.",
+     "sections": ["BNS 85", "BNSS 35"], "keywords": ["498A", "family welfare committee", "misuse", "partly overruled"]},
+
+    {"id": "social_action_forum_2018", "case": "Social Action Forum for Manav Adhikar v. Union of India", "citation": "(2018) 10 SCC 443", "court": "Supreme Court (3-judge)", "status": "good_law", "status_note": "Governs 498A/BNS 85 arrest practice with Arnesh Kumar.",
+     "ratio": "Family Welfare Committees have no legal basis; protection against mechanical arrest in matrimonial-cruelty cases flows from CrPC 41/41A (now BNSS 35) discipline, anticipatory bail remains available.",
+     "practice": "Pair with Arnesh Kumar in every BNS 85 defence advisory.",
+     "sections": ["BNS 85", "BNSS 35", "BNSS 482"], "keywords": ["498A", "arrest safeguards", "committee struck down"]},
+
+    {"id": "satbir_singh_2021", "case": "Satbir Singh v. State of Haryana", "citation": "(2021) 6 SCC 1", "court": "Supreme Court", "status": "good_law", "status_note": "Current authority on dowry-death trials.",
+     "ratio": "'Soon before death' in (then) IPC 304B — now BNS 80 — means proximate and live link, not immediately before; once ingredients are shown the (now) BSA 118 presumption is mandatory; trial courts must examine the accused meaningfully under (now) BNSS 351.",
+     "practice": "Dowry-death prosecutions: sequence of proof + presumption.",
+     "sections": ["BNS 80", "BSA 118", "BNSS 351"], "keywords": ["dowry death", "soon before", "presumption", "304B"]},
+
+    {"id": "sharad_sarda_1984", "case": "Sharad Birdhichand Sarda v. State of Maharashtra", "citation": "(1984) 4 SCC 116", "court": "Supreme Court", "status": "good_law", "status_note": "The five golden principles (panchsheel) of circumstantial evidence.",
+     "ratio": "Conviction on circumstantial evidence requires: fully established circumstances, consistent only with guilt, conclusive nature, exclusion of every hypothesis of innocence, and a complete chain.",
+     "practice": "Defence framework in every circumstantial murder case.",
+     "sections": ["BNS 103", "BSA 119"], "keywords": ["circumstantial evidence", "five golden rules", "chain of circumstances"]},
+
+    {"id": "bachan_singh_1980", "case": "Bachan Singh v. State of Punjab", "citation": "(1980) 2 SCC 684", "court": "Supreme Court (Constitution Bench)", "status": "good_law", "status_note": "Death-penalty framework; refined by Machhi Singh and Manoj (2022) mitigation guidelines.",
+     "ratio": "Death sentence only in the 'rarest of rare' cases where the alternative of life imprisonment is unquestionably foreclosed; aggravating and mitigating circumstances of both crime and criminal must be balanced.",
+     "practice": "Sentencing hearings in capital matters (BNS 103, 66, 70(2)).",
+     "sections": ["BNS 103"], "keywords": ["death penalty", "rarest of rare", "sentencing", "mitigation"]},
+
+    {"id": "machhi_singh_1983", "case": "Machhi Singh v. State of Punjab", "citation": "(1983) 3 SCC 470", "court": "Supreme Court", "status": "good_law", "status_note": "Operationalises Bachan Singh.",
+     "ratio": "Five categories (manner, motive, magnitude, anti-social nature, victim status) to test whether a murder is rarest of rare.",
+     "practice": "Both sides of capital sentencing argument.",
+     "sections": ["BNS 103"], "keywords": ["rarest of rare", "categories", "capital sentencing"]},
+
+    {"id": "virsa_singh_1958", "case": "Virsa Singh v. State of Punjab", "citation": "AIR 1958 SC 465", "court": "Supreme Court", "status": "good_law", "status_note": "Classic, constantly applied.",
+     "ratio": "For murder under (then) IPC 300 thirdly — now within BNS 101 — prosecution must prove the bodily injury present, and that the injury intended was sufficient in the ordinary course of nature to cause death; intention to cause that specific injury suffices.",
+     "practice": "Murder vs culpable homicide line (BNS 101 vs 105).",
+     "sections": ["BNS 101", "BNS 103", "BNS 105"], "keywords": ["300 thirdly", "sufficient in ordinary course", "intention"]},
+
+    {"id": "pulukuri_kottaya_1947", "case": "Pulukuri Kottaya v. Emperor", "citation": "AIR 1947 PC 67", "court": "Privy Council", "status": "good_law", "status_note": "Still the leading exposition of the discovery proviso.",
+     "ratio": "Under (then) IEA 27 — now proviso to BSA 23(2) — only that part of the information which distinctly relates to the fact discovered is admissible; the fact discovered includes the place and the accused's knowledge, not the confessional content.",
+     "practice": "Limit recovery-evidence to the discovery, exclude confessional surplus.",
+     "sections": ["BSA 23(2)"], "keywords": ["discovery", "section 27", "recovery", "distinctly relates"]},
+
+    {"id": "aghnoo_nagesia_1966", "case": "Aghnoo Nagesia v. State of Bihar", "citation": "AIR 1966 SC 119", "court": "Supreme Court", "status": "good_law", "status_note": "Standard authority on confessional FIRs.",
+     "ratio": "A confessional FIR lodged by the accused with police is hit by (then) IEA 25 — now BSA 23(1) — in its entirety except the portion leading to discovery and non-confessional facts.",
+     "practice": "Exclude confessional FIRs; salvage only discovery portions.",
+     "sections": ["BSA 23(1)", "BNSS 173"], "keywords": ["confessional FIR", "police confession", "admissibility"]},
+
+    {"id": "nandini_satpathy_1978", "case": "Nandini Satpathy v. P.L. Dani", "citation": "(1978) 2 SCC 424", "court": "Supreme Court", "status": "good_law", "status_note": "Expanded by Selvi (2010).",
+     "ratio": "Article 20(3) protection against self-incrimination extends to the investigation stage; an accused may refuse to answer incriminating questions during police interrogation (now BNSS 180 examinations).",
+     "practice": "Advising clients summoned for interrogation.",
+     "sections": ["BNSS 180", "BSA 23(1)"], "keywords": ["self-incrimination", "Article 20(3)", "interrogation", "right to silence"]},
+
+    {"id": "selvi_2010", "case": "Selvi v. State of Karnataka", "citation": "(2010) 7 SCC 263", "court": "Supreme Court (3-judge)", "status": "good_law", "status_note": "Governs narco/polygraph/BEAP.",
+     "ratio": "Involuntary narco-analysis, polygraph and brain-mapping violate Article 20(3) and personal liberty; results admissible only if the technique was consented to, and even then only discoveries made in consequence are usable.",
+     "practice": "Oppose involuntary forensic-psychological tests.",
+     "sections": ["BSA 23(2)"], "keywords": ["narco", "polygraph", "brain mapping", "consent", "20(3)"]},
+
+    {"id": "ritesh_sinha_2019", "case": "Ritesh Sinha v. State of U.P.", "citation": "(2019) 8 SCC 1", "court": "Supreme Court (3-judge)", "status": "good_law", "status_note": "Voice samples; BNSS 349 now codifies specimen powers.",
+     "ratio": "A Magistrate can direct an accused to give voice samples for investigation even without express statutory provision; does not violate Article 20(3).",
+     "practice": "Voice-sample directions in extortion/bribery tapes.",
+     "sections": ["BNSS 349"], "keywords": ["voice sample", "specimen", "identification"]},
+
+    {"id": "shreya_singhal_2015", "case": "Shreya Singhal v. Union of India", "citation": "(2015) 5 SCC 1", "court": "Supreme Court", "status": "good_law", "status_note": "IT Act 66A void ab initio; Zombie-prosecution directions in 2021-22 followups.",
+     "ratio": "IT Act Section 66A struck down as unconstitutionally vague and overbroad; intermediary liability under 79 read down to actual-knowledge via court/government order.",
+     "practice": "Any prosecution citing IT Act 66A is void — seek immediate quashing.",
+     "sections": ["BNS 356", "BNS 353"], "keywords": ["66A", "struck down", "online speech", "intermediary"]},
+
+    {"id": "joseph_shine_2018", "case": "Joseph Shine v. Union of India", "citation": "(2019) 3 SCC 39", "court": "Supreme Court (Constitution Bench)", "status": "good_law", "status_note": "Adultery (IPC 497) unconstitutional; BNS contains no adultery offence.",
+     "ratio": "IPC 497 (adultery) struck down as violative of Articles 14, 15 and 21; adultery may be a ground for divorce but not a crime.",
+     "practice": "Adultery allegations have civil (divorce) consequences only.",
+     "sections": [], "keywords": ["adultery", "497", "decriminalised", "struck down"]},
+
+    {"id": "navtej_johar_2018", "case": "Navtej Singh Johar v. Union of India", "citation": "(2018) 10 SCC 1", "court": "Supreme Court (Constitution Bench)", "status": "good_law", "status_note": "IPC 377 read down; BNS omits the offence for consenting adults.",
+     "ratio": "IPC 377 unconstitutional insofar as it criminalised consensual sexual acts between adults; non-consensual acts and acts with minors remain punishable (now via BNS sexual-offence and POCSO provisions).",
+     "practice": "Consensual same-sex relations are no offence; non-consensual acts charge under BNS 63-70/POCSO.",
+     "sections": ["BNS 63"], "keywords": ["377", "read down", "consent", "LGBTQ"]},
+
+    {"id": "puttaswamy_2017", "case": "Justice K.S. Puttaswamy v. Union of India", "citation": "(2017) 10 SCC 1", "court": "Supreme Court (9-judge)", "status": "good_law", "status_note": "Privacy is a fundamental right; the DPDP Act 2023 operates under it.",
+     "ratio": "Privacy is intrinsic to Article 21; State intrusion requires legality, necessity and proportionality.",
+     "practice": "Surveillance, phone-tapping, data-seizure challenges; DPDP compliance framing.",
+     "sections": [], "keywords": ["privacy", "Article 21", "proportionality", "surveillance"]},
+
+    {"id": "gian_kaur_1996", "case": "Gian Kaur v. State of Punjab", "citation": "(1996) 2 SCC 648", "court": "Supreme Court (Constitution Bench)", "status": "good_law", "status_note": "Overruled P. Rathinam; note Mental Healthcare Act 2017 s.115 presumes severe stress in attempted suicide; BNS has no general attempt-to-suicide offence (only BNS 226 attempt to compel a public servant).",
+     "ratio": "Right to life under Article 21 does not include a right to die; (then) IPC 306 abetment of suicide — now BNS 108 — is constitutionally valid.",
+     "practice": "Abetment-of-suicide prosecutions under BNS 108.",
+     "sections": ["BNS 108"], "keywords": ["suicide", "right to die", "abetment", "306"]},
+
+    {"id": "p_rathinam_1994", "case": "P. Rathinam v. Union of India", "citation": "(1994) 3 SCC 394", "court": "Supreme Court (2-judge)", "status": "overruled", "status_note": "OVERRULED by Gian Kaur (1996) Constitution Bench.",
+     "ratio": "(Historical) IPC 309 attempt to suicide held unconstitutional as violating Article 21.",
+     "practice": "Do not cite; the constitutional analysis is Gian Kaur's.",
+     "sections": ["BNS 108"], "keywords": ["attempt to suicide", "309", "overruled"]},
+
+    {"id": "mohan_lal_2018", "case": "Mohan Lal v. State of Punjab", "citation": "(2018) 17 SCC 627", "court": "Supreme Court (3-judge)", "status": "overruled", "status_note": "OVERRULED by Mukesh Singh v. State (NCT of Delhi) (2020) Constitution Bench — informant-investigator overlap is not automatically fatal.",
+     "ratio": "(Historical) A fair investigation requires that the informant and the investigator not be the same person; such trials stood vitiated.",
+     "practice": "Cite Mukesh Singh (2020): overlap goes to weight, decided case-by-case.",
+     "sections": ["BNSS 175"], "keywords": ["informant investigator", "NDPS", "fair investigation", "overruled"]},
+
+    {"id": "jacob_mathew_2005", "case": "Jacob Mathew v. State of Punjab", "citation": "(2005) 6 SCC 1", "court": "Supreme Court (3-judge)", "status": "good_law", "status_note": "Now reflected in BNS 106(1)'s reduced punishment for registered medical practitioners.",
+     "ratio": "Criminal prosecution of doctors for negligence requires gross negligence (recklessness), supported by credible expert opinion; simple lack of care attracts only civil liability.",
+     "practice": "Medical-negligence FIR defence; BNS 106(1) proviso (2 years for registered practitioners).",
+     "sections": ["BNS 106"], "keywords": ["medical negligence", "gross negligence", "doctor", "expert opinion"]},
+
+    {"id": "hussainara_khatoon_1979", "case": "Hussainara Khatoon v. State of Bihar", "citation": "(1980) 1 SCC 81", "court": "Supreme Court", "status": "good_law", "status_note": "Speedy-trial right; operationalised today via BNSS 479 undertrial release.",
+     "ratio": "Speedy trial is an essential ingredient of Article 21; undertrials detained beyond the maximum possible sentence must be released.",
+     "practice": "Undertrial release petitions (now BNSS 479 makes 1/3 for first offenders statutory).",
+     "sections": ["BNSS 479"], "keywords": ["speedy trial", "undertrial", "Article 21"]},
+
+    {"id": "maneka_gandhi_1978", "case": "Maneka Gandhi v. Union of India", "citation": "(1978) 1 SCC 248", "court": "Supreme Court (7-judge)", "status": "good_law", "status_note": "Foundation of modern Article 21 jurisprudence.",
+     "ratio": "Procedure established by law under Article 21 must be fair, just and reasonable; Articles 14, 19 and 21 interlock.",
+     "practice": "Constitutional backbone for procedural challenges.",
+     "sections": [], "keywords": ["Article 21", "due process", "fair procedure"]},
+
+    {"id": "vishaka_1997", "case": "Vishaka v. State of Rajasthan", "citation": "(1997) 6 SCC 241", "court": "Supreme Court", "status": "superseded", "status_note": "SUPERSEDED by the POSH Act 2013 — the Vishaka guidelines now operate through the statute; cite the Act, not the guidelines.",
+     "ratio": "(Historical) Laid binding guidelines on prevention of sexual harassment at the workplace until legislation was enacted.",
+     "practice": "Workplace sexual-harassment matters proceed under the POSH Act 2013 + BNS 75.",
+     "sections": ["BNS 75"], "keywords": ["sexual harassment", "workplace", "POSH", "superseded"]},
+
+    {"id": "kedar_nath_1962", "case": "Kedar Nath Singh v. State of Bihar", "citation": "AIR 1962 SC 955", "court": "Supreme Court (Constitution Bench)", "status": "superseded", "status_note": "IPC 124A (sedition) suspended by S.G. Vombatkere v. UoI (2022) and then REPEALED by the BNS; the successor offence is BNS 152 with a lawful-criticism explanation.",
+     "ratio": "(Historical) Sedition upheld but confined to acts with tendency to incite violence or public disorder.",
+     "practice": "Sedition FIRs post-2024 must be tested against BNS 152, not 124A; Kedar Nath's incitement threshold remains persuasive for 152.",
+     "sections": ["BNS 152"], "keywords": ["sedition", "124A", "repealed", "152", "incitement"]},
+
+    {"id": "anuradha_bhasin_2020", "case": "Anuradha Bhasin v. Union of India", "citation": "(2020) 3 SCC 637", "court": "Supreme Court", "status": "good_law", "status_note": "Internet-shutdown and Section 144 review standards.",
+     "ratio": "Orders under (then) CrPC 144 — now BNSS 163 — must state material facts, be proportionate, and are subject to judicial review; indefinite internet suspension is impermissible.",
+     "practice": "Challenging prohibitory orders and internet shutdowns.",
+     "sections": ["BNSS 163"], "keywords": ["144", "internet shutdown", "proportionality", "prohibitory order"]},
+
+    {"id": "lily_thomas_2000", "case": "Lily Thomas v. Union of India", "citation": "(2000) 6 SCC 224", "court": "Supreme Court", "status": "good_law", "status_note": "With Sarla Mudgal (1995).",
+     "ratio": "Conversion to another religion solely to contract a second marriage does not dissolve the first; the second marriage is void and attracts bigamy (then IPC 494 — now BNS 82).",
+     "practice": "Bigamy-by-conversion prosecutions under BNS 82.",
+     "sections": ["BNS 82"], "keywords": ["bigamy", "conversion", "second marriage", "void"]},
+
+    {"id": "indra_sarma_2013", "case": "Indra Sarma v. V.K.V. Sarma", "citation": "(2013) 15 SCC 755", "court": "Supreme Court", "status": "good_law", "status_note": "Live-in relationships under the DV Act.",
+     "ratio": "Guidelines on when a live-in relationship is a 'relationship in the nature of marriage' attracting the Protection of Women from Domestic Violence Act 2005.",
+     "practice": "DV Act claims arising from live-in relationships, alongside BNS 85 where applicable.",
+     "sections": ["BNS 85"], "keywords": ["live-in", "domestic violence", "relationship in nature of marriage"]},
+
+    {"id": "independent_thought_2017", "case": "Independent Thought v. Union of India", "citation": "(2017) 10 SCC 800", "court": "Supreme Court", "status": "good_law", "status_note": "Carried into BNS 63 Exception 2 (age raised to 18).",
+     "ratio": "Sexual intercourse by a husband with a wife below 18 is rape; the marital exception cannot dilute the age of consent.",
+     "practice": "Child-marriage-related sexual offence prosecutions (BNS 63-65 + POCSO).",
+     "sections": ["BNS 63", "BNS 65"], "keywords": ["marital rape exception", "child marriage", "age of consent"]},
+
+    {"id": "mukesh_nirbhaya_2017", "case": "Mukesh v. State (NCT of Delhi) (Nirbhaya)", "citation": "(2017) 6 SCC 1", "court": "Supreme Court (3-judge)", "status": "good_law", "status_note": "Death sentences executed 2020.",
+     "ratio": "Affirmed capital sentence in a gang-rape-murder as rarest of rare; dying declarations (three, consistent) and electronic/DNA evidence sustained conviction.",
+     "practice": "Template for multi-declarant dying declarations and forensic corroboration (BNS 70(2), BSA 26).",
+     "sections": ["BNS 70", "BNS 103", "BSA 26"], "keywords": ["Nirbhaya", "gang rape", "dying declaration", "rarest of rare"]},
+
+    {"id": "km_nanavati_1961", "case": "K.M. Nanavati v. State of Maharashtra", "citation": "AIR 1962 SC 605", "court": "Supreme Court", "status": "good_law", "status_note": "Grave-and-sudden-provocation classic.",
+     "ratio": "The provocation exception requires loss of self-control that is both grave and sudden; premeditated retrieval of a weapon and confrontation defeats the exception.",
+     "practice": "Testing Exception 1 to murder (now within BNS 101 exceptions).",
+     "sections": ["BNS 101", "BNS 105"], "keywords": ["provocation", "grave and sudden", "exception"]},
+
+    {"id": "pakala_narayana_1939", "case": "Pakala Narayana Swami v. Emperor", "citation": "AIR 1939 PC 47", "court": "Privy Council", "status": "good_law", "status_note": "Perennial authority on dying declarations and confessions.",
+     "ratio": "'Circumstances of the transaction resulting in death' under (then) IEA 32(1) — now BSA 26(a) — includes statements about events with proximate relation to death; a confession must either admit guilt or substantially all facts constituting the offence.",
+     "practice": "Scope arguments on dying declarations (BSA 26).",
+     "sections": ["BSA 26"], "keywords": ["dying declaration", "circumstances of transaction", "confession definition"]},
+
+    {"id": "laxman_2002", "case": "Laxman v. State of Maharashtra", "citation": "(2002) 6 SCC 710", "court": "Supreme Court (Constitution Bench)", "status": "good_law", "status_note": "Settled the certification conflict.",
+     "ratio": "A dying declaration is not invalid merely because the doctor's fitness certificate is absent; what matters is the court's satisfaction that the declarant was fit and the statement voluntary and truthful.",
+     "practice": "Defending/attacking dying declarations without medical certification (BSA 26).",
+     "sections": ["BSA 26"], "keywords": ["dying declaration", "fitness certificate", "magistrate"]},
+
+    {"id": "hanumant_1952", "case": "Hanumant Govind Nargundkar v. State of M.P.", "citation": "AIR 1952 SC 343", "court": "Supreme Court", "status": "good_law", "status_note": "Origin of the circumstantial-evidence standard later crystallised in Sharad Sarda.",
+     "ratio": "Circumstances must be fully established and the chain so complete as to exclude every reasonable hypothesis except guilt.",
+     "practice": "Read with Sharad Sarda in circumstantial cases.",
+     "sections": ["BNS 103", "BSA 119"], "keywords": ["circumstantial", "chain", "hypothesis of innocence"]},
+
+    {"id": "tukaram_mathura_1979", "case": "Tuka Ram v. State of Maharashtra (Mathura)", "citation": "(1979) 2 SCC 143", "court": "Supreme Court", "status": "superseded", "status_note": "SUPERSEDED by the 1983 amendment (custodial rape, consent presumption — then IEA 114A, now BSA 120) enacted in response; its consent reasoning is no longer law.",
+     "ratio": "(Historical) Acquittal in custodial rape for absence of injuries/'passive submission' — triggered nationwide reform.",
+     "practice": "Cite only as history; the law is BSA 120's consent presumption in custodial/aggravated rape.",
+     "sections": ["BSA 120", "BNS 64"], "keywords": ["Mathura", "custodial rape", "consent presumption", "superseded"]},
+
+    {"id": "rambraksh_2016", "case": "Rambraksh v. State of Chhattisgarh", "citation": "(2016) 12 SCC 251", "court": "Supreme Court", "status": "good_law", "status_note": "Representative of the settled last-seen line (with Satpal 2018).",
+     "ratio": "Last-seen-together evidence alone, without proximity of time and corroboration, is insufficient for murder conviction; BSA 109 (fact especially within knowledge) does not relieve the prosecution of its primary burden.",
+     "practice": "Defence in last-seen circumstantial cases.",
+     "sections": ["BNS 103", "BSA 109"], "keywords": ["last seen", "burden", "106 Evidence Act"]},
+
+    {"id": "prakash_singh_2006", "case": "Prakash Singh v. Union of India", "citation": "(2006) 8 SCC 1", "court": "Supreme Court", "status": "good_law", "status_note": "Police-reform directions; compliance still monitored.",
+     "ratio": "Seven binding directives on police reform: State Security Commissions, fixed tenure, separation of investigation from law-and-order, Police Complaints Authorities.",
+     "practice": "Complaints against police via the Police Complaints Authority route.",
+     "sections": [], "keywords": ["police reform", "complaints authority", "directives"]},
+
+    {"id": "youth_bar_assn_2016", "case": "Youth Bar Association of India v. Union of India", "citation": "(2016) 9 SCC 473", "court": "Supreme Court", "status": "good_law", "status_note": "Now codified in BNSS 173(3)/193 disclosure norms.",
+     "ratio": "Copies of FIRs must be uploaded on police/state websites within 24 hours (48-72 for remote areas), except sensitive categories; accused entitled to FIR copy before appearing.",
+     "practice": "Getting FIR copies quickly; challenging non-upload.",
+     "sections": ["BNSS 173"], "keywords": ["FIR upload", "website", "copy of FIR"]},
+
+    {"id": "sakiri_vasu_2008", "case": "Sakiri Vasu v. State of U.P.", "citation": "(2008) 2 SCC 409", "court": "Supreme Court", "status": "good_law", "status_note": "The 156(3) remedial ladder.",
+     "ratio": "If police refuse FIR or investigate improperly, the remedy ladder is: SP under (then) 154(3), then Magistrate under (then) 156(3) — now BNSS 175(3)-(4) — which includes all incidental powers to ensure proper investigation; writ petitions should not be the first resort.",
+     "practice": "The standard escalation route for FIR refusal, after Lalita Kumari.",
+     "sections": ["BNSS 175", "BNSS 173"], "keywords": ["156(3)", "FIR refusal", "magistrate direction", "remedial ladder"]},
+
+    {"id": "vinubhai_2019", "case": "Vinubhai Haribhai Malaviya v. State of Gujarat", "citation": "(2019) 17 SCC 1", "court": "Supreme Court (3-judge)", "status": "good_law", "status_note": "Magistrate's further-investigation power till chargesheet acceptance.",
+     "ratio": "Magistrates have power under (then) 156(3) — now BNSS 175(3) — to order further investigation even after a chargesheet, until charges are framed.",
+     "practice": "Seeking further investigation of shoddy chargesheets.",
+     "sections": ["BNSS 175", "BNSS 193"], "keywords": ["further investigation", "chargesheet", "magistrate power"]}
+  ]
+}

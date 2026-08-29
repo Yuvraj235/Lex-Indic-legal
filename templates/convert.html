@@ -604,15 +604,16 @@
     const matchList = document.getElementById('matchList');
     matchList.innerHTML = '';
     summary.matches.forEach(m => {
+      const statute = m.statute || 'IPC';   // multi-statute since v1.9
       m.section_numbers.forEach((num, i) => {
         const bns = m.bns[i];
         const row = document.createElement('div');
         row.className = 'match-row' + (bns ? '' : ' unmapped-row');
         const bnsCell = bns
           ? `<div class="match-bns">${escapeHtml(bns.bns)} — ${escapeHtml(bns.title)}</div>`
-          : `<div class="match-bns unmapped">No mapping — review manually</div>`;
+          : `<div class="match-bns unmapped">${escapeHtml((m.labels && m.labels[i]) || 'No mapping — review manually')}</div>`;
         row.innerHTML = `
-          <div class="match-ipc">IPC ${escapeHtml(num)}</div>
+          <div class="match-ipc">${escapeHtml(statute)} ${escapeHtml(num)}</div>
           <div class="match-arrow">→</div>
           ${bnsCell}
         `;
@@ -633,8 +634,9 @@
       const html = escapeHtml(annotatedText)
         .replace(/(\s)(u\/s\s+[\dA-Z]+|Section[s]?\s+[\d,/&A-Z\s]+(IPC|Indian Penal Code|Penal Code)|under\s+section[s]?\s+[\d,/&A-Z\s]+)/gi,
                  (m, sp, body) => `${sp}<span class="ipc">${body}</span>`)
-        .replace(/\[BNS\s+[^\]]+\]/g, m => `<span class="bns">${m}</span>`)
-        .replace(/\[IPC\s+[^\]]+ — no BNS mapping\]/g, m => `<span class="bns unmapped">${m}</span>`);
+        .replace(/\[(?:BNS|BNSS|BSA)\s+[^\]]+\]/g, m => `<span class="bns">${m}</span>`)
+        .replace(/\[(?:IPC|CrPC|Evidence Act)\s+[^\]]+(?:no (?:BNS|BNSS|BSA) mapping|no BNS equivalent)\]/g,
+                 m => `<span class="bns unmapped">${m}</span>`);
       preview.innerHTML = `<div class="annotated">${html}</div>`;
     }
     if (downloadFilename){

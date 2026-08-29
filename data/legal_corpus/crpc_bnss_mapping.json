@@ -1,0 +1,171 @@
+{
+  "_note": "CrPC -> BNSS mapping. Verified against the official concordance (latestlaws.com comparison / BPRD summary, fetched 2026-07-20). Unmapped refs are flagged honestly, never guessed.",
+  "CrPC 100": {
+    "bnss": "BNSS 103",
+    "title": "Search of Closed Place"
+  },
+  "CrPC 154": {
+    "bnss": "BNSS 173",
+    "title": "FIR — Information in Cognizable Cases"
+  },
+  "CrPC 156": {
+    "bnss": "BNSS 175",
+    "title": "Police Officer's Power to Investigate"
+  },
+  "CrPC 161": {
+    "bnss": "BNSS 180",
+    "title": "Examination of Witnesses by Police"
+  },
+  "CrPC 164": {
+    "bnss": "BNSS 183",
+    "title": "Recording of Confessions and Statements"
+  },
+  "CrPC 200": {
+    "bnss": "BNSS 223",
+    "title": "Examination of Complainant (Private Complaint)"
+  },
+  "CrPC 317": {
+    "bnss": "BNSS 356",
+    "title": "Trial in Absentia of Proclaimed Offender"
+  },
+  "CrPC 320": {
+    "bnss": "BNSS 359",
+    "title": "Compounding of Offences"
+  },
+  "CrPC 357A": {
+    "bnss": "BNSS 396",
+    "title": "Victim Compensation Scheme"
+  },
+  "CrPC 41A": {
+    "bnss": "BNSS 35",
+    "title": "Notice of Appearance Before Police Officer"
+  },
+  "CrPC 41B": {
+    "bnss": "BNSS 36",
+    "title": "Procedure of Arrest and Duties of Officer"
+  },
+  "CrPC 46": {
+    "bnss": "BNSS 43",
+    "title": "Arrest, How Made"
+  },
+  "CrPC 437": {
+    "bnss": "BNSS 480",
+    "title": "When Bail May Be Taken in a Non-Bailable Case"
+  },
+  "CrPC 438": {
+    "bnss": "BNSS 482",
+    "title": "Anticipatory Bail"
+  },
+  "CrPC 439": {
+    "bnss": "BNSS 483",
+    "title": "Special Powers of High Court / Sessions Court re Bail"
+  },
+  "CrPC 482": {
+    "bnss": "BNSS 528",
+    "title": "Saving of Inherent Powers of High Court"
+  },
+  "CrPC 41": {
+    "bnss": "BNSS 35",
+    "title": "When Police May Arrest Without Warrant"
+  },
+  "CrPC 50": {
+    "bnss": "BNSS 47",
+    "title": "Grounds of Arrest and Right to Bail to Be Informed"
+  },
+  "CrPC 57": {
+    "bnss": "BNSS 58",
+    "title": "Arrested Person Not to Be Detained More Than 24 Hours"
+  },
+  "CrPC 82": {
+    "bnss": "BNSS 84",
+    "title": "Proclamation for Person Absconding"
+  },
+  "CrPC 91": {
+    "bnss": "BNSS 94",
+    "title": "Summons to Produce Document or Other Thing"
+  },
+  "CrPC 107": {
+    "bnss": "BNSS 129",
+    "title": "Security for Keeping the Peace"
+  },
+  "CrPC 125": {
+    "bnss": "BNSS 144",
+    "title": "Order for Maintenance of Wives, Children and Parents"
+  },
+  "CrPC 133": {
+    "bnss": "BNSS 152",
+    "title": "Conditional Order for Removal of Nuisance"
+  },
+  "CrPC 144": {
+    "bnss": "BNSS 163",
+    "title": "Urgent Orders in Cases of Nuisance or Apprehended Danger"
+  },
+  "CrPC 151": {
+    "bnss": "BNSS 170",
+    "title": "Arrest to Prevent Commission of Cognizable Offences"
+  },
+  "CrPC 167": {
+    "bnss": "BNSS 187",
+    "title": "Remand / Default Bail When Investigation Not Completed"
+  },
+  "CrPC 173": {
+    "bnss": "BNSS 193",
+    "title": "Police Report on Completion of Investigation (Chargesheet)"
+  },
+  "CrPC 190": {
+    "bnss": "BNSS 210",
+    "title": "Cognizance of Offences by Magistrates"
+  },
+  "CrPC 197": {
+    "bnss": "BNSS 218",
+    "title": "Prosecution of Judges and Public Servants — Sanction"
+  },
+  "CrPC 202": {
+    "bnss": "BNSS 225",
+    "title": "Postponement of Issue of Process"
+  },
+  "CrPC 204": {
+    "bnss": "BNSS 227",
+    "title": "Issue of Process"
+  },
+  "CrPC 313": {
+    "bnss": "BNSS 351",
+    "title": "Power to Examine the Accused"
+  },
+  "CrPC 340": {
+    "bnss": "BNSS 379",
+    "title": "Procedure for Prosecution of Perjury / Offences Against Justice"
+  },
+  "CrPC 374": {
+    "bnss": "BNSS 415",
+    "title": "Appeals from Convictions"
+  },
+  "CrPC 389": {
+    "bnss": "BNSS 430",
+    "title": "Suspension of Sentence Pending Appeal; Bail"
+  },
+  "CrPC 397": {
+    "bnss": "BNSS 438",
+    "title": "Calling for Records — Revision"
+  },
+  "CrPC 401": {
+    "bnss": "BNSS 442",
+    "title": "High Court's Powers of Revision"
+  },
+  "CrPC 436": {
+    "bnss": "BNSS 478",
+    "title": "In What Cases Bail to Be Taken (Bailable Offences)"
+  },
+  "CrPC 436A": {
+    "bnss": "BNSS 479",
+    "title": "Maximum Detention of Undertrial Prisoners (1/3 for First-Timers)"
+  },
+  "CrPC 451": {
+    "bnss": "BNSS 497",
+    "title": "Custody and Disposal of Property Pending Trial"
+  },
+  "CrPC 468": {
+    "bnss": "BNSS 514",
+    "title": "Bar to Taking Cognizance After Period of Limitation"
+  }
+}

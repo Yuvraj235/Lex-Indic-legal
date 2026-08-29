@@ -461,7 +461,7 @@ BSA_SECTIONS = [
     },
     {
         "id": "bsa_53",
-        "section": "BSA Section 53",
+        "section": "BSA Section 23(1)",
         "old_ipc": "Indian Evidence Act Section 25",
         "title": "Confession to Police Officer Not To Be Proved",
         "description": (
@@ -469,7 +469,7 @@ BSA_SECTIONS = [
             "against a person accused of any offence.  This is the "
             "cornerstone protection against coerced confessions during "
             "investigation.  Statements admissible only under BNSS 183 "
-            "(Magistrate-recorded) or as a 'discovery' under BSA 27."
+            "(Magistrate-recorded) or as a 'discovery' under the proviso to BSA 23(2)."
         ),
         "punishment": "N/A (evidentiary)",
         "bailable": "N/A",
@@ -480,7 +480,7 @@ BSA_SECTIONS = [
     },
     {
         "id": "bsa_117",
-        "section": "BSA Section 117",
+        "section": "BSA Section 118",
         "old_ipc": "Indian Evidence Act Section 113B",
         "title": "Presumption as to Dowry Death",
         "description": (
@@ -496,12 +496,12 @@ BSA_SECTIONS = [
         "bailable": "N/A",
         "cognizable": "N/A",
         "keywords": ["dowry death presumption", "113B", "shifted burden",
-                     "BNS 84"],
-        "transition_note": "Replaces IEA 113B. Read with BNS 84 (Dowry Death). The reverse-burden remains intact.",
+                     "BNS 80"],
+        "transition_note": "Replaces IEA 113B. Read with BNS 80 (Dowry Death). The reverse-burden remains intact.",
     },
     {
         "id": "bsa_118",
-        "section": "BSA Section 118",
+        "section": "BSA Section 119",
         "old_ipc": "Indian Evidence Act Section 114",
         "title": "Court May Presume Existence of Certain Facts",
         "description": (
@@ -543,14 +543,14 @@ BSA_SECTIONS = [
     },
     {
         "id": "bsa_24",
-        "section": "BSA Section 24",
+        "section": "BSA Section 23(2)",
         "old_ipc": "Indian Evidence Act Section 26",
         "title": "Confession by Accused While in Police Custody Not to be Proved",
         "description": (
             "No confession made by any person whilst he is in the "
             "custody of a police officer, unless it be made in the "
             "immediate presence of a Magistrate, shall be proved as "
-            "against such person.  This complements BSA 53 — together "
+            "against such person.  This complements BSA 23(1) — together "
             "they create the architecture of protection against "
             "custodial confessions."
         ),
@@ -559,11 +559,11 @@ BSA_SECTIONS = [
         "cognizable": "N/A",
         "keywords": ["custodial confession", "26", "police custody",
                      "Magistrate presence", "Article 20(3)"],
-        "transition_note": "Replaces IEA 26. Read with BSA 53 and BNSS 183.",
+        "transition_note": "Replaces IEA 26. Now BSA 23(2); read with BSA 23(1) and BNSS 183.",
     },
     {
         "id": "bsa_46",
-        "section": "BSA Section 46",
+        "section": "BSA Section 48",
         "old_ipc": "Indian Evidence Act Section 53A",
         "title": "Evidence of Character or Previous Sexual Experience Not Relevant in Certain Cases",
         "description": (

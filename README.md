@@ -14,9 +14,9 @@ short_description: AI Junior Associate for Indian law — BNS transition engine
 
 ### AI-Powered Junior Associate for Indian Law Firms
 
-[![Status](https://img.shields.io/badge/status-v1.7-success)]()
+[![Status](https://img.shields.io/badge/status-v1.9-success)]()
 [![Stack](https://img.shields.io/badge/stack-Flask%20%2B%20Three.js%20%2B%20ChromaDB-blue)]()
-[![Tests](https://img.shields.io/badge/tests-80%20passing-success)]()
+[![Tests](https://img.shields.io/badge/tests-225%20passing-success)]()
 [![SOC2](https://img.shields.io/badge/SOC2-9%2F10%20controls%20passing-success)]()
 [![API](https://img.shields.io/badge/API-v1%20%2B%20OpenAPI-blue)]()
 [![License](https://img.shields.io/badge/license-Educational-lightgrey)]()
@@ -36,6 +36,21 @@ and within seconds the system produces a **complete legal case brief with 6 outp
 > that hallucinates section numbers.
 
 ---
+
+## What's New in v1.9 — Verification-first serving
+
+The theme of v1.9 is moving citation checking out of offline eval scripts and onto
+the **live serving path**, so a wrong or invented section can never silently reach a
+filing.
+
+| Area | Change | File(s) | Why it matters |
+|---|---|---|---|
+| **Runtime citation verifier** | Every `/analyze` response is checked before it returns: each BNS/BNSS/BSA section is verified against the knowledge base + concordance, foreign (US/UK) reporters are flagged, and IPC-cited-without-a-BNS-equivalent is warned | `verifier.py`, `app.py` | The app catches its own hallucinations at request time — verified citations get a green badge, ungrounded ones a blocking warning. The offline eval reuses the same functions, so they can't drift. |
+| **Verdict in the UI + PDF** | Green "citation check passed" / red "unverified — do not file" banner and per-citation chips; the verdict is stamped onto the PDF's disclaimer page | `templates/index.html`, `pdf_generator.py` | The trust signal is visible where the lawyer works and travels with the document. |
+| **Human-in-the-loop gate** | `/download` requires an explicit advocate-review confirmation (`?approved=1`); WhatsApp-intake drafts are filed as "pending review". Approvals are audit-logged | `app.py` | No AI-generated filing exports without a human sign-off, recorded for the audit trail. |
+| **Knowledge base audit + expansion** | Corrected 26 wrong section numbers; BNS KB 39 → 89 verified sections; CrPC→BNSS 16 → 42 and IEA→BSA 8 → 20 mappings; 45 landmark judgments with a `good_law / overruled / superseded` status feeding RAG | `data/bns_knowledge_base.py`, `data/bnss_bsa_knowledge_base.py`, `data/legal_corpus/*.json` | Broader, verified coverage; a cited case that is no longer good law is flagged rather than presented as current. |
+| **Multi-statute converter** | `/convert` and the Word add-in now convert CrPC→BNSS and Evidence Act→BSA alongside IPC→BNS in one pass | `ipc_bns_converter.py`, `templates/convert.html`, `templates/addin/taskpane.html` | Old pleadings citing procedure/evidence sections convert too, not just penal ones. |
+| **Local-model training + eval** | End-to-end QLoRA→GGUF pipeline (Kaggle notebook) and instruction data enriched with real case-citation and worked-scenario pairs; served through the existing Ollama path | `training/kaggle_finetune.ipynb`, `tools/generate_instruction_data.py`, `tools/eval_model.py` | An optional air-gapped model for focused Q&A/lookup behind the verifier. The hosted engine remains the primary generator; the held-out eval is the honest accuracy gate. |
 
 ## What's New in v1.8
 

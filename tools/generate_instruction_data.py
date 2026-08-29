@@ -72,6 +72,7 @@ from i18n import HINDI_SYSTEM_INSTRUCTION
 # ──────────────────────────────────────────────────────────────────────────────
 MAPPING_PATH = ROOT / "data" / "legal_corpus" / "ipc_bns_mapping.json"
 CASE_DIR = ROOT / "data" / "legal_corpus" / "case_summaries"
+LANDMARK_PATH = ROOT / "data" / "legal_corpus" / "landmark_judgments.json"
 OUT_DIR = ROOT / "data" / "finetune"
 
 # A trimmed, self-contained statement of LEXI's role.  Kept here (rather than
@@ -308,6 +309,90 @@ def case_pairs() -> list[Pair]:
     return pairs
 
 
+def landmark_case_pairs() -> list[Pair]:
+    """Rich precedent pairs from landmark_judgments.json so the model cites REAL
+    cases (name + citation + good-law status), never invented ones. Directly
+    addresses the eval finding that the model gave zero case references."""
+    pairs: list[Pair] = []
+    try:
+        data = json.loads(LANDMARK_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return pairs
+    for j in data.get("judgments", []):
+        case = (j.get("case") or "").strip()
+        cite = (j.get("citation") or "").strip()
+        ratio = (j.get("ratio") or "").strip()
+        status = (j.get("status") or "good_law").replace("_", " ")
+        note = (j.get("status_note") or "").strip()
+        practice = (j.get("practice") or "").strip()
+        court = (j.get("court") or "").strip()
+        secs = ", ".join(j.get("sections", []))
+        if not case or not ratio:
+            continue
+        full = f"{case}, {cite}" if cite else case
+        pairs.append(Pair(
+            f"What did the court hold in {case}?",
+            f"In {full} ({court}): {ratio} Good-law status: {status}."
+            + (f" {note}" if note else ""),
+            source="landmark"))
+        pairs.append(Pair(
+            f"Is {case} still good law?",
+            (f"Status: {status}. {note}" if note else f"Status: {status}."),
+            source="landmark"))
+        pairs.append(Pair(f"Give the full citation for {case}.",
+                          f"{full}.", source="landmark"))
+        if practice:
+            pairs.append(Pair(
+                f"When should an advocate cite {case}?",
+                practice + (f" Relevant sections: {secs}." if secs else ""),
+                source="landmark"))
+        for kw in (j.get("keywords") or [])[:2]:
+            pairs.append(Pair(
+                f"Which landmark judgment deals with {kw} in Indian criminal law?",
+                f"{full} — {ratio[:200]}", source="landmark"))
+    return pairs
+
+
+# Worked case scenarios: client story -> the correct BNS/BNSS/BSA sections applied
+# to the facts + the real precedent to cite. Hand-written and KB-accurate; teaches
+# the model to reason from facts to law (the pipeline eval's weak spot) and to
+# name real cases. ipc=None so they are never holdout-gated.
+_SCENARIOS: list[tuple[str, str]] = [
+    ("My client's husband and mother-in-law beat her and keep demanding a car as dowry. What sections apply?",
+     "Applicable: BNS 85 (cruelty by husband or his relatives, replacing IPC 498A); the demand itself is an offence under the Dowry Prohibition Act 1961; if death results within seven years, BNS 80 (dowry death). Arrest safeguard for the accused: Arnesh Kumar v. State of Bihar (2014) — no automatic arrest for offences up to 7 years; police must first issue a BNSS 35 notice. If police refuse the FIR, cite Lalita Kumari v. Govt. of U.P. (2014) — registration is mandatory."),
+    ("A speeding truck hit my client's father at night and drove off without stopping; he died. There was no enmity.",
+     "Applicable: BNS 106 (causing death by negligence; sub-section (2) covers hit-and-run where the driver escapes without reporting to police). This is NOT murder or culpable homicide because there was no intention to kill. Rash driving itself is BNS 281. For doctors, note the gross-negligence standard in Jacob Mathew v. State of Punjab (2005)."),
+    ("A man threw acid on my client's face because she refused to marry him. He had threatened her twice before.",
+     "Applicable: BNS 124(1) (voluntarily causing grievous hurt by use of acid — minimum 10 years up to life, with fine paid to the victim for treatment); an attempt is BNS 124(2). The earlier threats attract BNS 351 (criminal intimidation). For any CCTV or phone evidence, file the BSA 63(4) certificate — Arjun Panditrao Khotkar v. Kailash Gorantyal (2020)."),
+    ("A mob of more than ten villagers beat a man to death over a WhatsApp child-lifter rumour; videos identify seven.",
+     "Applicable: BNS 103(2) (murder by a group of five or more on grounds such as identity — mob lynching; death or life imprisonment), read with BNS 190 (every member of an unlawful assembly is liable for the common object) and BNS 189 (unlawful assembly). Bystander videos need a BSA 63 certificate to be admissible — Arjun Panditrao Khotkar (2020)."),
+    ("A society treasurer collected maintenance money entrusted to him and moved Rs 31 lakh into his own fixed deposits.",
+     "Applicable: BNS 316 (criminal breach of trust) — the property was lawfully entrusted and then dishonestly misappropriated, which distinguishes it from cheating (BNS 318). If accounts were falsified, add BNS 344 (falsification of accounts)."),
+    ("A man on a motorcycle snatched my client's phone from her hand at a speed-breaker; no weapon, no threat, over in seconds.",
+     "Applicable: BNS 304 (snatching — sudden or quick seizing of property from a person). It is NOT robbery (BNS 309), because no force or threat was used, and it is more than ordinary theft (BNS 303). CCTV of the road needs a BSA 63 certificate."),
+    ("A fake buyer posing as an army officer sent a QR code; when my client scanned it, Rs 47,000 was debited.",
+     "Applicable: BNS 318 (cheating and dishonestly inducing delivery of property, replacing IPC 420) and BNS 319 (cheating by personation) for impersonating an army officer; add IT Act Section 66D for impersonation using a computer resource. Note IT Act 66A is void — Shreya Singhal v. Union of India (2015). Chat screenshots require a BSA 63 certificate."),
+    ("Three men demand monthly protection money from my client's shop, beat him with iron rods breaking his arm, and smashed his display cases.",
+     "Applicable: BNS 308 (extortion — putting a person in fear of injury to obtain money); BNS 118(2) (grievous hurt by dangerous weapons — iron rods); BNS 351 (criminal intimidation — threat to kill/burn the shop); BNS 324 (mischief — smashed cases). If it is an organised syndicate, BNS 111 (organised crime) or BNS 112 (petty organised crime)."),
+    ("The police are refusing to register my client's FIR even though a cognizable offence occurred.",
+     "Cite Lalita Kumari v. Govt. of U.P. (2014): registration of an FIR is mandatory once information discloses a cognizable offence. The remedy ladder is the Superintendent of Police, then a Magistrate under BNSS 175(3) — Sakiri Vasu v. State of U.P. (2008). FIR copies must also be uploaded promptly — Youth Bar Association of India v. Union of India (2016)."),
+    ("Police are threatening to arrest my client over his wife's cruelty complaint though he received no notice.",
+     "Cite Arnesh Kumar v. State of Bihar (2014) and Satender Kumar Antil v. CBI (2022): for offences punishable up to 7 years such as BNS 85, arrest is not automatic; police must record reasons and serve a BNSS 35 notice of appearance. Anticipatory bail lies under BNSS 482 and need not be time-limited — Sushila Aggarwal v. State (NCT of Delhi) (2020)."),
+    ("Our murder case rests only on circumstantial evidence. What is the standard?",
+     "Apply the five golden principles of circumstantial evidence from Sharad Birdhichand Sarda v. State of Maharashtra (1984): the circumstances must be fully established and the chain so complete that it excludes every reasonable hypothesis except the guilt of the accused. The charge is BNS 103 (murder). Last-seen evidence alone is insufficient without proximity of time and corroboration."),
+    ("I have WhatsApp screenshots and CCTV footage as evidence. What must I do to make them admissible?",
+     "File the certificate under BSA 63(4) (replacing IEA 65B) — it is a condition precedent for secondary electronic evidence. The governing authority is Arjun Panditrao Khotkar v. Kailash Gorantyal (2020), which affirmed Anvar P.V. (2014) and overruled Shafhi Mohammad (2018). Do not rely on Shafhi Mohammad to skip the certificate."),
+    ("A prosecution has charged my client under IT Act Section 66A for a Facebook post.",
+     "Section 66A of the IT Act was struck down as unconstitutional in Shreya Singhal v. Union of India (2015); any charge under it is void and should be quashed. If the post insulted a woman's modesty it is BNS 79; online cheating by personation is BNS 319 read with IT Act 66D."),
+    ("My client's daughter is 16 and was married off; her husband had intercourse with her.",
+     "This is rape: Independent Thought v. Union of India (2017) held that intercourse by a husband with a wife under 18 is rape, so the marital exception does not apply. Charge under BNS 63-65 (rape and rape of a minor) together with the POCSO Act 2012."),
+]
+
+
+def scenario_pairs() -> list[Pair]:
+    return [Pair(q, a, source="scenario") for q, a in _SCENARIOS]
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Dataset assembly (deterministic) + holdout routing
 # ──────────────────────────────────────────────────────────────────────────────
@@ -397,6 +482,13 @@ def build_dataset(*, hindi: bool, holdout_frac: float, seed: int) -> Dataset:
                     ds.train.append(p)
 
     for p in case_pairs():        # case pairs have no IPC code → always train
+        ds.train.append(p)
+
+    # v1.9 firm-grade upgrade: real precedent (landmark judgments) + worked
+    # fact→law scenarios. Neither is holdout-gated (ipc=None).
+    for p in landmark_case_pairs():
+        ds.train.append(p)
+    for p in scenario_pairs():
         ds.train.append(p)
 
     return ds

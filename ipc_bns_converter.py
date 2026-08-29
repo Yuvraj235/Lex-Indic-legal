@@ -420,6 +420,229 @@ def convert_docx(file_obj) -> tuple[bytes, ConversionSummary]:
 
 
 # ════════════════════════════════════════════════════════════════════════════
+# Multi-statute conversion (IPC→BNS, CrPC→BNSS, Evidence Act→BSA)
+#
+# ADDITIVE — used by the migration auditor.  The IPC-only convert_text /
+# convert_docx above are untouched, so the /convert UI and Word add-in behave
+# exactly as before.  Any reference we don't have a mapping for is flagged
+# honestly ("no BNSS mapping"), never guessed.
+# ════════════════════════════════════════════════════════════════════════════
+_CRPC_PATH = Path(__file__).parent / "data" / "legal_corpus" / "crpc_bnss_mapping.json"
+_IEA_PATH = Path(__file__).parent / "data" / "legal_corpus" / "iea_bsa_mapping.json"
+
+
+def _load_target_mapping(path: Path, target_key: str) -> dict[str, dict]:
+    """Load {<PREFIX> <num>: {<target_key>, title}} → {num: {target, title}}.
+    Skips metadata keys (starting with '_'); section number = text from first digit."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    out: dict[str, dict] = {}
+    for key, value in raw.items():
+        if key.startswith("_"):
+            continue
+        m = re.search(r"\d", key)
+        if not m:
+            continue
+        num = key[m.start():].strip().upper()
+        out[num] = {"target": value.get(target_key, ""), "title": value.get("title", "")}
+    return out
+
+
+@dataclass(frozen=True)
+class _Statute:
+    name: str            # 'IPC' / 'CrPC' / 'Evidence Act'
+    target_label: str    # 'BNS' / 'BNSS' / 'BSA'
+    marker: str          # regex alternation matching the statute name
+
+
+_STATUTE_DEFS = [
+    _Statute("IPC", "BNS", r"IPC|Indian\s+Penal\s+Code|Penal\s+Code"),
+    _Statute("CrPC", "BNSS", r"CrPC|Cr\.?\s?P\.?\s?C\.?|Code\s+of\s+Criminal\s+Procedure"),
+    _Statute("Evidence Act", "BSA", r"Indian\s+Evidence\s+Act|Evidence\s+Act|IEA"),
+]
+
+_MULTI_MAPS: dict[str, dict] | None = None
+
+
+def _multi_maps() -> dict[str, dict]:
+    """statute name → {num: {target, title}} for all three statutes (cached)."""
+    global _MULTI_MAPS
+    if _MULTI_MAPS is None:
+        ipc = {num: {"target": v.get("bns", ""), "title": v.get("title", "")}
+               for num, v in get_mapping().items() if not num.startswith("_")}
+        _MULTI_MAPS = {
+            "IPC": ipc,
+            "CrPC": _load_target_mapping(_CRPC_PATH, "bnss"),
+            "Evidence Act": _load_target_mapping(_IEA_PATH, "bsa"),
+        }
+    return _MULTI_MAPS
+
+
+def _statute_patterns(marker: str) -> tuple[re.Pattern, re.Pattern]:
+    first = re.compile(
+        rf"(?ix)\b(?:{marker})\b\s*[,:\-]?\s*(?:Section[s]?|Sec\.?|S\.?)?\s*({_SECTION_GROUP})")
+    # 'u/s 167(2) CrPC' must be claimed by CrPC, not the implicit-IPC u/s rule:
+    # accept u/s-style prefixes and tolerate a trailing subsection before the
+    # statute word.
+    after = re.compile(
+        rf"(?ix)\b(?:u/s\.?|under\s+section[s]?|Section[s]?|Sec\.?|S\.?)\s*"
+        rf"({_SECTION_GROUP})\s*(?:\(\d+\)\s*)?(?:of\s+the\s+)?\b(?:{marker})\b")
+    return first, after
+
+
+@dataclass
+class StatuteMatch:
+    statute: str               # 'IPC' / 'CrPC' / 'Evidence Act'
+    target_label: str          # 'BNS' / 'BNSS' / 'BSA'
+    old_num: str               # '302'
+    target: str | None         # 'BNS 103' or None when unmapped
+    title: str | None
+
+
+def _iter_multi(text: str) -> list[tuple]:
+    # 1) Explicit statute-word matches take priority (CrPC/Evidence must beat the
+    #    IPC-implicit 'u/s' rule when a statute word is actually present).
+    explicit: list[tuple] = []
+    for st in _STATUTE_DEFS:
+        first, after = _statute_patterns(st.marker)
+        for pat in (first, after):
+            for m in pat.finditer(text):
+                explicit.append((m.start(), m.end(), st,
+                                 _split_section_numbers(m.group(1))))
+    explicit.sort(key=lambda c: (c[0], -(c[1] - c[0])))
+    accepted, spans, last_end = [], [], -1
+    for c in explicit:
+        if c[0] >= last_end:
+            accepted.append(c)
+            spans.append((c[0], c[1]))
+            last_end = c[1]
+
+    # 2) 'u/s NN' / 'under section NN' with NO statute word → IPC implicit, but
+    #    only where an explicit match hasn't already claimed the span.
+    for m in _PATTERN_USS.finditer(text):
+        s, e = m.start(), m.end()
+        if any(not (e <= a or s >= b) for (a, b) in spans):
+            continue
+        accepted.append((s, e, _STATUTE_DEFS[0], _split_section_numbers(m.group(1))))
+
+    # 3) Final ordering + de-dup (handles u/s-vs-u/s overlaps).
+    accepted.sort(key=lambda c: (c[0], -(c[1] - c[0])))
+    final, last_end = [], -1
+    for c in accepted:
+        if c[0] >= last_end:
+            final.append(c)
+            last_end = c[1]
+    return final
+
+
+def convert_text_multi(
+    text: str, *, marker_format: str = " [{target} — {title}]"
+) -> tuple[str, list[StatuteMatch]]:
+    """Annotate IPC/CrPC/Evidence-Act references with their BNS/BNSS/BSA
+    equivalents in one pass. Returns (annotated_text, matches)."""
+    chunks: list[str] = []
+    matches: list[StatuteMatch] = []
+    cursor = 0
+    for start, end, st, nums in _iter_multi(text):
+        maps = _multi_maps()[st.name]
+        chunks.append(text[cursor:end])
+        parts = []
+        for num in nums:
+            rep = maps.get(num.upper())
+            if rep and rep.get("target"):
+                parts.append(marker_format.format(target=rep["target"],
+                                                  title=rep["title"]).strip())
+                matches.append(StatuteMatch(st.name, st.target_label, num,
+                                            rep["target"], rep["title"]))
+            else:
+                parts.append(f"[{st.name} {num} — no {st.target_label} mapping]")
+                matches.append(StatuteMatch(st.name, st.target_label, num, None, None))
+        if parts:
+            chunks.append(" " + " ".join(parts))
+        cursor = end
+    chunks.append(text[cursor:])
+    return "".join(chunks), matches
+
+
+def convert_text_multi_summary(
+    text: str, *, marker_format: str = " [{target} — {title}]"
+) -> tuple[str, dict]:
+    """Multi-statute conversion (IPC→BNS, CrPC→BNSS, Evidence Act→BSA) with a
+    ConversionSummary-shaped dict, so /convert/text and the Word add-in can
+    consume all three statutes through the response format they already know.
+
+    Each match dict carries:
+      raw             — the exact matched substring (the add-in searches on it)
+      statute         — 'IPC' / 'CrPC' / 'Evidence Act'
+      target_label    — 'BNS' / 'BNSS' / 'BSA'
+      section_numbers — ['302', ...]
+      bns             — per-number {bns: 'BNS 103', title} or None (unmapped);
+                        the key keeps its legacy name for old clients
+      labels          — per-number ready-to-insert marker text
+    """
+    chunks: list[str] = []
+    out_matches: list[dict] = []
+    unmapped: list[str] = []
+    statute_counts: dict[str, int] = {}
+    total_refs = 0
+    mapped_count = 0
+    cursor = 0
+
+    for start, end, st, nums in _iter_multi(text):
+        maps = _multi_maps()[st.name]
+        chunks.append(text[cursor:end])
+        parts: list[str] = []
+        reps: list[dict | None] = []
+        for num in nums:
+            total_refs += 1
+            rep = maps.get(num.upper())
+            # IPC repealed sections (377/497/124A…) must say "no BNS
+            # equivalent" — checked FIRST because the mapping stores a
+            # placeholder ("—") in the bns field that would read as mapped.
+            full = get_mapping().get(num.upper()) if st.name == "IPC" else None
+            if full and full.get("repealed"):
+                label = f"[IPC {num} — {full['title']} · no BNS equivalent]"
+                reps.append(None)
+            elif rep and rep.get("target"):
+                label = marker_format.format(target=rep["target"],
+                                             title=rep["title"]).strip()
+                reps.append({"bns": rep["target"], "title": rep["title"]})
+                mapped_count += 1
+            else:
+                label = f"[{st.name} {num} — no {st.target_label} mapping]"
+                reps.append(None)
+                unmapped.append(f"{st.name} {num}")
+            parts.append(label)
+        statute_counts[st.name] = statute_counts.get(st.name, 0) + 1
+        out_matches.append({
+            "raw": text[start:end],
+            "statute": st.name,
+            "target_label": st.target_label,
+            "section_numbers": nums,
+            "bns": reps,
+            "labels": parts,
+        })
+        if parts:
+            chunks.append(" " + " ".join(parts))
+        cursor = end
+    chunks.append(text[cursor:])
+
+    summary = {
+        "total_matches": len(out_matches),
+        "total_section_refs": total_refs,
+        "mapped_count": mapped_count,
+        "unmapped_count": len(set(unmapped)),
+        "unmapped_section_numbers": sorted(set(unmapped)),
+        "statutes": statute_counts,
+        "matches": out_matches,
+    }
+    return "".join(chunks), summary
+
+
+# ════════════════════════════════════════════════════════════════════════════
 # CLI for local testing — `python3 ipc_bns_converter.py path/to/old.docx`
 # ════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":

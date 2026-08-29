@@ -1,0 +1,83 @@
+{
+  "_note": "IEA -> BSA mapping. Verified against the NCRB CyTrain BSA table and published IEA-BSA concordances (2026-07-20). Unmapped refs are flagged honestly, never guessed.",
+  "IEA 25": {
+    "bsa": "BSA 23(1)",
+    "title": "Confession to Police Officer Not to Be Proved"
+  },
+  "IEA 26": {
+    "bsa": "BSA 23(2)",
+    "title": "Confession in Police Custody Not to Be Proved"
+  },
+  "IEA 27": {
+    "bsa": "BSA 23(2)",
+    "title": "How Much Information from Accused May Be Proved"
+  },
+  "IEA 53A": {
+    "bsa": "BSA 48",
+    "title": "Character / Previous Sexual Experience Not Relevant"
+  },
+  "IEA 65A": {
+    "bsa": "BSA 62",
+    "title": "Special Provisions as to Evidence Relating to Electronic Record"
+  },
+  "IEA 65B": {
+    "bsa": "BSA 63",
+    "title": "Admissibility of Electronic Records (Certificate)"
+  },
+  "IEA 113B": {
+    "bsa": "BSA 118",
+    "title": "Presumption as to Dowry Death"
+  },
+  "IEA 114": {
+    "bsa": "BSA 119",
+    "title": "Court May Presume Existence of Certain Facts"
+  },
+  "IEA 8": {
+    "bsa": "BSA 6",
+    "title": "Motive, Preparation and Previous or Subsequent Conduct"
+  },
+  "IEA 17": {
+    "bsa": "BSA 15",
+    "title": "Admission (Definition)"
+  },
+  "IEA 24": {
+    "bsa": "BSA 22",
+    "title": "Confession Caused by Inducement, Threat, Coercion or Promise"
+  },
+  "IEA 32": {
+    "bsa": "BSA 26",
+    "title": "Statements by Persons Who Cannot Be Called (Dying Declaration)"
+  },
+  "IEA 45": {
+    "bsa": "BSA 39",
+    "title": "Opinions of Experts"
+  },
+  "IEA 90": {
+    "bsa": "BSA 92",
+    "title": "Presumption as to Documents Thirty Years Old"
+  },
+  "IEA 101": {
+    "bsa": "BSA 104",
+    "title": "Burden of Proof"
+  },
+  "IEA 106": {
+    "bsa": "BSA 109",
+    "title": "Burden of Proving Fact Especially Within Knowledge"
+  },
+  "IEA 112": {
+    "bsa": "BSA 116",
+    "title": "Birth During Marriage — Conclusive Proof of Legitimacy"
+  },
+  "IEA 113A": {
+    "bsa": "BSA 117",
+    "title": "Presumption as to Abetment of Suicide by a Married Woman"
+  },
+  "IEA 114A": {
+    "bsa": "BSA 120",
+    "title": "Presumption as to Absence of Consent in Certain Rape Prosecutions"
+  },
+  "IEA 133": {
+    "bsa": "BSA 138",
+    "title": "Accomplice — Competent Witness"
+  }
+}

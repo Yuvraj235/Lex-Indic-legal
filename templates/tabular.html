@@ -148,6 +148,20 @@
     employment contracts, partnership deeds, NDAs, distributor agreements.
   </p>
 
+  <!-- Privilege notice — shown only when a cloud LLM provider is active -->
+  <p id="privilegeNotice" style="display:none;background:#fff6e0;border:1px solid #e0c060;
+     border-radius:8px;padding:8px 12px;font-size:12.5px">
+    <strong>Cloud processing notice:</strong> uploaded contracts are processed by a
+    cloud AI provider to extract clauses. For privileged or highly sensitive
+    documents, use the local (air-gapped) mode — see <a href="/trust">Trust &amp; data flow</a>.
+  </p>
+  <script>
+    fetch('/llm/status').then(r => r.json()).then(st => {
+      if (st.provider !== 'ollama')
+        document.getElementById('privilegeNotice').style.display = 'block';
+    }).catch(() => {});
+  </script>
+
   <div class="grid">
     <!-- Upload -->
     <div class="card">

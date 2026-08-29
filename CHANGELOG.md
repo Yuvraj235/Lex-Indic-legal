@@ -2,6 +2,10 @@
 
 All notable changes to Lex-Indic. Auto-generated from git log.
 
+## August 2026
+
+- **30 Aug** _(pending commit)_ — v1.9 verification-first: runtime citation verifier (`verifier.py`) wired into `/analyze` with per-citation green/red badges, foreign-law + stale-IPC guards, and a PDF verdict stamp; human-in-the-loop approval gate on `/download`; KB audit (26 wrong section numbers fixed) + expansion (BNS 39→89, CrPC→BNSS 16→42, IEA→BSA 8→20, 45 landmark judgments with good-law status into RAG); multi-statute converter for `/convert` + Word add-in; local QLoRA→GGUF training pipeline (Kaggle) with case-citation/scenario instruction data. 225 pure tests.
+
 ## June 2026
 
 - **12 Jun** _(pending commit)_ — Day 26: local legal-model fine-tuning — `tools/generate_instruction_data.py` (KB → instruction pairs, Hindi, held-out split) + `tools/eval_model.py` (BNS-mapping accuracy harness) + `training/` QLoRA→GGUF recipe for Qwen 2.5 7B / Llama 3.1 8B + per-firm model service

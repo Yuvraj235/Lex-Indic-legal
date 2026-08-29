@@ -467,14 +467,17 @@
         : context.document.body;
 
       for (const m of ordered){
-        // Build the BNS marker text once
+        // Build the marker text once. Since v1.9 the server sends ready-made
+        // per-number labels (multi-statute: BNS/BNSS/BSA); fall back to the
+        // legacy IPC-only construction for older servers.
         const markerParts = [];
         for (let i = 0; i < m.section_numbers.length; i++){
           const num = m.section_numbers[i];
           const bns = m.bns[i];
-          markerParts.push(bns
-            ? `[${bns.bns} — ${bns.title}]`
-            : `[IPC ${num} — no BNS mapping]`);
+          markerParts.push((m.labels && m.labels[i])
+            ? m.labels[i]
+            : (bns ? `[${bns.bns} — ${bns.title}]`
+                   : `[IPC ${num} — no BNS mapping]`));
         }
         const markerText = ' ' + markerParts.join(' ');
 

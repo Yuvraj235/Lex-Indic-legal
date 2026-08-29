@@ -139,14 +139,14 @@ SEED_RULINGS = [
         "court": "Supreme Court of India",
         "date": "2024-07-08",
         "neutral_citation": "2024 INSC 545",
-        "sections": ["BNS 84", "BSA 117", "BSA 118"],
+        "sections": ["BNS 80", "BSA 118", "BSA 119"],
         "tags": ["dowry death", "presumption", "seven year window", "matrimonial"],
         "ratio": (
-            "The BNS 84 presumption (death within 7 years of marriage + "
+            "The BNS 80 presumption (death within 7 years of marriage + "
             "shown cruelty for dowry = deemed dowry death) is rebuttable "
             "but only by leading credible evidence of an intervening cause. "
             "Mere denial by the husband or in-laws is insufficient. The "
-            "burden under BSA 117/118 is real and substantive."
+            "burden under BSA 118/119 is real and substantive."
         ),
         "practice_impact": (
             "For defence: gather contemporaneous medical evidence, third-"

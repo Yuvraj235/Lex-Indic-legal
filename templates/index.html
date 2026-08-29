@@ -621,6 +621,15 @@
         </p>
       </div>
 
+      <!-- Privilege notice — shown only when a cloud LLM provider is active -->
+      <div id="privilegeNotice" class="alert alert-warning py-2 small d-none" role="alert">
+        <i class="bi bi-cloud-arrow-up me-1"></i>
+        <strong>Cloud processing notice:</strong> this text and any attachments will be
+        processed by a cloud AI provider to generate the analysis. For privileged or
+        highly sensitive material, use the local (air-gapped) mode — see
+        <a href="/trust" class="alert-link">Trust &amp; data flow</a>.
+      </div>
+
       <div class="card intake-card">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center">
@@ -865,11 +874,25 @@
           <button class="btn btn-outline-primary btn-sm" onclick="showEditPanel()">
             <i class="bi bi-pencil-square me-1"></i>Edit &amp; Supplement
           </button>
-          <a id="downloadBtn" href="#" class="btn btn-download btn-sm" target="_blank">
+          <a id="downloadBtn" href="#" class="btn btn-download btn-sm disabled" target="_blank"
+             aria-disabled="true" title="Tick the review confirmation below to enable the download">
             <i class="bi bi-file-earmark-pdf-fill me-1"></i>Download PDF Case Brief
           </a>
         </div>
       </div>
+
+      <!-- Human-in-the-loop gate: the PDF export unlocks only after explicit review -->
+      <div id="approveGate" class="form-check mb-3 p-2 px-4 rounded"
+           style="background: rgba(180,140,40,0.08); border: 1px solid rgba(180,140,40,0.35);">
+        <input class="form-check-input" type="checkbox" id="approveCheck" onchange="toggleDownloadGate()">
+        <label class="form-check-label small" for="approveCheck">
+          <strong>Advocate review confirmation</strong> — I have reviewed this AI-generated draft
+          and approve it for download. (Required before any export; recorded in the audit log.)
+        </label>
+      </div>
+
+      <!-- Citation verification banner (injected by JS) -->
+      <div id="verificationBanner" class="mb-4 d-none"></div>
 
       <!-- Strength badge (injected by JS) -->
       <div id="strengthBadge" class="mb-4"></div>
@@ -1399,19 +1422,83 @@ async function runSupplementAnalysis() {
 
 // ── Render results into the DOM ──────────────────────────────────────────────
 let lastStory = '';
+let lastPdfFilename = '';
+
+// Human-in-the-loop gate: the download link only works after the advocate
+// ticks the review box. The server also enforces this (?approved=1 → 403
+// without it), so bypassing the checkbox in devtools doesn't help.
+function toggleDownloadGate() {
+  const btn = document.getElementById('downloadBtn');
+  const ok = document.getElementById('approveCheck').checked && lastPdfFilename;
+  if (ok) {
+    btn.href = '/download/' + lastPdfFilename + '?approved=1';
+    btn.classList.remove('disabled');
+    btn.removeAttribute('aria-disabled');
+  } else {
+    btn.href = '#';
+    btn.classList.add('disabled');
+    btn.setAttribute('aria-disabled', 'true');
+  }
+}
+
+// Citation verification banner — the server checked every BNS/BNSS/BSA
+// citation in the answer against the knowledge base. Green = all verified;
+// red = at least one citation the KB cannot vouch for (or foreign law).
+function renderVerification(v) {
+  const el = document.getElementById('verificationBanner');
+  if (!v || !Array.isArray(v.citations)) { el.classList.add('d-none'); return; }
+
+  const chip = (c) => c.status === 'verified'
+    ? `<span class="badge bg-success me-1 mb-1"><i class="bi bi-check-lg me-1"></i>${c.statute} ${c.section}</span>`
+    : `<span class="badge bg-danger me-1 mb-1"><i class="bi bi-x-lg me-1"></i>${c.statute} ${c.section} — UNVERIFIED</span>`;
+  const chips = v.citations.map(chip).join('');
+
+  const clean = v.all_verified && !v.ipc_without_bns;
+  if (clean) {
+    el.innerHTML =
+      `<div class="alert alert-success mb-0">
+         <div class="fw-bold mb-1"><i class="bi bi-patch-check-fill me-2"></i>Citation check passed</div>
+         <div class="small mb-2">All ${v.verified_count} statute citation(s) in this analysis were verified
+           against the Lex-Indic knowledge base at generation time.</div>
+         <div>${chips}</div>
+       </div>`;
+  } else {
+    const problems = [];
+    if (v.ungrounded && v.ungrounded.length)
+      problems.push(`<strong>Unverified citations:</strong> ${v.ungrounded.join(', ')} — the knowledge base cannot vouch for these. Check the bare act on indiacode.nic.in before relying on them.`);
+    if (v.foreign_citations && v.foreign_citations.length)
+      problems.push(`<strong>Foreign-law references detected:</strong> ${v.foreign_citations.map(f => f.match).join(', ')} — this analysis should cite Indian law only.`);
+    if (v.ipc_without_bns)
+      problems.push(`<strong>IPC cited with no BNS equivalent</strong> — valid only if the incident predates 01 July 2024.`);
+    el.innerHTML =
+      `<div class="alert alert-danger mb-0">
+         <div class="fw-bold mb-1"><i class="bi bi-exclamation-triangle-fill me-2"></i>Citation check: attention required — do not file without review</div>
+         <ul class="small mb-2">${problems.map(p => `<li>${p}</li>`).join('')}</ul>
+         <div>${chips}</div>
+       </div>`;
+  }
+  el.classList.remove('d-none');
+}
 
 function renderResults(data) {
   lastStory = data.client_statement || '';
   // Date
   document.getElementById('resultsDate').textContent = 'Generated: ' + (data.generated || '');
 
-  // PDF download link
+  // PDF download link — locked behind the advocate-review checkbox.
+  lastPdfFilename = data.pdf_filename || '';
+  document.getElementById('approveCheck').checked = false;
+  toggleDownloadGate();
   if (data.pdf_filename) {
-    document.getElementById('downloadBtn').href = '/download/' + data.pdf_filename;
     document.getElementById('downloadBtn').classList.remove('d-none');
+    document.getElementById('approveGate').classList.remove('d-none');
   } else {
     document.getElementById('downloadBtn').classList.add('d-none');
+    document.getElementById('approveGate').classList.add('d-none');
   }
+
+  // Citation verification banner (runtime verifier verdict from the server)
+  renderVerification(data.verification);
 
   // Strength badge
   const strategyText = (data.sections.section_3 || '').toUpperCase();
@@ -1635,8 +1722,8 @@ async function loadHistory() {
         <div class="history-date"><i class="bi bi-clock me-1"></i>${c.date}</div>
         <div class="history-snippet">${escapeHtml(c.snippet)}</div>
         ${c.pdf_file
-          ? `<a href="/download/${c.pdf_file}" class="history-pdf-link" target="_blank"
-               onclick="event.stopPropagation()">
+          ? `<a href="#" class="history-pdf-link"
+               onclick="event.stopPropagation(); event.preventDefault(); approvedDownload('${c.pdf_file}')">
                <i class="bi bi-file-earmark-pdf"></i> PDF
              </a>`
           : ''}
@@ -1645,6 +1732,14 @@ async function loadHistory() {
   } catch (e) {
     console.error('History load failed:', e);
   }
+}
+
+// History downloads go through the same human-in-the-loop gate as fresh
+// results: an explicit confirmation, then the server-enforced approved=1.
+function approvedDownload(pdfFile) {
+  if (!confirm('This is an AI-generated draft. Confirm you have reviewed it '
+             + 'as (or with) a licensed Advocate before downloading.')) return;
+  window.open('/download/' + pdfFile + '?approved=1', '_blank');
 }
 
 async function loadCase(txtFile, pdfFile) {
@@ -1668,6 +1763,17 @@ async function loadCase(txtFile, pdfFile) {
 function escapeHtml(text) {
   return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+// ── Privilege notice: shown whenever the active LLM provider is a cloud one ──
+(async function showPrivilegeNoticeIfCloud() {
+  try {
+    const resp = await fetch('/llm/status');
+    const st = await resp.json();
+    if (st.provider !== 'ollama') {
+      document.getElementById('privilegeNotice').classList.remove('d-none');
+    }
+  } catch (e) { /* status endpoint unavailable — leave the notice hidden */ }
+})();
 
 // ── Day-4: i18n runtime ─────────────────────────────────────────────────────
 let _i18nStrings = null;

@@ -64,6 +64,22 @@ class TestIpcBnsConverter:
         assert summary.total_matches == 1
         assert "377" not in summary.unmapped_section_numbers  # it IS mapped (to a repeal)
 
+    def test_multi_statute_routes_each_to_right_code(self):
+        """CrPC->BNSS and Evidence-Act->BSA, with explicit markers beating u/s."""
+        from ipc_bns_converter import convert_text_multi
+        a, _ = convert_text_multi(
+            "FIR u/s 154 CrPC; statement u/s 161 CrPC; certificate u/s 65B Evidence Act; "
+            "charged u/s 302 IPC")
+        assert "BNSS 173" in a and "BNSS 180" in a   # CrPC -> BNSS
+        assert "BSA 63" in a                          # Evidence Act -> BSA
+        assert "BNS 103" in a                         # IPC -> BNS
+
+    def test_multi_statute_unmapped_is_flagged_not_guessed(self):
+        from ipc_bns_converter import convert_text_multi
+        a, matches = convert_text_multi("filed u/s 999 CrPC")
+        assert "no BNSS mapping" in a
+        assert any(m.statute == "CrPC" and m.target is None for m in matches)
+
 
 # ────────────────────────────── audit ──────────────────────────────────────
 class TestAudit:
@@ -1783,3 +1799,264 @@ class TestReadiness:
         ec = next(i for i in readiness.gather_readiness()["items"]
                   if i["subsystem"].startswith("e-Courts"))
         assert ec["mode"] == "live" and ec["ready"] is False
+
+
+# ─────────────────────────── statute migration audit ────────────────────────
+class TestMigrationAudit:
+    def test_audit_text_counts_by_statute(self):
+        import migration_audit as ma
+        d = ma.audit_text(
+            "t.docx",
+            "FIR u/s 154 CrPC; charged u/s 302 IPC; certificate u/s 65B Evidence Act; "
+            "filed u/s 999 CrPC")
+        assert d.refs_found == 4
+        assert d.mapped == 3 and d.unmapped == 1
+        assert d.by_statute.get("CrPC") == 2
+        assert d.by_statute.get("IPC") == 1
+        assert d.by_statute.get("Evidence Act") == 1
+
+    def test_aggregate_rolls_up_and_lists_unmapped(self):
+        import migration_audit as ma
+        d1 = ma.audit_text("a", "u/s 302 IPC")
+        d2 = ma.audit_text("b", "u/s 999 CrPC and u/s 999 CrPC")
+        rep = ma.aggregate([d1, d2])
+        assert rep.totals["documents"] == 2
+        assert rep.totals["refs_found"] == 3
+        assert rep.totals["mapped"] == 1 and rep.totals["unmapped"] == 2
+        assert ("CrPC 999", 2) in rep.top_unmapped
+
+    def test_render_markdown_has_summary(self):
+        import migration_audit as ma
+        md = ma.render_markdown(ma.aggregate([ma.audit_text("a", "u/s 302 IPC")]))
+        assert "Statute Migration Audit" in md and "`a`" in md
+
+
+# ──────────────────────── per-deployment training corpus ────────────────────
+class TestFirmCorpus:
+    def test_redact_removes_party_names_case_insensitive(self):
+        from firm_corpus import redact
+        out = redact("Ramesh Kumar accused VIKRAM Mehta of fraud.",
+                     [("Ramesh Kumar", "[CLIENT]"), ("Vikram Mehta", "[OPPOSING PARTY]")])
+        assert "Ramesh" not in out and "Vikram" not in out.title()
+        assert "[CLIENT]" in out and "[OPPOSING PARTY]" in out
+
+    def test_redact_ignores_too_short_names(self):
+        from firm_corpus import redact
+        # a 2-char name must not nuke every occurrence of those letters
+        assert redact("the cat sat", [("at", "[X]")]) == "the cat sat"
+
+    def test_matter_to_pairs_are_redacted(self):
+        from firm_corpus import matter_to_pairs
+        m = {"matter_type": "matrimonial", "client_name": "Priya Sharma",
+             "opposing_party": "Anil Sharma",
+             "description": "Priya Sharma filed a cruelty complaint against Anil Sharma "
+                            "after sustained dowry harassment over two years."}
+        pairs = matter_to_pairs(m)
+        assert pairs and "matrimonial" in pairs[0]["q"]
+        joined = " ".join(p["a"] for p in pairs)
+        assert "Priya" not in joined and "Anil" not in joined
+        assert "[CLIENT]" in joined and "[OPPOSING PARTY]" in joined
+
+    def test_matter_to_pairs_skips_thin_description(self):
+        from firm_corpus import matter_to_pairs
+        assert matter_to_pairs({"matter_type": "x", "description": "short"}) == []
+
+
+# ───────────────────────────── WhatsApp intake ──────────────────────────────
+class TestWhatsAppIntake:
+    def test_parse_inbound_twilio_form(self):
+        from intake import parse_inbound
+        s, t = parse_inbound({"From": "whatsapp:+919812345678", "Body": "hi"}, None)
+        assert s == "+919812345678" and t == "hi"
+
+    def test_parse_inbound_msg91_json(self):
+        from intake import parse_inbound
+        s, t = parse_inbound(None, {"mobile": "919812345678", "message": "hello"})
+        assert s == "919812345678" and t == "hello"
+
+    def test_intake_flow_collects_then_completes(self):
+        from intake import IntakeSession, handle_message, is_ready, compose_story
+        s = IntakeSession(sender="x")
+        s, r = handle_message(s, "hi")
+        assert "what happened" in r.lower() and not is_ready(s)
+        s, r = handle_message(s, "husband beat me for dowry")
+        assert "when" in r.lower()
+        s, r = handle_message(s, "last week")
+        assert "where" in r.lower()
+        s, r = handle_message(s, "Mumbai")
+        assert "who" in r.lower()
+        s, r = handle_message(s, "skip")
+        assert s.done and is_ready(s)
+        story = compose_story(s)
+        assert "dowry" in story and "Mumbai" in story
+
+    def test_skip_does_not_record_a_slot(self):
+        from intake import IntakeSession, handle_message
+        s = IntakeSession(sender="x")
+        for msg in ("hi", "incident text", "when text", "where text", "skip"):
+            s, _ = handle_message(s, msg)
+        assert "parties" not in s.answers
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# v1.9 Week 1 — runtime citation verifier (verifier.py)
+# ═══════════════════════════════════════════════════════════════════════════════
+class TestVerifier:
+    def _sections(self, **kw):
+        base = {f"section_{i}": "" for i in range(1, 7)}
+        base.update(kw)
+        return base
+
+    def test_known_sections_covers_all_three_statutes(self):
+        from verifier import known_sections
+        k = known_sections()
+        assert {"85", "103", "318"} <= k["BNS"]
+        assert "173" in k["BNSS"]
+        assert "61" in k["BSA"]
+
+    def test_bnss_citation_never_read_as_bns(self):
+        from verifier import cited_sections
+        text = "Apply BNSS 173 for the FIR."
+        assert cited_sections(text, "BNS") == set()
+        assert cited_sections(text, "BNSS") == {"173"}
+
+    def test_all_verified_analysis_passes(self):
+        from verifier import verify_analysis
+        v = verify_analysis(self._sections(
+            section_1="BNS 85 cruelty applies; register via BNSS 173."))
+        assert v["all_verified"] and v["ungrounded_count"] == 0
+        assert v["verified_count"] == 2
+
+    def test_hallucinated_section_is_ungrounded(self):
+        from verifier import verify_analysis
+        v = verify_analysis(self._sections(section_2="Under BNS 999 the accused..."))
+        assert not v["all_verified"]
+        assert v["ungrounded"] == ["BNS 999"]
+        cited = [c for c in v["citations"] if c["section"] == "999"][0]
+        assert cited["status"] == "ungrounded" and cited["found_in"] == "section_2"
+
+    def test_subsection_verified_via_base_number(self):
+        from verifier import verify_analysis
+        v = verify_analysis(self._sections(section_2="BNS 103(2) covers mob lynching."))
+        assert v["all_verified"] and v["citations"][0]["status"] == "verified"
+
+    def test_foreign_reporters_flagged_indian_reporters_not(self):
+        from verifier import foreign_citations
+        assert foreign_citations("See 410 U.S. 113 and EWCA Civ 33.")
+        assert foreign_citations("held in 998 F.3d 112")
+        assert foreign_citations("(2014) 8 SCC 273 and AIR 1997 SC 610") == []
+
+    def test_ipc_only_analysis_flagged_ipc_with_bns_not(self):
+        from verifier import verify_analysis
+        only_ipc = verify_analysis(self._sections(section_2="Charge u/s Section 302 of the IPC."))
+        assert only_ipc["ipc_without_bns"]
+        both = verify_analysis(self._sections(section_2="IPC 302 is now BNS 103."))
+        assert not both["ipc_without_bns"]
+
+    def test_verification_stamp_wording(self):
+        from verifier import verify_analysis, verification_stamp
+        good = verify_analysis(self._sections(section_1="BNS 85 applies."))
+        assert verification_stamp(good).startswith("CITATION CHECK: PASSED")
+        bad = verify_analysis(self._sections(section_1="BNS 9999 applies."))
+        stamp = verification_stamp(bad)
+        assert "ATTENTION REQUIRED" in stamp and "BNS 9999" in stamp
+
+    def test_eval_pipeline_reexports_verifier_functions(self):
+        # eval and serving must share one implementation so they cannot drift
+        from tools.eval_pipeline import known_bns_sections, cited_sections
+        import verifier
+        assert known_bns_sections() == verifier.known_bns_sections()
+        assert cited_sections("BNS 85") == {"85"}
+
+    def test_verify_analysis_is_json_safe(self):
+        from verifier import verify_analysis
+        v = verify_analysis(self._sections(section_1="BNS 85 and 410 U.S. 113"))
+        json.dumps(v)  # must not raise
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# v1.9 Week 1 — multi-statute /convert summary (IPC→BNS + CrPC→BNSS + IEA→BSA)
+# ═══════════════════════════════════════════════════════════════════════════════
+class TestMultiStatuteConvertSummary:
+    def test_three_statutes_one_pass(self):
+        from ipc_bns_converter import convert_text_multi_summary
+        ann, s = convert_text_multi_summary(
+            "Charged u/s 302 IPC and Section 161 CrPC; "
+            "see Section 65B of the Indian Evidence Act.")
+        assert "[BNS 103" in ann and "[BNSS 180" in ann and "[BSA 63" in ann
+        assert s["statutes"] == {"IPC": 1, "CrPC": 1, "Evidence Act": 1}
+        assert s["mapped_count"] == 3 and s["unmapped_count"] == 0
+
+    def test_repealed_ipc_says_no_equivalent_not_mapped(self):
+        from ipc_bns_converter import convert_text_multi_summary
+        ann, s = convert_text_multi_summary("Booked u/s 377 IPC.")
+        assert "no BNS equivalent" in ann
+        assert s["mapped_count"] == 0
+        # repealed is an honest terminal state, not an unmapped gap
+        assert s["unmapped_section_numbers"] == []
+
+    def test_unmapped_flagged_per_statute(self):
+        from ipc_bns_converter import convert_text_multi_summary
+        ann, s = convert_text_multi_summary("Relied on Section 999 CrPC.")
+        assert "[CrPC 999 — no BNSS mapping]" in ann
+        assert s["unmapped_section_numbers"] == ["CrPC 999"]
+
+    def test_match_shape_backwards_compatible_with_addin(self):
+        from ipc_bns_converter import convert_text_multi_summary
+        _, s = convert_text_multi_summary("u/s 302 IPC")
+        m = s["matches"][0]
+        assert set(m) >= {"raw", "statute", "target_label",
+                          "section_numbers", "bns", "labels"}
+        assert len(m["labels"]) == len(m["section_numbers"]) == len(m["bns"])
+        assert m["bns"][0]["bns"].startswith("BNS")
+
+    def test_act_year_not_read_as_section(self):
+        # "BNS 2023" cites the Act's year — the hard-case eval caught this
+        # being flagged as an ungrounded section 2023.
+        from verifier import cited_sections, verify_analysis
+        assert cited_sections("under the BNS 2023, theft is BNS 303") == {"303"}
+        v = verify_analysis({"section_1": "The BNS 2023 replaced the IPC.",
+                             **{f"section_{i}": "" for i in range(2, 7)}})
+        assert v["ungrounded"] == []
+
+    def test_us_subsection_claimed_by_correct_statute(self):
+        # 'u/s 167(2) CrPC' must be CrPC->BNSS 187, not implicit IPC
+        from ipc_bns_converter import convert_text_multi_summary
+        ann, s = convert_text_multi_summary("Default bail u/s 167(2) CrPC was sought.")
+        assert "[BNSS 187" in ann
+        assert s["matches"][0]["statute"] == "CrPC"
+
+    def test_expanded_maps_dying_declaration_and_default_bail(self):
+        from ipc_bns_converter import convert_text_multi_summary
+        ann, _ = convert_text_multi_summary(
+            "Dying declaration under Section 32 of the Indian Evidence Act; "
+            "maintenance under Section 125 CrPC.")
+        assert "[BSA 26" in ann and "[BNSS 144" in ann
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# v1.9 Week 2 — landmark judgments corpus (good-law status) + SC-rulings RAG feed
+# ═══════════════════════════════════════════════════════════════════════════════
+class TestJudgmentsCorpus:
+    def test_judgments_load_with_status(self):
+        from data.download_legal_corpus import load_landmark_judgments
+        js = load_landmark_judgments()
+        assert len(js) >= 40
+        statuses = {j["status"] for j in js}
+        assert statuses <= {"good_law", "overruled", "partly_overruled", "superseded"}
+        # the canonical overruled example must be present and marked
+        shafhi = [j for j in js if j["id"] == "shafhi_mohammad_2018"][0]
+        assert shafhi["status"] == "overruled"
+        assert "Arjun Panditrao" in shafhi["status_note"]
+
+    def test_rag_docs_carry_good_law_warning(self):
+        from data.download_legal_corpus import get_corpus_as_rag_documents
+        docs, metas, ids = get_corpus_as_rag_documents()
+        assert len(docs) == len(metas) == len(ids) == len(set(ids))
+        overruled_docs = [d for d in docs if "GOOD-LAW STATUS: OVERRULED" in d]
+        assert overruled_docs, "overruled cases must be flagged in RAG doc text"
+
+    def test_stub_sc_rulings_never_reach_rag(self):
+        from data.download_legal_corpus import load_sc_rulings_for_rag
+        for r in load_sc_rulings_for_rag():
+            assert r.get("source") and r["source"] != "stub"

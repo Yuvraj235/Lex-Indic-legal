@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Statute Migration Audit — Lex-Indic</title>
+<meta name="description" content="Scan a document set for outdated IPC / CrPC / Evidence-Act references and get the BNS / BNSS / BSA equivalents.">
+<link rel="stylesheet" href="/static/lex-design-system.css">
+<style>
+  body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+       color:#0f2850;margin:0;background:#f7f8fa}
+  .wrap{max-width:860px;margin:0 auto;padding:28px 20px 80px}
+  h1{font-family:"Playfair Display",Georgia,serif;font-size:30px;margin:.2em 0 .1em}
+  .sub{color:#5b6472;margin-bottom:22px;line-height:1.55}
+  .drop{border:2px dashed #c3ccd9;border-radius:12px;padding:28px;text-align:center;
+        background:#fff}
+  .btn{background:#0f2850;color:#fff;border:0;border-radius:8px;padding:10px 18px;
+       font-weight:600;cursor:pointer;margin-top:12px}
+  .btn:disabled{opacity:.5;cursor:default}
+  .cards{display:flex;gap:12px;flex-wrap:wrap;margin:22px 0}
+  .kpi{flex:1;min-width:120px;background:#fff;border:1px solid #e6e9ef;border-radius:10px;
+       padding:14px 16px}
+  .kpi .n{font-size:26px;font-weight:800}
+  .kpi .l{font-size:12px;color:#5b6472;text-transform:uppercase;letter-spacing:.04em}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e6e9ef;
+        border-radius:10px;overflow:hidden;font-size:14px}
+  th,td{padding:9px 12px;text-align:left;border-bottom:1px solid #eef1f5}
+  th{background:#0f2850;color:#fff;font-size:12px}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .unmapped{background:#fff7e6;border:1px solid #f0c36d;border-radius:10px;padding:12px 16px;
+            margin-top:16px;color:#8a6d1a;font-size:13px}
+  .muted{color:#5b6472;font-size:12.5px;margin-top:8px}
+</style>
+</head>
+<body>
+  {% include '_nav.html' %}
+  <div class="wrap">
+    <h1>Statute Migration Audit</h1>
+    <p class="sub">Upload templates, drafts or precedents (.docx, .pdf, .txt). Lex-Indic
+      scans every document for outdated <strong>IPC / CrPC / Evidence-Act</strong>
+      references and reports the <strong>BNS / BNSS / BSA</strong> equivalent. Anything
+      without a verified mapping is listed honestly — never guessed.</p>
+
+    <div class="drop">
+      <input type="file" id="files" multiple accept=".docx,.pdf,.txt">
+      <div><button class="btn" id="go">Scan documents →</button></div>
+      <div class="muted">Files are processed in-memory for the report and not stored.</div>
+    </div>
+
+    <div id="out"></div>
+  </div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  $('go').onclick = async () => {
+    const inp = $('files');
+    if (!inp.files.length){ $('out').innerHTML = '<p class="muted">Pick at least one file.</p>'; return; }
+    const fd = new FormData();
+    for (const f of inp.files) fd.append('files', f);
+    $('go').disabled = true; $('go').textContent = 'Scanning…';
+    try{
+      const r = await fetch('/audit/api/scan', {method:'POST', body:fd});
+      render(await r.json());
+    }catch(e){ $('out').innerHTML = '<p class="unmapped">Scan failed: '+e.message+'</p>'; }
+    $('go').disabled = false; $('go').textContent = 'Scan documents →';
+  };
+
+  function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+  function render(rep){
+    if (rep.error){ $('out').innerHTML = '<p class="unmapped">'+esc(rep.error)+'</p>'; return; }
+    const t = rep.totals || {};
+    const by = t.by_statute || {};
+    let html = '<div class="cards">'
+      + kpi(t.documents||0,'Documents')
+      + kpi(t.refs_found||0,'Old refs')
+      + kpi(t.mapped||0,'Mapped')
+      + kpi(t.unmapped||0,'Unmapped')
+      + '</div>';
+    html += '<p class="muted">By statute: '
+      + Object.entries(by).map(([k,v])=>esc(k)+' '+v).join(' · ') + '</p>';
+    html += '<table><tr><th>Document</th><th>Found</th><th>Mapped</th><th>Unmapped</th></tr>';
+    for (const d of (rep.docs||[]))
+      html += '<tr><td>'+esc(d.name)+'</td><td class="num">'+d.refs_found
+            +'</td><td class="num">'+d.mapped+'</td><td class="num">'+d.unmapped+'</td></tr>';
+    html += '</table>';
+    if ((rep.top_unmapped||[]).length){
+      html += '<div class="unmapped"><strong>No verified mapping yet</strong> (reported, not guessed): '
+            + rep.top_unmapped.map(([ref,n])=>esc(ref)+' ×'+n).join(', ') + '</div>';
+    }
+    $('out').innerHTML = html;
+  }
+  function kpi(n,l){ return '<div class="kpi"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>'; }
+</script>
+</body>
+</html>

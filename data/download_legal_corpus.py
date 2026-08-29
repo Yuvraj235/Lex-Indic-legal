@@ -97,7 +97,7 @@ IPC_TO_BNS_MAPPING = {
     # OFFENCES AGAINST WOMEN
     "IPC 302": {"bns": "BNS 103", "title": "Murder", "change": "Same punishment, new section number"},
     "IPC 304": {"bns": "BNS 80", "title": "Culpable Homicide not Murder", "change": "Consolidated"},
-    "IPC 304B": {"bns": "BNS 84", "title": "Dowry Death", "change": "Minimum 7 years retained"},
+    "IPC 304B": {"bns": "BNS 80", "title": "Dowry Death", "change": "Minimum 7 years retained"},
     "IPC 306": {"bns": "BNS 108", "title": "Abetment of Suicide", "change": "Similar provisions"},
     "IPC 307": {"bns": "BNS 109", "title": "Attempt to Murder", "change": "Same"},
     "IPC 354": {"bns": "BNS 74", "title": "Outraging Modesty", "change": "Now explicitly non-bailable"},
@@ -236,7 +236,7 @@ CASE_SUMMARIES = [
         "case_name": "Pawan Kumar v. State of Haryana (2003) 11 SCC 241",
         "court": "Supreme Court of India",
         "year": 2003,
-        "relevant_sections": ["IPC 304B", "BNS 84", "Dowry Death"],
+        "relevant_sections": ["IPC 304B", "BNS 80", "Dowry Death"],
         "summary": (
             "The Supreme Court held that in dowry death cases, once prosecution proves "
             "the death occurred within 7 years of marriage and there was dowry harassment "
@@ -244,10 +244,10 @@ CASE_SUMMARIES = [
             "in-laws under Section 113B of the Indian Evidence Act (now BSA). "
             "The burden of proof shifts to the accused to prove innocence. "
             "SIGNIFICANCE: Lawyers need not prove direct causation — harassment + death "
-            "within 7 years is sufficient to invoke BNS 84."
+            "within 7 years is sufficient to invoke BNS 80."
         ),
         "ratio": "Presumption under Section 113B Evidence Act (now BSA) shifts burden to accused in dowry death cases.",
-        "keywords": ["dowry death", "BNS 84", "IPC 304B", "presumption of guilt", "burden of proof", "7 years"],
+        "keywords": ["dowry death", "BNS 80", "IPC 304B", "presumption of guilt", "burden of proof", "7 years"],
     },
     {
         "case_name": "Shafin Jahan v. Asokan K.M. (2018) 16 SCC 368",
@@ -473,7 +473,75 @@ def get_corpus_as_rag_documents():
         safe_id = ipc_section.replace(" ", "_").replace("/", "_")
         ids.append(f"mapping_{safe_id}")
 
+    # ── v1.9 W2: Landmark judgments with good-law status ─────────────────────
+    # The doc text carries the status line so the model can warn when a cited
+    # case is overruled/superseded (the "date sanity" safeguard).
+    for j in load_landmark_judgments():
+        status = j.get("status", "good_law").upper()
+        doc_text = (
+            f"LANDMARK CASE: {j['case']}, {j.get('citation', '')}\n"
+            f"COURT: {j.get('court', '')}\n"
+            f"GOOD-LAW STATUS: {status} — {j.get('status_note', '')}\n"
+            f"RELEVANT SECTIONS: {', '.join(j.get('sections', []))}\n"
+            f"LEGAL RATIO: {j.get('ratio', '')}\n"
+            f"PRACTICE USE: {j.get('practice', '')}\n"
+            f"KEYWORDS: {', '.join(j.get('keywords', []))}"
+        )
+        documents.append(doc_text)
+        metadatas.append({
+            "type": "case_summary",
+            "case_name": j["case"],
+            "court": j.get("court", ""),
+            "year": j["id"].rsplit("_", 1)[-1],
+            "good_law_status": j.get("status", "good_law"),
+        })
+        ids.append(f"case_j_{j['id']}")
+
+    # ── v1.9 W2: Daily-scraped SC rulings (monitor corpus) into RAG ──────────
+    # Stub-provider entries are refused — only real scraped rulings inform
+    # answers. Extraction is automatic, so the doc text says so.
+    for r in load_sc_rulings_for_rag():
+        doc_text = (
+            f"RECENT SC RULING: {r.get('title', '')}\n"
+            f"DATE: {r.get('date', '')}  SOURCE: {r.get('source', '')}\n"
+            f"SECTIONS: {', '.join(r.get('sections', []))}\n"
+            f"RATIO: {r.get('ratio', '')}\n"
+            f"PRACTICE IMPACT: {r.get('practice_impact', '')}"
+        )
+        documents.append(doc_text)
+        metadatas.append({
+            "type": "sc_ruling",
+            "title": r.get("title", ""),
+            "date": r.get("date", ""),
+            "source": r.get("source", ""),
+        })
+        ids.append(f"sc_{r.get('id', abs(hash(r.get('title', ''))) % 10**8)}")
+
     return documents, metadatas, ids
+
+
+def load_landmark_judgments() -> list:
+    """Landmark judgments with good-law status from legal_corpus JSON."""
+    import json as _json
+    path = CORPUS_DIR / "landmark_judgments.json"
+    try:
+        data = _json.loads(path.read_text(encoding="utf-8"))
+        return data.get("judgments", [])
+    except (OSError, ValueError):
+        return []
+
+
+def load_sc_rulings_for_rag() -> list:
+    """Scraped SC rulings (data/monitor_corpus/sc_rulings.json), excluding
+    stub-provider entries — fake rulings must never ground real answers."""
+    import json as _json
+    path = Path(__file__).parent / "monitor_corpus" / "sc_rulings.json"
+    try:
+        data = _json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    rulings = data if isinstance(data, list) else data.get("rulings", [])
+    return [r for r in rulings if r.get("source") and r.get("source") != "stub"]
 
 
 if __name__ == "__main__":

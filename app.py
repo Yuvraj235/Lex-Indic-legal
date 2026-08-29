@@ -169,7 +169,7 @@ def app_page():
 # highlighted yellow and the BNS equivalent inserted in red right after it.
 # Plain-text path also available for the in-page preview.
 # ═══════════════════════════════════════════════════════════════════════════════
-from ipc_bns_converter import convert_text, convert_docx
+from ipc_bns_converter import convert_text, convert_docx, convert_text_multi_summary
 
 
 @app.route("/convert")
@@ -192,10 +192,12 @@ def convert_text_endpoint():
     if len(text) > 200_000:
         return jsonify({"error": "Text too large (limit 200,000 chars)."}), 400
 
-    annotated, summary = convert_text(text)
+    # v1.9: multi-statute pass — IPC→BNS plus CrPC→BNSS and Evidence Act→BSA
+    # (previously only the migration audit used the multi maps).
+    annotated, summary = convert_text_multi_summary(text)
     return jsonify({
         "annotated": annotated,
-        "summary": summary.to_dict(),
+        "summary": summary,
     })
 
 
@@ -274,6 +276,7 @@ import erasure as erasure_module    # Day 28 (DPDP)
 import billing as billing_module    # Day 31 (Stripe)
 import prefs as prefs_module         # Day 34 (notification preferences)
 import uploads as uploads_module     # Day 35 (per-matter document storage)
+import verifier as verifier_module   # v1.9 — runtime citation verification
 
 
 @app.route("/monitors")
@@ -670,6 +673,126 @@ def admin_readiness():
     if guard: return guard
     import readiness
     return jsonify(readiness.gather_readiness())
+
+
+@app.route("/audit")
+def audit_page():
+    """Statute Migration Audit — scan a document set for outdated IPC/CrPC/IEA refs."""
+    return render_template("audit.html")
+
+
+@app.route("/audit/api/scan", methods=["POST"])
+def audit_scan():
+    """Scan uploaded docs (multipart 'files') OR JSON {"docs":[{name,text}]} →
+    aggregate migration-audit report. Reuses migration_audit; unmapped refs are
+    reported honestly, never guessed."""
+    import migration_audit as ma
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+        docs = [ma.audit_text(d.get("name", "doc"), d.get("text", ""))
+                for d in (data.get("docs") or [])]
+        return jsonify(ma.aggregate(docs).to_dict())
+    files = request.files.getlist("files")
+    if not files:
+        return jsonify({"error": "Upload files in the 'files' field, or POST JSON "
+                                 "{\"docs\": [{\"name\", \"text\"}]}."}), 400
+    import tempfile
+    from werkzeug.utils import secure_filename
+    docs = []
+    with tempfile.TemporaryDirectory() as td:
+        for f in files:
+            if not f.filename:
+                continue
+            name = secure_filename(f.filename) or "doc"
+            if Path(name).suffix.lower() not in ma.SUPPORTED_SUFFIXES:
+                continue
+            p = Path(td) / name
+            f.save(str(p))
+            try:
+                docs.append(ma.audit_text(f.filename, ma.extract_text(p)))
+            except Exception:  # noqa: BLE001 — one bad upload shouldn't fail the scan
+                continue
+    return jsonify(ma.aggregate(docs).to_dict())
+
+
+# ─── WhatsApp inbound intake → draft → file ─────────────────────────────────
+def _wa_draft(story: str) -> str:
+    """Generate a draft from an intake story, reusing the warm RAG + Groq path."""
+    from main import LEXI_SYSTEM_PROMPT
+    ctx, _sources = retrieve_relevant_sections_structured(
+        rag_collection, story, n_results=6)
+    prompt = build_legal_prompt(story, ctx)
+    comp = groq_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "system", "content": LEXI_SYSTEM_PROMPT},
+                  {"role": "user", "content": prompt}],
+        temperature=0.2, max_tokens=4096)
+    return comp.choices[0].message.content or ""
+
+
+def _wa_file_draft(sender: str, story: str, draft: str) -> str:
+    """File the intake story + draft into a per-sender folder. Returns the ref.
+
+    v1.9: drafts are filed as PENDING ADVOCATE REVIEW — the verifier verdict is
+    stored alongside so the reviewing advocate sees the citation check first.
+    """
+    import re as _re
+    from datetime import datetime
+    safe = _re.sub(r"[^0-9A-Za-z]", "_", sender)
+    folder = Path("outputs/wa_intake") / f"{safe}_{datetime.now():%Y%m%d_%H%M%S}"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "intake_story.txt").write_text(story, encoding="utf-8")
+    try:
+        verification = verifier_module.verify_analysis(parse_sections(draft))
+        stamp = verifier_module.verification_stamp(verification)
+    except Exception:  # noqa: BLE001 — verification must never block filing
+        verification, stamp = None, "CITATION CHECK: could not run."
+    header = ("STATUS: PENDING ADVOCATE REVIEW — AI-generated draft, "
+              "not approved for filing.\n" + stamp + "\n"
+              + "═" * 70 + "\n\n")
+    (folder / "draft.txt").write_text(header + draft, encoding="utf-8")
+    (folder / "status.json").write_text(json.dumps({
+        "status": "pending_review",
+        "verification": verification,
+        "filed_at": datetime.now().isoformat(timespec="seconds"),
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    return str(folder.relative_to(Path("outputs")))
+
+
+@app.route("/wa/inbound", methods=["POST"])
+def wa_inbound():
+    """Inbound WhatsApp webhook (Twilio form OR MSG91/generic JSON). Runs a
+    multi-turn intake; on completion drafts via the analysis pipeline, files it,
+    and replies (TwiML for Twilio, JSON otherwise)."""
+    import intake as intake_module
+    is_twilio = bool(request.form.get("From") or request.form.get("Body"))
+    form = request.form.to_dict() if request.form else {}
+    body = request.get_json(silent=True) if request.is_json else None
+    sender, text = intake_module.parse_inbound(form, body)
+    if not sender:
+        return jsonify({"error": "Could not determine sender."}), 400
+
+    session = intake_module.load_session(sender)
+    session, reply = intake_module.handle_message(session, text or "")
+
+    draft_ref = None
+    if session.done:
+        story = intake_module.compose_story(session)
+        try:
+            draft_ref = _wa_file_draft(sender, story, _wa_draft(story))
+            reply += f"\n\n(Draft filed: {draft_ref})"
+        except Exception as e:  # noqa: BLE001 — reply even if drafting fails
+            print(f"[wa] draft failed for {sender}: {e}")
+        intake_module.clear_session(sender)
+    else:
+        intake_module.save_session(session)
+
+    if is_twilio:
+        from xml.sax.saxutils import escape
+        twiml = (f"<?xml version='1.0' encoding='UTF-8'?>"
+                 f"<Response><Message>{escape(reply)}</Message></Response>")
+        return app.response_class(twiml, mimetype="application/xml")
+    return jsonify({"reply": reply, "done": session.done, "draft": draft_ref})
 
 
 # ─── Day 36: per-matter analysis history (read audit log filtered by matter_id) ─
@@ -1256,14 +1379,16 @@ def analyze():
         # ── Step 3: Save text output ──────────────────────────────────────────
         txt_path = save_raw_output(client_story, ai_response)
 
-        # ── Step 4: Generate PDF ──────────────────────────────────────────────
-        pdf_path = generate_pdf(txt_path)
-        pdf_filename = Path(pdf_path).name
-
-        # ── Step 5: Parse sections for the frontend ───────────────────────────
+        # ── Step 4: Parse sections + runtime citation verification ────────────
+        # Verification runs BEFORE the PDF so the verdict is stamped into it.
         with open(txt_path, "r", encoding="utf-8") as f:
             raw_text = f.read()
         sections = parse_sections(raw_text)
+        verification = verifier_module.verify_analysis(sections)
+
+        # ── Step 5: Generate PDF (carries the verification panel) ─────────────
+        pdf_path = generate_pdf(txt_path, verification=verification)
+        pdf_filename = Path(pdf_path).name
 
         # Clean markdown bold markers for web display
         for key in sections:
@@ -1271,6 +1396,10 @@ def analyze():
                 sections[key] = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", sections[key])
 
         # ── Audit log: success ────────────────────────────────────────────────
+        _audit_extra["ungrounded_citations"] = verification["ungrounded"] or None
+        _audit_extra["citation_check"] = (
+            "passed" if verification["all_verified"] else "attention"
+        )
         request_id = audit.log_request(
             endpoint="/analyze",
             client_ip=client_ip,
@@ -1302,6 +1431,7 @@ def analyze():
             "pdf_filename":      pdf_filename,
             "generated":         sections.get("generated", datetime.now().strftime("%d %B %Y, %H:%M:%S")),
             "sources":           sources,
+            "verification":      verification,
             "language":          language,
             "request_id":        request_id,
             "error":             None,
@@ -1448,9 +1578,33 @@ def load_case(filename):
 # ═══════════════════════════════════════════════════════════════════════════════
 @app.route("/download/<filename>")
 def download(filename):
-    """Serve a PDF file from the outputs/ folder."""
+    """Serve a PDF file from the outputs/ folder.
+
+    Human-in-the-loop gate (v1.9): the export requires ?approved=1, which the
+    UI only sets after the advocate ticks the review-confirmation checkbox.
+    Every approved export is audit-logged with the approver's identity.
+    """
     if not re.match(r"^CaseBrief_\d{8}_\d{6}\.pdf$", filename):
         return "Invalid filename.", 400
+    if request.args.get("approved") != "1":
+        return jsonify({
+            "error": ("This AI-generated draft must be reviewed and approved "
+                      "by an advocate before download. Tick the review "
+                      "confirmation to enable the export."),
+        }), 403
+    _u = _current_user()
+    audit.log_request(
+        endpoint="/download",
+        client_ip=(request.headers.get("X-Forwarded-For") or request.remote_addr or ""),
+        user_agent=request.headers.get("User-Agent", ""),
+        status="ok",
+        pdf_filename=filename,
+        extra={
+            "approved_by": ((_u or {}).get("email") or "anonymous"),
+            "user_id":     (_u or {}).get("id") or None,
+            "firm_id":     (_u or {}).get("firm_id") or None,
+        },
+    )
     return send_from_directory(
         Path("outputs").resolve(),
         filename,

@@ -41,6 +41,7 @@ import argparse
 import json
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -54,10 +55,11 @@ try:
 except ImportError:
     pass
 
-import data.bns_knowledge_base as bns_kb
+# Grounding/citation extraction lives in the runtime verifier (verifier.py) —
+# the same functions run inside /analyze, so eval and serving can never drift.
+from verifier import cited_sections, known_bns_sections  # noqa: F401 (re-exported)
 
 OUT_DIR = ROOT / "data" / "finetune"
-MAPPING_PATH = ROOT / "data" / "legal_corpus" / "ipc_bns_mapping.json"
 
 SECTION_KEYS = [f"section_{i}" for i in range(1, 7)]   # the six /analyze sections
 
@@ -96,40 +98,86 @@ GOLD_SCENARIOS = [
         "must_cite": ["85"],
         "must_mention": ["Arnesh Kumar", "notice"],  # arrest safeguards
     },
+    # ── Hard cases (added after the 2026-07-20 stress test): facts written the
+    # way a client talks, no legal keywords, traps between look-alike sections.
+    {
+        "id": "snatching_not_robbery",
+        "story": ("My client, a college student, was riding pillion on her friend's "
+                  "scooter in Pune. When they slowed at a speed-breaker, a man on a "
+                  "motorcycle came from behind, grabbed the mobile phone she was "
+                  "holding in her hand, and sped away instantly. Nobody was "
+                  "threatened or hurt, no weapon was shown, and the whole thing was "
+                  "over in two seconds. The phone cost Rs 80,000 and had her "
+                  "research data. CCTV of the road shows the incident."),
+        "must_cite": ["304"],              # snatching — NOT robbery (no force/threat)
+        "must_mention": ["snatching"],
+    },
+    {
+        "id": "hit_and_run_negligence",
+        "story": ("Last Sunday around 11 pm my client's father, aged 61, was walking "
+                  "back from the temple on the service road. A speeding truck hit him "
+                  "and he died on the spot. The driver did not stop, did not call "
+                  "anyone, and drove away in the dark. Police traced the truck two "
+                  "days later from a toll camera. The driver says he did not realise "
+                  "he had hit a person. There was no enmity between them."),
+        "must_cite": ["106"],              # death by negligence — NOT murder
+        "must_mention": ["negligence"],
+    },
+    {
+        "id": "treasurer_breach_of_trust",
+        "story": ("My client's housing society elected a treasurer three years ago. "
+                  "Every month he collected Rs 2.5 lakh in maintenance money from 90 "
+                  "flats into the society account, to which only he had access. An "
+                  "audit last month found that over two years he quietly moved Rs 31 "
+                  "lakh into fixed deposits in his own name and his wife's name. When "
+                  "confronted he said it was a 'temporary arrangement'. He has now "
+                  "stopped attending meetings."),
+        "must_cite": ["316"],              # entrusted first → breach of trust, not cheating
+        "must_mention": ["breach of trust"],
+    },
+    {
+        "id": "mob_lynching_group_murder",
+        "story": ("My client's brother, a migrant scrap dealer, was passing through a "
+                  "village in the evening. A message had been circulating on WhatsApp "
+                  "that child-lifters were roaming the area. A crowd of more than ten "
+                  "villagers surrounded him, called him a child-lifter, tied him to a "
+                  "pole and beat him with sticks for an hour. He died in hospital. "
+                  "Videos from phones of bystanders identify at least seven "
+                  "attackers. The family wants the strictest possible case."),
+        "must_cite": ["103"],              # 103(2) murder by group / mob lynching
+        "must_mention": ["lynching"],
+    },
+    {
+        "id": "fake_army_qr_scam",
+        "story": ("My client listed his almirah for sale on a marketplace app. A "
+                  "buyer contacted him saying he was an army jawan being posted out, "
+                  "sent a photo of an ID card, and insisted on paying in advance "
+                  "through a QR code. He sent a QR and said 'scan this and you will "
+                  "receive the money'. My client scanned it three times and Rs 47,000 "
+                  "was debited from his account instead. The number is now switched "
+                  "off. He has screenshots of the entire chat."),
+        "must_cite": ["318"],              # cheating
+        "must_mention": ["cheating"],
+    },
+    {
+        "id": "acid_attack_mapping_layer",
+        "story": ("A man my client had refused to marry stopped her outside her "
+                  "coaching class and threw a corrosive liquid on her face from a "
+                  "steel container. She has permanent burn scars on her face and neck "
+                  "and partial loss of vision in one eye. Doctors say two more "
+                  "surgeries are needed. The man had threatened her twice before on "
+                  "the phone, saying he would 'ruin her face'. She wants him punished "
+                  "as severely as the law allows."),
+        "must_cite": ["124"],              # acid attack — reached via IPC 326A mapping
+        "must_mention": ["acid"],
+    },
 ]
-
-_BNS_CITE_RE = re.compile(r"BNS\s*(?:Section\s*)?(\d{1,4}[A-Z]?(?:\(\d+\))?)", re.I)
-_SEC_NUM_RE = re.compile(r"(\d{1,4}[A-Z]?(?:\(\d+\))?)")
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Pure scoring (unit-tested) — no network
 # ──────────────────────────────────────────────────────────────────────────────
 def _norm(s: str) -> str:
     return s.upper().replace(" ", "")
-
-
-def known_bns_sections() -> set[str]:
-    """Every BNS section number our KB / mapping vouches for. A citation outside
-    this set is ungrounded relative to what /analyze was actually given."""
-    nums: set[str] = set()
-    for s in bns_kb.BNS_SECTIONS:
-        m = _SEC_NUM_RE.search(s.get("section", ""))
-        if m:
-            nums.add(_norm(m.group(1)))
-    try:
-        mp = json.loads(MAPPING_PATH.read_text(encoding="utf-8"))
-        for v in mp.values():
-            m = _SEC_NUM_RE.search(v.get("bns", ""))
-            if m:
-                nums.add(_norm(m.group(1)))
-    except (OSError, json.JSONDecodeError):
-        pass
-    return nums
-
-
-def cited_sections(text: str) -> set[str]:
-    return {_norm(n) for n in _BNS_CITE_RE.findall(text or "")}
 
 
 def count_sections_present(sections: dict, min_len: int = 40) -> int:
@@ -206,18 +254,52 @@ def main() -> None:
     ap.add_argument("--base-url", default="http://localhost:8080")
     ap.add_argument("--judge", action="store_true", help="Add a Groq holistic 1-5 score.")
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--resume", action="store_true",
+                    help="Skip scenarios already in pipeline_eval_report.json "
+                         "(lets a run finish across rate-limit interruptions / days).")
+    ap.add_argument("--retries", type=int, default=1,
+                    help="Retries per scenario on failure, with backoff (default 1).")
+    ap.add_argument("--retry-wait", type=int, default=1500,
+                    help="Seconds to wait between retries (default 1500 = 25 min, "
+                         "sized for Groq's rolling free-tier window).")
     args = ap.parse_args()
 
     scenarios = GOLD_SCENARIOS[:args.limit] if args.limit else GOLD_SCENARIOS
     known = known_bns_sections()
-    print(f"Grading {len(scenarios)} scenario(s) against {args.base_url} …\n")
 
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    report_path = OUT_DIR / "pipeline_eval_report.json"
+
+    # Resume: keep prior good results, only run the scenarios still missing.
     results = []
-    for sc in scenarios:
+    done_ids: set[str] = set()
+    if args.resume and report_path.exists():
         try:
-            sections = fetch_analysis(args.base_url, sc["story"])
-        except Exception as e:  # noqa: BLE001
-            print(f"  ! {sc['id']}: /analyze failed: {e}")
+            results = json.loads(report_path.read_text(encoding="utf-8")).get("results", [])
+            done_ids = {g["scenario"] for g in results}
+            print(f"Resuming — {len(done_ids)} scenario(s) already graded.\n")
+        except (OSError, json.JSONDecodeError):
+            results, done_ids = [], set()
+
+    def _write_report():
+        report_path.write_text(
+            json.dumps({"results": results}, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    todo = [sc for sc in scenarios if sc["id"] not in done_ids]
+    print(f"Grading {len(todo)} scenario(s) against {args.base_url} …\n")
+
+    for sc in todo:
+        sections = None
+        for attempt in range(1, args.retries + 1):
+            try:
+                sections = fetch_analysis(args.base_url, sc["story"])
+                break
+            except Exception as e:  # noqa: BLE001
+                print(f"  ! {sc['id']}: attempt {attempt}/{args.retries} failed: {e}")
+                if attempt < args.retries:
+                    time.sleep(args.retry_wait)
+        if sections is None:
+            print(f"  ! {sc['id']}: giving up (will retry on next --resume run)")
             continue
         g = grade_analysis(sections, sc, known)
         g["composite"] = composite(g)
@@ -225,15 +307,14 @@ def main() -> None:
             combined = "\n".join((sections.get(k) or "") for k in SECTION_KEYS)
             g["judge"] = llm_judge(combined, sc)
         results.append(g)
+        _write_report()   # checkpoint after every scenario — never lose progress
         jw = f"  judge {g['judge'].get('score')}" if args.judge else ""
         print(f"  {sc['id']:32s} composite {g['composite']:.2f}  "
               f"sections {g['sections_present']}/6  "
               f"cite {g['citations'][0]}/{g['citations'][1]}  "
               f"ungrounded {len(g['ungrounded_citations'])}{jw}")
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    (OUT_DIR / "pipeline_eval_report.json").write_text(
-        json.dumps({"results": results}, indent=2, ensure_ascii=False), encoding="utf-8")
+    _write_report()
     lines = ["# Lex-Indic — full-pipeline answer eval", "",
              "| Scenario | Composite | Sections | Citations | Mentions | Ungrounded |",
              "|----------|----------:|---------:|----------:|---------:|-----------:|"]
