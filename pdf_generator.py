@@ -135,13 +135,21 @@ def parse_sections(text: str) -> dict:
     result["generated"] = date_match.group(1).strip() if date_match else datetime.now().strftime("%d %B %Y, %H:%M:%S")
 
     # ── Extract each numbered section ─────────────────────────────────────────
+    # Headings are matched by number + a title keyword at the start of a line,
+    # tolerating markdown and punctuation models add ("**Section 2 — Legal
+    # Analysis under BNS, 2023**", "## SECTION 4: Draft FIR"). Requiring the
+    # keyword keeps body lines like "Section 3 of the Act…" from matching.
+    titles = {
+        "section_1": r"IMMEDIATE|CLIENT\s+ADVISORY|ADVISORY",
+        "section_2": r"LEGAL\s+ANALYSIS",
+        "section_3": r"CASE\s+STRATEGY|STRATEGY",
+        "section_4": r"DRAFT\s+(?:FIRST\s+INFORMATION|FIR)|FIRST\s+INFORMATION|FIR\b",
+        "section_5": r"(?:DRAFT\s+)?LEGAL\s+NOTICE",
+        "section_6": r"POLICE",
+    }
     section_patterns = {
-        "section_1": r"SECTION 1:\s*IMMEDIATE CLIENT ADVISORY",
-        "section_2": r"SECTION 2:\s*LEGAL ANALYSIS UNDER BNS 2023",
-        "section_3": r"SECTION 3:\s*CASE STRATEGY.*?ASSESSMENT",
-        "section_4": r"SECTION 4:\s*DRAFT FIRST INFORMATION REPORT.*?\(FIR\)",
-        "section_5": r"SECTION 5:\s*DRAFT LEGAL NOTICE",
-        "section_6": r"SECTION 6:\s*POLICE HELP REPORT",
+        key: rf"(?m)^[ \t>#*_]*SECTION\s*{key[-1]}\s*[:.\-–—)]*\s*[*_]*\s*(?:{title})"
+        for key, title in titles.items()
     }
 
     # Find positions of all section headings
@@ -1016,10 +1024,13 @@ def generate_pdf(input_txt_path: str, verification: dict = None) -> str:
     print("    ✓ Disclaimer (Final page)")
 
     # ── Save PDF ──────────────────────────────────────────────────────────────
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # Same stem as the source txt, so the pair is exact rather than guessed
+    # from timestamps.
     output_dir = Path("outputs")
     output_dir.mkdir(exist_ok=True)
-    output_path = output_dir / f"CaseBrief_{timestamp}.pdf"
+    m = re.match(r"case_analysis_(.+)\.txt$", Path(input_txt_path).name)
+    stem = m.group(1) if m else datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = output_dir / f"CaseBrief_{stem}.pdf"
 
     pdf.output(str(output_path))
     return str(output_path)

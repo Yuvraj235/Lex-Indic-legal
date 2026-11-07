@@ -83,16 +83,21 @@ run the cache holds every document's embedding. Set
 The only operation that still needs Gemini is embedding the **query** —
 which contains the client story.
 
-### Option B — Swap to a local embedding model
+### Option B — Local embeddings through Ollama (zero sub-processors)
 
-For full zero-sub-processor mode, replace Gemini embeddings with a local
-`sentence-transformers/all-mpnet-base-v2` (768-dim, runs CPU-only in
-~80ms per query). This requires a code change in `main.py` — search
-for `GeminiEmbeddingFunction` and replace with `SentenceTransformerEmbeddingFunction`.
+```bash
+ollama pull nomic-embed-text
+# .env
+LLM_PROVIDER=ollama
+EMBEDDINGS_PROVIDER=ollama
+OLLAMA_EMBED_MODEL=nomic-embed-text   # default; any Ollama embedding model works
+```
 
-**Documented as v1.5 work**: full local-mode `--air-gapped` flag that
-sets both `LLM_PROVIDER=ollama` and switches embeddings to local. Until
-then, document Option A in your DPIA and your customer's GC.
+The first start re-embeds the knowledge base locally (cached afterwards, in a
+separate namespace from the Gemini vectors). `/llm/status` then reports
+`"fully_local": true` — the only configuration in which no client data leaves
+the server. A chat model can't stand in for the embedding model: recent Ollama
+versions refuse embeddings from generative models.
 
 ---
 

@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import os
 import secrets
 import sqlite3
 import time
@@ -38,6 +37,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Optional
+
+import envmode
 
 _DB_PATH = Path("outputs") / "auth.db"   # shares the auth.py SQLite DB
 _LOCK = Lock()
@@ -83,8 +84,8 @@ def init_db():
 
 
 def _hash_secret(secret: str) -> str:
-    """SHA-256 of secret + deployment salt; reuses AUDIT_HASH_SALT."""
-    salt = os.getenv("AUDIT_HASH_SALT", "lex-indic-dev")
+    """SHA-256 of secret + deployment secret (envmode.secret_key)."""
+    salt = envmode.secret_key()
     return hashlib.sha256(f"lex-api|{salt}|{secret}".encode()).hexdigest()
 
 
@@ -180,16 +181,19 @@ def list_keys(*, user_id: str = "") -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def revoke_key(key_id: str, *, grace_period_min: int = 60) -> bool:
+def revoke_key(key_id: str, *, grace_period_min: int = 60,
+               user_id: str | None = None) -> bool:
+    """Revoke a key. With user_id, only if that user owns it (None: operator)."""
     init_db()
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    sql = ("UPDATE api_keys SET revoked_at = ?, grace_period_min = ? "
+           "WHERE key_id = ? AND revoked_at IS NULL")
+    args = [now, int(grace_period_min), key_id]
+    if user_id is not None:
+        sql += " AND user_id = ?"
+        args.append(user_id)
     with _db() as c:
-        cur = c.execute(
-            "UPDATE api_keys SET revoked_at = ?, grace_period_min = ? "
-            "WHERE key_id = ? AND revoked_at IS NULL",
-            (now, int(grace_period_min), key_id),
-        )
-        return cur.rowcount > 0
+        return c.execute(sql, args).rowcount > 0
 
 
 # ─── In-memory rate limiter ─────────────────────────────────────────────────

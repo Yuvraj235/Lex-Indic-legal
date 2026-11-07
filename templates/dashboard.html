@@ -187,44 +187,23 @@
   </div>
 
   <div class="access-note">
-    <strong>Token-gated.</strong>  This page checks <code>X-Admin-Token</code>
-    header or <code>?token=...</code> query param against the
-    <code>ADMIN_TOKEN</code> in your .env.  If <code>ADMIN_TOKEN</code> is unset
-    (dev mode), the dashboard is open.  Production: always set the token.
+    <strong>Token-gated.</strong>  The data behind this page requires the
+    <code>X-Admin-Token</code> header to match <code>ADMIN_TOKEN</code>.  With
+    <code>ADMIN_TOKEN</code> unset the admin API is closed, except when
+    <code>LEX_ENV=development</code>.
   </div>
 </main>
 
+<script src="/static/admin-auth.js"></script>
 <script>
   const $ = id => document.getElementById(id);
   const escapeHtml = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-  function token(){
-    // Allow the token to come via ?token= so the operator can bookmark it
-    const urlT = new URLSearchParams(location.search).get('token');
-    return urlT || localStorage.getItem('lexindic.admin_token') || '';
-  }
-
-  function withAuth(url){
-    const t = token();
-    return t ? `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(t)}` : url;
-  }
-
   async function loadData(){
     try {
-      const r = await fetch(withAuth('/dashboard/data.json'));
-      if (r.status === 401){
-        $('content').innerHTML = `
-          <div class="card" style="text-align:center;padding:50px">
-            <h2 style="font-family:Playfair,serif;font-size:22px;margin-bottom:10px">Token required</h2>
-            <p style="color:var(--grey-700);font-size:14px;max-width:480px;margin:0 auto 14px">
-              Add <code>?token=YOUR_ADMIN_TOKEN</code> to the URL, or paste your token below:
-            </p>
-            <input type="text" id="tokenInput" placeholder="ADMIN_TOKEN value"
-                   style="width:280px;padding:8px 10px;border:1px solid var(--grey-300);border-radius:6px;font-family:Menlo;font-size:12px">
-            <button onclick="saveToken()" style="margin-left:6px;padding:8px 16px;
-                            background:linear-gradient(135deg,var(--gold),var(--gold-light));
-                            border:none;border-radius:6px;font-weight:600;cursor:pointer">Save</button>
-          </div>`;
+      const r = await lexAdmin.fetch('/dashboard/data.json');
+      if (r.status === 401 || r.status === 503){
+        lexAdmin.prompt($('content'), loadData);
         return;
       }
       const d = await r.json();
@@ -233,11 +212,6 @@
       $('content').innerHTML = `<div class="empty" style="color:var(--red)">Load failed: ${escapeHtml(e.message)}</div>`;
     }
   }
-
-  window.saveToken = () => {
-    const t = document.getElementById('tokenInput').value.trim();
-    if (t){ localStorage.setItem('lexindic.admin_token', t); loadData(); }
-  };
 
   function render(d){
     $('updatedStamp').textContent = 'Last refreshed: ' + d.generated_at.replace('T',' ').slice(0,19);

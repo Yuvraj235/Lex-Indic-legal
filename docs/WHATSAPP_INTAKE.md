@@ -13,6 +13,16 @@ drafts via the analysis pipeline and files the draft for the advocate to review.
   + Groq path) and files `intake_story.txt` + `draft.txt` under
   `outputs/wa_intake/<sender>_<ts>/`.
 
+## Authentication (required)
+`/wa/inbound` refuses calls it can't attribute to your messaging provider —
+otherwise anyone could post as any client's number.
+- **Twilio:** set `TWILIO_AUTH_TOKEN`; every request's `X-Twilio-Signature` is
+  checked. If Twilio calls a URL different from what the server sees (e.g. a
+  tunnel), set `WA_PUBLIC_URL` to the exact webhook URL configured in Twilio.
+- **MSG91 / n8n:** set `WA_INBOUND_TOKEN` to a long random value and send it as
+  the `X-Lex-Inbound-Token` header, or append `?token=<value>` to the webhook URL.
+- With neither set the endpoint returns 403, except under `LEX_ENV=development`.
+
 ## Wiring a provider
 
 ### Option A — Twilio WhatsApp (fastest to test)

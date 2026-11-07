@@ -66,11 +66,13 @@ QUESTIONS: list[tuple[str, str, str]] = [
      "Default deployment: all data — including audit logs and generated "
      "PDFs — is stored on the customer's own server in India. Lex-Indic "
      "does not operate a SaaS multi-tenant cloud. For the on-premise "
-     "deployment, no data ever leaves the customer's VPC. "
-     "Sub-processor exception: the client story is transmitted to Groq "
-     "(US) and Google Gemini (US) for inference and embeddings. Customer "
-     "may opt out by hosting Llama-3.3-70B locally via Ollama (documented "
-     "alternative), in which case zero data leaves India."),
+     "deployment, stored data stays in the customer's VPC. "
+     "Sub-processor exception: in the default configuration the client "
+     "story is transmitted to Groq (US) for generation and Google Gemini "
+     "(US) for search embeddings. Both can be replaced: LLM_PROVIDER=ollama "
+     "runs generation locally and EMBEDDINGS_PROVIDER=ollama runs "
+     "embeddings locally. Only with both set does no client data leave "
+     "the customer's server; /llm/status reports this as fully_local."),
 
     ("DPDP Act 2023",
      "How is consent obtained from the Data Principal (the firm's client)?",
@@ -175,15 +177,17 @@ QUESTIONS: list[tuple[str, str, str]] = [
     # ─── 4. Sub-processors ─────────────────────────────────────────────
     ("Sub-processors",
      "List your sub-processors.",
-     "(1) Groq Inc. (US) — inference for Llama-3.3-70B. Data shared: "
+     "(1) Groq Inc. (US) — inference for the configured open-weight model "
+     "(default GPT-OSS-120B; the exact model is recorded per request in the "
+     "audit log). Data shared: "
      "client story + retrieved BNS sections + system prompt. Retention: "
      "Groq's stated policy is no retention beyond the request lifecycle. "
      "(2) Google LLC (US) — Gemini embedding-001 for vector search. "
      "Data shared: client story (for query embedding); document text "
      "(for KB indexing — public BNS text only, no PII). (3) For "
-     "deployments that opt out of (1) and (2), local Llama-3.3-70B via "
-     "Ollama + local sentence-transformers embeddings remove all "
-     "sub-processors."),
+     "deployments that opt out of (1) and (2), a local open-weight model and "
+     "local embeddings via Ollama (LLM_PROVIDER=ollama, "
+     "EMBEDDINGS_PROVIDER=ollama) remove all sub-processors."),
 
     ("Sub-processors",
      "Are sub-processors notified to customers when added?",
@@ -228,10 +232,12 @@ QUESTIONS: list[tuple[str, str, str]] = [
 
     ("AI",
      "What is the model and how is it updated?",
-     "Groq Llama-3.3-70B (versatile). Temperature 0.2. Updated only when "
-     "Groq's pinned model version changes, which is documented in their "
-     "release notes and surfaced to customers via the audit log "
-     "(`model` field)."),
+     "An open-weight model served by Groq (default GPT-OSS-120B, set by "
+     "GROQ_MODEL), temperature 0.2. A model change is a deliberate config "
+     "change, benchmarked first on the fixed evaluation scenarios, and every "
+     "request records the model that answered in the audit log (`model` "
+     "field). Every answer is checked against the knowledge base before it "
+     "is shown."),
 
     # ─── 7. Liability and contracts ────────────────────────────────────
     ("Contractual",
@@ -299,7 +305,7 @@ DATA_FLOW_STAGES = [
     },
     {
         "stage": "4. Inference (Groq)",
-        "actor": "Groq Llama-3.3-70B (US)",
+        "actor": "Groq-hosted open-weight model (US)",
         "what": "Client story + retrieved BNS context + system prompt sent to "
                 "Groq for legal analysis. Response streamed back in ~5 seconds.",
         "data": "Client story + retrieved BNS sections + prompt.",

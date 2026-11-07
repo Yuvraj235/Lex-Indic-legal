@@ -74,6 +74,13 @@ def gather_readiness() -> dict:
         "Audit-log salt", "weak" if weak else "set", live=not weak, ready=not weak,
         detail="AUDIT_HASH_SALT must be a long random per-deployment secret."))
 
+    secret = os.getenv("SECRET_KEY") or ""
+    items.append(_live_subsystem(
+        "Signing secret", "set" if len(secret) >= 16 else "falls back to salt",
+        live=len(secret) >= 16, ready=len(secret) >= 16,
+        detail="SECRET_KEY: separate from AUDIT_HASH_SALT so erasure-driven salt "
+               "rotation doesn't log users out."))
+
     admin = os.getenv("ADMIN_TOKEN") or ""
     items.append(_live_subsystem(
         "Admin token", "set" if admin else "unset", live=bool(admin),

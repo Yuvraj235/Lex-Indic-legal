@@ -9,7 +9,7 @@ Two-part Hindi support:
   (1) Static UI strings translated to Hindi (Devanagari) — toggle on the
       front-end persists in localStorage; the language= query param also works.
   (2) A `?lang=hi` flag on /analyze that adds a system instruction asking
-      Groq Llama-3.3-70B to generate the six legal sections in Hindi
+      the configured model to generate the six legal sections in Hindi
       (mixed Devanagari + English legal citations, which is how Indian
       bilingual pleadings are actually written).
 

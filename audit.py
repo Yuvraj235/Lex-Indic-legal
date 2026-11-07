@@ -60,17 +60,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+import envmode
+import llm_provider
+
 # ──────────────────────────────────────────────────────────────────────────────
 # CONFIG (read once at import time)
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Salt used when hashing the client story. Must be stable across restarts so
 # duplicate-detection works, but unique per deployment so hashes don't collide
-# across customers. Default is dev-only; production deployments MUST override.
-_AUDIT_SALT = os.getenv(
-    "AUDIT_HASH_SALT",
-    "lex-indic-default-dev-salt-CHANGE-ME-IN-PRODUCTION",
-)
+# across customers. Read per call (envmode.audit_salt) so it is never frozen
+# before .env loads; production refuses to run without one.
 
 _AUDIT_DIR = Path(os.getenv("AUDIT_LOG_DIR", "outputs/audit"))
 
@@ -95,7 +95,7 @@ def hash_story(story: str) -> str:
     intended to resist cryptographic attacks.
     """
     h = hashlib.sha256()
-    h.update(_AUDIT_SALT.encode("utf-8"))
+    h.update(envmode.audit_salt().encode("utf-8"))
     h.update(b"\x00")
     h.update((story or "").encode("utf-8"))
     return f"sha256:{h.hexdigest()[:32]}"
@@ -131,7 +131,7 @@ def log_request(
     response_chars: int = 0,
     error: str = None,
     pdf_filename: str = None,
-    model: str = "llama-3.3-70b-versatile",
+    model: str | None = None,
     extra: dict = None,
 ) -> str:
     """
@@ -151,7 +151,7 @@ def log_request(
         "story_hash":     hash_story(story),
         "story_length":   len(story or ""),
         "sources":        _normalize_sources(sources),
-        "model":          model,
+        "model":          model or llm_provider.active_model(),
         "status":         status,
         "duration_ms":    int(duration_ms),
         "response_chars": int(response_chars),

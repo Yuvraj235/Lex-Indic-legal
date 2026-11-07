@@ -13,6 +13,7 @@ execute the local, non-GPU steps (ingest + data build).
 from __future__ import annotations
 
 import argparse
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -55,7 +56,9 @@ def main() -> None:
     if args.run:
         for label, cmd in steps[:2]:
             print(f"--- running: {label} ---")
-            subprocess.run(cmd, shell=True, check=False)
+            # No shell: `firm` comes from the command line and is interpolated
+            # into cmd, so shell metacharacters in it must stay inert.
+            subprocess.run(shlex.split(cmd), check=False)
     else:
         print("Re-run with --run to execute the local steps 1-2; the GPU steps "
               "(3-4) stay manual on a rented GPU.")

@@ -220,7 +220,9 @@
     <p class="section-lead">
       Standard on-prem deployment. The two stages marked <strong>"Leaves
       India"</strong> can be eliminated by switching to the local-Ollama
-      path (Llama-3.3-70B + sentence-transformers running on your own GPU),
+      path (an open-weight model plus local embeddings, both through Ollama on
+      your own server — <code>LLM_PROVIDER=ollama</code> and
+      <code>EMBEDDINGS_PROVIDER=ollama</code>),
       bringing the data-residency story to 100%.
     </p>
     <div class="flow">

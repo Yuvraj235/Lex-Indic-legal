@@ -16,8 +16,10 @@ kill_timeout   = 30
 [env]
   PYTHONUNBUFFERED = "1"
   FLASK_APP        = "app"
-  # All other env (GEMINI_API_KEY, GROQ_API_KEY, ADMIN_TOKEN, AUDIT_HASH_SALT,
-  # MAIL_PROVIDER, etc.) goes via `fly secrets set …`.
+  LEX_ENV          = "production"
+  TRUST_PROXY_HOPS = "1"          # Fly's edge proxy sets X-Forwarded-For/-Proto
+  # All other env (GEMINI_API_KEY, GROQ_API_KEY, ADMIN_TOKEN, SECRET_KEY,
+  # AUDIT_HASH_SALT, MAIL_PROVIDER, etc.) goes via `fly secrets set …`.
 
 [http_service]
   internal_port = 8080

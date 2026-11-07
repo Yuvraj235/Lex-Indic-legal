@@ -67,7 +67,10 @@
   "IPC 498A": {
     "bns": "BNS 85",
     "title": "Matrimonial Cruelty",
-    "change": "Cognizable & Non-bailable retained"
+    "change": "Cognizable & Non-bailable retained; the definition of cruelty (the Explanation to 498A) is now BNS 86",
+    "also_bns": [
+      "BNS 86"
+    ]
   },
   "IPC 509": {
     "bns": "BNS 79",

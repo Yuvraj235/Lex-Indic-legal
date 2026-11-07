@@ -16,7 +16,7 @@ short_description: AI Junior Associate for Indian law — BNS transition engine
 
 [![Status](https://img.shields.io/badge/status-v1.9-success)]()
 [![Stack](https://img.shields.io/badge/stack-Flask%20%2B%20Three.js%20%2B%20ChromaDB-blue)]()
-[![Tests](https://img.shields.io/badge/tests-225%20passing-success)]()
+[![Tests](https://img.shields.io/badge/tests-447%20passing-success)]()
 [![SOC2](https://img.shields.io/badge/SOC2-9%2F10%20controls%20passing-success)]()
 [![API](https://img.shields.io/badge/API-v1%20%2B%20OpenAPI-blue)]()
 [![License](https://img.shields.io/badge/license-Educational-lightgrey)]()
@@ -46,6 +46,8 @@ filing.
 | Area | Change | File(s) | Why it matters |
 |---|---|---|---|
 | **Runtime citation verifier** | Every `/analyze` response is checked before it returns: each BNS/BNSS/BSA section is verified against the knowledge base + concordance, foreign (US/UK) reporters are flagged, and IPC-cited-without-a-BNS-equivalent is warned | `verifier.py`, `app.py` | The app catches its own hallucinations at request time — verified citations get a green badge, ungrounded ones a blocking warning. The offline eval reuses the same functions, so they can't drift. |
+| **Correctness checks + self-correction** | Beyond "does the section exist": IPC↔BNS pairings are checked against the government concordance ("BNS 302 (old IPC 302)" is caught — it's BNS 103), case law is checked against the curated judgments (unverified, overruled or wrongly-reported precedents are flagged), and citations written out in full ("Section 85 of the Bharatiya Nyaya Sanhita") are caught too. If a draft fails, the model gets one targeted correction pass naming each problem; the better draft wins | `verifier.py`, `app.py` | Matches the Supreme Court's zero-tolerance line on AI-fabricated precedents (2026 INSC 668) with a deterministic check, not a promise |
+| **Table answers** | "BNS equivalent of IPC 420?", "Is BNS 70 bailable?" are answered straight from the concordance and the knowledge base — no model call | `statute_lookup.py` | Questions with one right answer can't be hallucinated; the model is only used where judgment is needed |
 | **Verdict in the UI + PDF** | Green "citation check passed" / red "unverified — do not file" banner and per-citation chips; the verdict is stamped onto the PDF's disclaimer page | `templates/index.html`, `pdf_generator.py` | The trust signal is visible where the lawyer works and travels with the document. |
 | **Human-in-the-loop gate** | `/download` requires an explicit advocate-review confirmation (`?approved=1`); WhatsApp-intake drafts are filed as "pending review". Approvals are audit-logged | `app.py` | No AI-generated filing exports without a human sign-off, recorded for the audit trail. |
 | **Knowledge base audit + expansion** | Corrected 26 wrong section numbers; BNS KB 39 → 89 verified sections; CrPC→BNSS 16 → 42 and IEA→BSA 8 → 20 mappings; 45 landmark judgments with a `good_law / overruled / superseded` status feeding RAG | `data/bns_knowledge_base.py`, `data/bnss_bsa_knowledge_base.py`, `data/legal_corpus/*.json` | Broader, verified coverage; a cited case that is no longer good law is flagged rather than presented as current. |
@@ -178,7 +180,7 @@ STEP 2: RAG SEARCH (Retrieval-Augmented Generation)
         |
         v
 
-STEP 3: AI ANALYSIS (Groq Llama-3.3-70B)
+STEP 3: AI ANALYSIS (Groq — GPT-OSS-120B by default, set GROQ_MODEL)
   The retrieved laws + client story are sent to the AI with strict instructions:
   "Act as a Senior Indian Criminal Lawyer with 20+ years experience.
    Respond only with verified BNS sections from the provided context.
@@ -234,7 +236,7 @@ STEP 6: PDF CASE BRIEF + AUDIT LOG
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
-| **AI Model** | Groq Llama-3.3-70B | Fast, high-quality legal reasoning |
+| **AI Model** | Groq GPT-OSS-120B (`GROQ_MODEL`) | Legal drafting, grounded in retrieved law and checked by the verifier |
 | **Embeddings** | Google Gemini text-embedding-001 | Semantic search across law sections |
 | **Vector Database** | ChromaDB (in-memory) | RAG retrieval of relevant BNS sections |
 | **Web Framework** | Flask (Python 3.10+) | Lightweight web server, REST API |
@@ -328,15 +330,22 @@ LAW_FIRM_HEADER=Singhania & Partners | BNS Case Brief | CONFIDENTIAL
 LAW_FIRM_DISCLAIMER=Prepared by Singhania & Partners as a draft. Must be reviewed by the assigned advocate before filing.
 ```
 
-Optional — production audit salt (REQUIRED for any production deployment):
+Secrets — the app **refuses to start** without these unless `LEX_ENV=development`:
 ```bash
-AUDIT_HASH_SALT=your-unique-deployment-salt-here
-AUDIT_LOG_DIR=outputs/audit          # default; override to ship logs elsewhere
+SECRET_KEY=<python3 -c "import secrets; print(secrets.token_hex(32))">   # signs sessions, links, invites
+AUDIT_HASH_SALT=<another random value>   # salts audit-log hashes (rotated on DPDP erasure)
+ADMIN_TOKEN=<random>                     # operator API; sent only as the X-Admin-Token header
+AUDIT_LOG_DIR=outputs/audit              # default; override to ship logs elsewhere
 ```
+On your own machine, `LEX_ENV=development` relaxes this (random local key, login
+code shown on screen, admin open without a token). Behind Fly/Render/nginx set
+`TRUST_PROXY_HOPS=1`. For a deployment where no client data leaves the server,
+set **both** `LLM_PROVIDER=ollama` and `EMBEDDINGS_PROVIDER=ollama`. All settings
+are documented in [`.env.example`](.env.example).
 
 ### 4. Run the web server
 ```bash
-python3 app.py                    # HTTP on :8080 (default)
+python3 app.py                    # HTTP on 127.0.0.1:8080 (add --host 0.0.0.0 to expose on your LAN)
 python3 app.py --https            # HTTPS on :8443 (required for the Word add-in)
 ```
 Then open: **http://localhost:8080** (or **https://localhost:8443** for the add-in)
@@ -346,7 +355,10 @@ Then open: **http://localhost:8080** (or **https://localhost:8443** for the add-
 pip3 install -r requirements-dev.txt
 python3 -m pytest tests/
 ```
-94 tests, runs in <2 seconds, zero network calls.  See [`tests/README.md`](tests/README.md) for details.
+447 tests, runs in ~5 seconds, zero network calls (DNS and the webhook retry thread are stubbed).
+`tests/test_security.py` pins every access-control rule — who gets a 401/403/404;
+`tests/test_accuracy.py` pins the citation, concordance, precedent and self-correction checks.
+See [`tests/README.md`](tests/README.md) for details.
 
 ### 6. Share a public demo URL
 ```bash
@@ -453,7 +465,7 @@ Every `/analyze` and `/chat` request writes a JSONL record:
   "story_hash": "sha256:9a9ef4d43f4c3c3bafaf8caa87eaacda",
   "story_length": 208,
   "sources": ["bns_351","bns_115","bns_78","bns_66","bns_356","bns_125","bns_336","bns_75"],
-  "model": "llama-3.3-70b-versatile",
+  "model": "openai/gpt-oss-120b",
   "status": "ok",
   "duration_ms": 12391,
   "response_chars": 6826,

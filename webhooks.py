@@ -35,20 +35,23 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import ipaddress
 import json
-import os
+import secrets
+import socket
 import sqlite3
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 import db   # Day-21 dual-backend; transparent when DATABASE_URL unset
+import envmode
 
 _SUBS_PATH   = Path("outputs") / "webhooks" / "subscriptions.json"
 _LOG_PATH    = Path("outputs") / "webhooks" / "deliveries.log"
@@ -168,7 +171,11 @@ def _drain_loop():
     while True:
         try:
             jobs = _rq_dequeue_due()
+            live_ids = {s.id for s in _all_subs()} if jobs else set()
             for job in jobs:
+                if job["sub_id"] not in live_ids:   # unsubscribed since: stop retrying
+                    _rq_delete(job["id"])
+                    continue
                 sub = Subscription(
                     id=job["sub_id"], url=job["sub_url"], events=[], active=True,
                 )
@@ -189,8 +196,8 @@ def _drain_loop():
                         "duration_ms": 0, "error": error, "attempt": job["attempt"],
                         "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                     })
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001 — the drainer must keep running
+            print(f"  [webhooks] retry drain failed: {e}", flush=True)
         time.sleep(5)   # poll every 5 s
 
 
@@ -203,9 +210,58 @@ def _ensure_drainer():
 
 
 def _secret() -> bytes:
-    """Reuse the audit hash salt so the operator only manages one secret."""
-    s = os.getenv("AUDIT_HASH_SALT") or "lex-indic-dev-only-do-not-deploy"
-    return hashlib.sha256(b"lex-indic-webhook-key|" + s.encode()).digest()
+    """Deployment-wide signing key — only for subscriptions created before
+    per-subscription secrets existed."""
+    return hashlib.sha256(b"lex-indic-webhook-key|" + envmode.secret_key().encode()).digest()
+
+
+# ─── Target validation (SSRF guard) ─────────────────────────────────────────
+# A subscriber chooses the URL our server POSTs to, so without these checks a
+# subscription could point at http://169.254.169.254/ (cloud metadata), a
+# database on localhost, or the office LAN. Rules: https only, no credentials
+# in the URL, and every address the host resolves to must be public. The check
+# runs at subscribe time and again before every delivery (DNS can change), and
+# redirects are never followed (a public URL could 302 to a private one).
+def _resolve_host(host: str, port: int) -> list[str]:
+    try:
+        return sorted({ai[4][0] for ai in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)})
+    except socket.gaierror:
+        raise ValueError(f"Could not resolve host {host!r}.")
+
+
+def _is_public(addr: str) -> bool:
+    ip = ipaddress.ip_address(addr.split("%", 1)[0])
+    if ip.version == 6 and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    return ip.is_global and not ip.is_multicast
+
+
+def validate_target(url: str) -> str:
+    """Return the cleaned URL, or raise ValueError saying why it's refused.
+    LEX_ENV=development also allows http:// and private addresses so a
+    receiver on the developer's own machine can be tested."""
+    url = (url or "").strip()
+    parts = urllib.parse.urlsplit(url)
+    dev = envmode.is_dev()
+    if parts.scheme != "https" and not (dev and parts.scheme == "http"):
+        raise ValueError("URL must start with https://")
+    if not parts.hostname:
+        raise ValueError("URL must include a host name.")
+    if parts.username or parts.password:
+        raise ValueError("URL must not contain a username or password.")
+    if not dev:
+        port = parts.port or (443 if parts.scheme == "https" else 80)
+        if not all(_is_public(a) for a in _resolve_host(parts.hostname, port)):
+            raise ValueError("URL must resolve to a public internet address.")
+    return url
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None   # a 3xx surfaces as an HTTPError → failed delivery
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
 
 
 # ─── Subscription model ─────────────────────────────────────────────────────
@@ -217,6 +273,23 @@ class Subscription:
     description: str = ""
     active: bool = True
     created_at: str = ""
+    # Tenant: the firm that owns this subscription, or "*" for the operator
+    # (admin token), which receives every event. "" = legacy, receives none.
+    firm_id: str = ""
+    # Per-subscription signing secret, shown to the creator once. Legacy
+    # subscriptions without one are signed with the deployment-wide key.
+    secret: str = ""
+
+
+def _public(sub: "Subscription") -> dict:
+    """A subscription as the API lists it — never the signing secret."""
+    d = asdict(sub)
+    d.pop("secret", None)
+    return d
+
+
+def _signing_key(sub: "Subscription") -> bytes:
+    return sub.secret.encode() if sub.secret else _secret()
 
 
 # ── JSON-file backend (default) ─────────────────────────────────────────────
@@ -241,21 +314,36 @@ def _row_to_sub(row) -> Subscription:
         description=row.description or "",
         active=bool(row.active),
         created_at=row.created_at.isoformat(timespec="seconds") if row.created_at else "",
+        firm_id=getattr(row, "firm_id", "") or "",
+        secret=getattr(row, "secret", "") or "",
     )
 
 
+def _visible(sub: "Subscription", firm_id: str | None) -> bool:
+    """firm_id=None is the operator's view (everything)."""
+    return firm_id is None or sub.firm_id == firm_id
+
+
 # ── Public API ──────────────────────────────────────────────────────────────
-def list_subs() -> list[dict]:
+def _all_subs() -> list[Subscription]:
     if db.is_enabled():
         with db.session() as s:
             rows = s.query(db.WebhookSub).order_by(db.WebhookSub.created_at.asc()).all()
-            return [asdict(_row_to_sub(r)) for r in rows]
-    return [asdict(s) for s in _load_json()]
+            return [_row_to_sub(r) for r in rows]
+    return _load_json()
 
 
-def add_sub(url: str, events: list[str], description: str = "") -> dict:
-    if not url.startswith(("http://", "https://")):
-        raise ValueError("URL must start with http:// or https://")
+def list_subs(firm_id: str | None = None) -> list[dict]:
+    return [_public(s) for s in _all_subs() if _visible(s, firm_id)]
+
+
+def add_sub(url: str, events: list[str], description: str = "", *,
+            firm_id: str) -> dict:
+    """Create a subscription owned by firm_id ("*" = operator). The returned
+    dict is the only time the signing secret is shown."""
+    if not firm_id:
+        raise ValueError("A subscription must belong to a firm.")
+    url = validate_target(url)
     valid_events = {"analysis.completed", "monitor.digest.ready", "matter.created",
                     "nalsa.registered", "lead.captured",
                     # Day 32: billing event types
@@ -271,6 +359,8 @@ def add_sub(url: str, events: list[str], description: str = "") -> dict:
         description=description.strip()[:200],
         active=True,
         created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        firm_id=firm_id,
+        secret="whsec_" + secrets.token_hex(24),
     )
     if db.is_enabled():
         with db.session() as s:
@@ -278,6 +368,7 @@ def add_sub(url: str, events: list[str], description: str = "") -> dict:
                 id=new.id, url=new.url, events=new.events,
                 description=new.description, active=new.active,
                 created_at=datetime.now(timezone.utc),
+                firm_id=new.firm_id, secret=new.secret,
             ))
         return asdict(new)
     subs = _load_json()
@@ -286,20 +377,20 @@ def add_sub(url: str, events: list[str], description: str = "") -> dict:
     return asdict(new)
 
 
-def remove_sub(sub_id: str) -> bool:
+def remove_sub(sub_id: str, firm_id: str | None = None) -> bool:
+    """Delete a subscription the caller owns (firm_id=None: operator, any)."""
     if db.is_enabled():
         with db.session() as s:
             row = s.query(db.WebhookSub).filter(db.WebhookSub.id == sub_id).first()
-            if not row:
+            if not row or not _visible(_row_to_sub(row), firm_id):
                 return False
             s.delete(row)
             return True
     subs = _load_json()
-    n = len(subs)
-    subs = [s for s in subs if s.id != sub_id]
-    if len(subs) == n:
+    target = next((s for s in subs if s.id == sub_id), None)
+    if not target or not _visible(target, firm_id):
         return False
-    _save_json(subs)
+    _save_json([s for s in subs if s.id != sub_id])
     return True
 
 
@@ -311,25 +402,25 @@ def backend() -> str:
 
 
 # ─── Dispatch ──────────────────────────────────────────────────────────────
-def _load_active_for_event(event: str) -> list[Subscription]:
-    """Backend-aware: returns active subs subscribed to `event`."""
-    if db.is_enabled():
-        with db.session() as s:
-            rows = (s.query(db.WebhookSub)
-                     .filter(db.WebhookSub.active == True)  # noqa: E712
-                     .all())
-            return [_row_to_sub(r) for r in rows if event in (r.events or [])]
-    return [s for s in _load_json() if s.active and event in s.events]
+def _load_active_for_event(event: str, firm_id: str | None) -> list[Subscription]:
+    """Active subs for `event` that may see it: the operator's ("*") always,
+    a firm's only for that firm's own events."""
+    return [s for s in _all_subs()
+            if s.active and event in s.events
+            and (s.firm_id == "*" or (firm_id and s.firm_id == firm_id))]
 
 
 def _attempt_http(sub: "Subscription", body: bytes, sig: str, event_id: str) -> tuple[bool, int, str]:
     """Single HTTP attempt. Returns (success, http_status, error_message)."""
-    start = time.monotonic()
     status = 0
     error = ""
     # Receiver should reject deliveries where X-Lex-Timestamp is older than 5 minutes
     # to prevent replay attacks. Timestamp is included inside the signed body too.
     ts_header = str(int(time.time()))
+    try:
+        validate_target(sub.url)   # re-check: the host's DNS may have changed
+    except ValueError as e:
+        return False, 0, f"blocked: {e}"
     try:
         req = urllib.request.Request(
             sub.url,
@@ -344,7 +435,7 @@ def _attempt_http(sub: "Subscription", body: bytes, sig: str, event_id: str) -> 
             },
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with _OPENER.open(req, timeout=10) as resp:
             status = resp.status
             return (200 <= status < 300), status, ""
     except urllib.error.HTTPError as e:
@@ -356,16 +447,20 @@ def _attempt_http(sub: "Subscription", body: bytes, sig: str, event_id: str) -> 
 
 
 def verify_signature(body: bytes, signature_header: str,
-                     timestamp_header: str = "", max_age_seconds: int = 300) -> bool:
+                     timestamp_header: str = "", max_age_seconds: int = 300,
+                     secret: str = "") -> bool:
     """Receiver-side helper. Returns True iff:
-       1. HMAC-SHA256(body) matches X-Lex-Signature header (constant-time compare), AND
+       1. HMAC-SHA256(secret, body) matches X-Lex-Signature header
+          (constant-time compare), AND
        2. X-Lex-Timestamp is within max_age_seconds of now (replay protection).
 
-    Receivers should call this before processing any webhook delivery.
+    `secret` is the subscription's whsec_… value (shown once at creation);
+    omit it only for legacy subscriptions signed with the deployment key.
     """
     if not signature_header:
         return False
-    expected = hmac.new(_secret(), body, hashlib.sha256).hexdigest()
+    key = secret.encode() if secret else _secret()
+    expected = hmac.new(key, body, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, signature_header):
         return False
     if timestamp_header:
@@ -378,15 +473,17 @@ def verify_signature(body: bytes, signature_header: str,
     return True
 
 
-def emit(event: str, payload: dict):
-    """Emit an event to all active subscribers.
+def emit(event: str, payload: dict, *, firm_id: str | None = None):
+    """Emit an event to the subscribers allowed to see it: the firm the event
+    belongs to (firm_id) plus operator subscriptions. Events with no firm
+    (anonymous runs, leads, billing) go to operator subscriptions only.
 
     Day 22: First attempt is synchronous-ish (on a thread); on failure the
     job is written to the SQLite retry queue and the drainer thread handles
     exponential backoff up to MAX_RETRIES times.
     """
     _ensure_drainer()
-    subs = _load_active_for_event(event)
+    subs = _load_active_for_event(event, firm_id)
     if not subs:
         return
     body = {
@@ -396,9 +493,9 @@ def emit(event: str, payload: dict):
         "data": payload,
     }
     encoded = json.dumps(body, default=str).encode("utf-8")
-    sig = hmac.new(_secret(), encoded, hashlib.sha256).hexdigest()
 
     for sub in subs:
+        sig = hmac.new(_signing_key(sub), encoded, hashlib.sha256).hexdigest()
         threading.Thread(
             target=_first_attempt,
             args=(sub, encoded, sig, body["id"]),
@@ -437,15 +534,20 @@ def _log_delivery(record: dict):
         f.flush()
 
 
-def recent_deliveries(limit: int = 50) -> list[dict]:
-    """Read the last N entries from deliveries.log — for the dashboard."""
+def recent_deliveries(limit: int = 50, firm_id: str | None = None) -> list[dict]:
+    """The last N delivery records, newest first — only for the caller's own
+    subscriptions unless firm_id is None (operator)."""
     if not _LOG_PATH.exists():
         return []
-    lines = _LOG_PATH.read_text(encoding="utf-8").splitlines()[-limit:]
+    own = None if firm_id is None else {s["id"] for s in list_subs(firm_id)}
     out = []
-    for line in lines:
+    for line in reversed(_LOG_PATH.read_text(encoding="utf-8").splitlines()):
         try:
-            out.append(json.loads(line))
-        except Exception:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
             continue
-    return list(reversed(out))   # newest first
+        if own is None or rec.get("sub_id") in own:
+            out.append(rec)
+            if len(out) >= limit:
+                break
+    return out

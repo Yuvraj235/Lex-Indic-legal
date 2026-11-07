@@ -9,102 +9,11 @@ after a deploy.
 
 from __future__ import annotations
 
-import importlib
-import io
-import json
-import os
-import sys
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 
-# ────────────────────────────── App fixture ────────────────────────────────
-# We import app.py once per test session with all the slow / network-dependent
-# pieces patched out.  The fixture below builds a Flask test client.
-
-@pytest.fixture(scope="session")
-def app():
-    # Patch the expensive module-level work BEFORE importing app.py.
-    # The patches need to survive for the lifetime of the session.
-
-    # 1) Stub the Groq client so it never hits the network
-    from groq import Groq as _RealGroq
-    fake_groq = MagicMock()
-    fake_completion = MagicMock()
-    fake_completion.choices = [MagicMock(message=MagicMock(content=(
-        "SECTION 1: IMMEDIATE CLIENT ADVISORY\n"
-        "Test advisory.\n\n"
-        "SECTION 2: LEGAL ANALYSIS UNDER BNS 2023\n"
-        "Test legal analysis citing BNS Section 304.\n\n"
-        "SECTION 3: CASE STRATEGY & STRENGTH ASSESSMENT\n"
-        "Test strategy.\n\n"
-        "SECTION 4: DRAFT FIRST INFORMATION REPORT (FIR)\n"
-        "Test FIR.\n\n"
-        "SECTION 5: DRAFT LEGAL NOTICE\n"
-        "Test notice.\n\n"
-        "SECTION 6: POLICE HELP REPORT\n"
-        "Test police report.\n"
-    ))) ]
-    fake_groq.chat.completions.create.return_value = fake_completion
-
-    # 2) Stub ChromaDB collection to return canned hits
-    fake_collection = MagicMock()
-    fake_collection.query.return_value = {
-        "documents":  [["BNS Section 304 doc text", "BNS Section 115 doc text"]],
-        "metadatas":  [[
-            {"section": "BNS Section 304", "title": "Snatching", "old_ipc": "(NEW)",
-             "punishment": "Up to 3 years + fine", "bailable": "Non-bailable",
-             "cognizable": "Yes", "transition_note": "..."},
-            {"section": "BNS Section 115", "title": "Hurt", "old_ipc": "IPC 323",
-             "punishment": "Up to 1 year + fine", "bailable": "Bailable",
-             "cognizable": "Yes", "transition_note": "..."},
-        ]],
-        "distances":  [[0.3, 0.4]],
-        "ids":        [["bns_304", "bns_115"]],
-    }
-    fake_collection.count.return_value = 2
-    fake_collection.get.return_value = {"ids": ["bns_304", "bns_115"]}
-
-    # 3) Stub Gemini embedding
-    fake_gemini_embed = {"embedding": [0.1] * 768}
-
-    # 4) Patch everything before app.py runs its top-level code
-    with patch("main.Groq") as MockGroq, \
-         patch("main.build_rag_knowledge_base", return_value=fake_collection), \
-         patch("main.genai.embed_content", return_value=fake_gemini_embed), \
-         patch("main.configure_groq", return_value=fake_groq), \
-         patch("main._get_embedding_with_cache", return_value=[0.1] * 768):
-        MockGroq.return_value = fake_groq
-
-        # Force-reload the app module so the patches take effect
-        if "app" in sys.modules:
-            del sys.modules["app"]
-        import app as flask_app_module
-
-        # Also patch the live groq_client and rag_collection on the module
-        flask_app_module.groq_client = fake_groq
-        flask_app_module.rag_collection = fake_collection
-
-        # Patch the analyze flow's retrieval helper so it doesn't try Gemini
-        from main import _normalize_source
-        def fake_retrieve(collection, story, n_results=8):
-            sources = [
-                _normalize_source(1, "bns_304", "snatching text",
-                                  {"section": "BNS Section 304", "title": "Snatching",
-                                   "old_ipc": "(NEW)", "punishment": "Up to 3 years",
-                                   "bailable": "Non-bailable", "cognizable": "Yes",
-                                   "transition_note": "..."}, 70.0),
-            ]
-            return ("=== RETRIEVED ===\n[SECTION 1 — 70.0%]\nsnatching text", sources)
-        flask_app_module.retrieve_relevant_sections_structured = fake_retrieve
-
-        yield flask_app_module.app
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
+# App + client fixtures live in conftest.py (shared with test_security.py).
 
 
 # ────────────────────────────── Public pages ───────────────────────────────
@@ -214,7 +123,17 @@ class TestConvert:
 
 # ────────────────────────────── Matters CRUD ───────────────────────────────
 class TestMattersRoutes:
+    """Matters are firm-scoped: sign in, create a firm (you become its
+    partner), then every call is scoped to that firm by the session."""
+
+    @staticmethod
+    def _sign_in(client, email):
+        import auth as auth_module
+        code = auth_module.issue_code(email)
+        assert client.post("/auth/verify", json={"email": email, "code": code}).status_code == 200
+
     def test_firm_lawyer_matter_flow(self, client):
+        self._sign_in(client, "partner@routetest.in")
         r = client.post("/matters/api/firms",
                         json={"name": "RouteTest Firm", "address": "Anywhere"})
         assert r.status_code == 200
@@ -222,13 +141,13 @@ class TestMattersRoutes:
         assert firm["id"].startswith("firm_")
 
         r = client.post("/matters/api/lawyers",
-                        json={"firm_id": firm["id"], "full_name": "Adv. T",
-                              "role": "associate"})
+                        json={"full_name": "Adv. T", "role": "associate"})
         assert r.status_code == 200
         lwy = r.get_json()["lawyer"]
+        assert lwy["firm_id"] == firm["id"]
 
         r = client.post("/matters/api/matters",
-                        json={"firm_id": firm["id"], "lawyer_id": lwy["id"],
+                        json={"lawyer_id": lwy["id"],
                               "client_name": "Alice", "opposing_party": "Bob"})
         assert r.status_code == 200
         d = r.get_json()
@@ -237,16 +156,14 @@ class TestMattersRoutes:
         assert d["matter"]["client_name"] == "Alice"
 
     def test_conflict_check_route(self, client):
-        # Create the test firm + a matter against Bob
-        firm = client.post("/matters/api/firms", json={"name": "ConflictFirm"}).get_json()["firm"]
-        lwy  = client.post("/matters/api/lawyers", json={"firm_id": firm["id"], "full_name": "Adv. Z"}).get_json()["lawyer"]
+        self._sign_in(client, "partner@conflictfirm.in")
+        client.post("/matters/api/firms", json={"name": "ConflictFirm"})
+        lwy = client.post("/matters/api/lawyers", json={"full_name": "Adv. Z"}).get_json()["lawyer"]
         client.post("/matters/api/matters", json={
-            "firm_id": firm["id"], "lawyer_id": lwy["id"],
-            "client_name": "Alice", "opposing_party": "Bob"})
+            "lawyer_id": lwy["id"], "client_name": "Alice", "opposing_party": "Bob"})
 
         # Now check for conflict if we'd take Bob as a new client
-        r = client.post("/matters/api/conflict-check", json={
-            "firm_id": firm["id"], "client_name": "Bob"})
+        r = client.post("/matters/api/conflict-check", json={"client_name": "Bob"})
         assert r.status_code == 200
         hits = r.get_json()["conflicts"]
         assert len(hits) >= 1
@@ -294,8 +211,15 @@ class TestAuthRoutes:
 
 # ────────────────────────────── Admin gate ─────────────────────────────────
 class TestAdminGate:
-    def test_admin_open_when_token_unset(self, client, monkeypatch):
+    def test_admin_closed_when_token_unset_in_production(self, client, monkeypatch):
         monkeypatch.delenv("ADMIN_TOKEN", raising=False)
+        monkeypatch.delenv("LEX_ENV", raising=False)
+        r = client.get("/admin/soc2/summary.json")
+        assert r.status_code == 503
+
+    def test_admin_open_when_token_unset_in_development(self, client, monkeypatch):
+        monkeypatch.delenv("ADMIN_TOKEN", raising=False)
+        monkeypatch.setenv("LEX_ENV", "development")
         r = client.get("/admin/soc2/summary.json")
         assert r.status_code == 200
 
@@ -310,14 +234,23 @@ class TestAdminGate:
                        headers={"X-Admin-Token": "test-token-abc"})
         assert r.status_code == 200
 
-    def test_admin_accepts_token_query(self, client, monkeypatch):
+    def test_admin_rejects_token_in_query_string(self, client, monkeypatch):
+        """Query strings land in logs and browser history: header only."""
         monkeypatch.setenv("ADMIN_TOKEN", "test-token-abc")
         r = client.get("/admin/soc2/summary.json?token=test-token-abc")
-        assert r.status_code == 200
+        assert r.status_code == 401
 
 
 # ────────────────────────────── Monitors API ───────────────────────────────
 class TestMonitorRoutes:
+    """A watchlist belongs to the signed-in user's firm (or the user)."""
+
+    @pytest.fixture(autouse=True)
+    def _signed_in(self, client):
+        import auth as auth_module
+        code = auth_module.issue_code("watcher@routetest.in")
+        client.post("/auth/verify", json={"email": "watcher@routetest.in", "code": code})
+
     def test_matter_list_starts_empty(self, client):
         r = client.get("/monitors/api/matters")
         assert r.status_code == 200
@@ -362,7 +295,18 @@ class TestEcourtsRoutes:
 
 # ────────────────────────────── Webhooks routes ────────────────────────────
 class TestWebhookRoutes:
-    def test_subscriptions_crud(self, client):
+    """Webhooks belong to a firm: sign in and create one first."""
+
+    @pytest.fixture
+    def firm_client(self, client):
+        import auth as auth_module
+        code = auth_module.issue_code("hooks@routetest.in")
+        client.post("/auth/verify", json={"email": "hooks@routetest.in", "code": code})
+        client.post("/matters/api/firms", json={"name": "Hooks Firm"})
+        return client
+
+    def test_subscriptions_crud(self, firm_client, fake_dns):
+        client = firm_client
         # Initially empty
         r = client.get("/webhooks/api/subscriptions")
         assert r.status_code == 200
@@ -387,8 +331,8 @@ class TestWebhookRoutes:
         # Gone
         assert client.get("/webhooks/api/subscriptions").get_json()["subscriptions"] == []
 
-    def test_invalid_url_rejected(self, client):
-        r = client.post("/webhooks/api/subscriptions", json={
+    def test_invalid_url_rejected(self, firm_client):
+        r = firm_client.post("/webhooks/api/subscriptions", json={
             "url": "not-a-url",
             "events": ["analysis.completed"],
         })
@@ -545,19 +489,20 @@ class TestApiV1:
 
 # ────────────────────────────── Operator dashboard (Day 19) ────────────────
 class TestDashboard:
-    def test_open_without_admin_token(self, client, monkeypatch):
-        monkeypatch.delenv("ADMIN_TOKEN", raising=False)
+    def test_page_shell_renders(self, client, monkeypatch):
+        """The HTML shell has no data; it prompts for the token."""
+        monkeypatch.setenv("ADMIN_TOKEN", "test-tok-xyz")
         r = client.get("/dashboard")
         assert r.status_code == 200
 
-    def test_blocked_without_token(self, client, monkeypatch):
+    def test_data_blocked_without_token(self, client, monkeypatch):
         monkeypatch.setenv("ADMIN_TOKEN", "test-tok-xyz")
-        r = client.get("/dashboard")
+        r = client.get("/dashboard/data.json")
         assert r.status_code == 401
 
-    def test_query_token_unlocks_data(self, client, monkeypatch):
+    def test_header_token_unlocks_data(self, client, monkeypatch):
         monkeypatch.setenv("ADMIN_TOKEN", "test-tok-xyz")
-        r = client.get("/dashboard/data.json?token=test-tok-xyz")
+        r = client.get("/dashboard/data.json", headers={"X-Admin-Token": "test-tok-xyz"})
         assert r.status_code == 200
         d = r.get_json()
         assert "kpis" in d and "funnel" in d

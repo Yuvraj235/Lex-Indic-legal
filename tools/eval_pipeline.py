@@ -57,7 +57,8 @@ except ImportError:
 
 # Grounding/citation extraction lives in the runtime verifier (verifier.py) —
 # the same functions run inside /analyze, so eval and serving can never drift.
-from verifier import cited_sections, known_bns_sections  # noqa: F401 (re-exported)
+from verifier import (cited_sections, known_bns_sections,  # noqa: F401 (re-exported)
+                      mapping_mismatches, precedent_check)
 
 OUT_DIR = ROOT / "data" / "finetune"
 
@@ -176,6 +177,21 @@ GOLD_SCENARIOS = [
 # ──────────────────────────────────────────────────────────────────────────────
 # Pure scoring (unit-tested) — no network
 # ──────────────────────────────────────────────────────────────────────────────
+def _save_output(scenario_id: str, base_url: str, sections: dict) -> None:
+    """Raw answers go to outputs/eval/ (gitignored) so a run can be re-graded
+    after the rubric changes without paying for the model again."""
+    out = ROOT / "outputs" / "eval" / "pipeline_outputs.jsonl"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with open(out, "a", encoding="utf-8") as f:
+        f.write(json.dumps({"scenario": scenario_id, "base_url": base_url,
+                            "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                            "sections": sections}, ensure_ascii=False) + "\n")
+
+
+def _base(section: str) -> str:
+    return re.sub(r"\(.*\)$", "", section)
+
+
 def _norm(s: str) -> str:
     return s.upper().replace(" ", "")
 
@@ -190,17 +206,30 @@ def grade_analysis(sections: dict, scenario: dict, known: set[str] | None = None
     combined = "\n".join((sections.get(k) or "") for k in SECTION_KEYS)
     low = combined.lower()
     cites = cited_sections(combined)
+    # Compare on base numbers, as the runtime verifier does: "BNS 103(2)"
+    # (mob lynching) cites section 103 — it is neither missing nor invented.
+    bases = {_base(c) for c in cites}
     must = [_norm(x) for x in scenario.get("must_cite", [])]
     mentions = scenario.get("must_mention", [])
     return {
         "scenario": scenario["id"],
         "sections_present": count_sections_present(sections),
-        "citations": [sum(c in cites for c in must), len(must)],
+        "citations": [sum(_base(c) in bases for c in must), len(must)],
         "mentions": [sum(w.lower() in low for w in mentions), len(mentions)],
-        "ungrounded_citations": sorted(c for c in cites if c not in known),
-        "missing_citations": [c for c in must if c not in cites],
+        "ungrounded_citations": sorted(c for c in cites if _base(c) not in known),
+        "missing_citations": [c for c in must if _base(c) not in bases],
         "missing_mentions": [w for w in mentions if w.lower() not in low],
+        # Wrong IPC→BNS pairings and case law that isn't verified / good law —
+        # the same checks the runtime verifier applies.
+        "wrong_pairings": [f"IPC {m['ipc']}→BNS {m['cited_bns']}" for m in mapping_mismatches(combined)],
+        "bad_precedents": _bad_precedents(combined),
     }
+
+
+def _bad_precedents(text: str) -> list[str]:
+    p = precedent_check(text)
+    return (p["unverified"] + [b["case"] for b in p["bad_law"]]
+            + [w["case"] + " (wrong report)" for w in p["wrong_citation"]])
 
 
 def composite(g: dict) -> float:
@@ -211,7 +240,9 @@ def composite(g: dict) -> float:
     if g["mentions"][1]:
         parts.append(g["mentions"][0] / g["mentions"][1])
     base = sum(parts) / len(parts)
-    penalty = min(0.3, 0.1 * len(g["ungrounded_citations"]))
+    errors = (len(g["ungrounded_citations"]) + len(g.get("wrong_pairings", []))
+              + len(g.get("bad_precedents", [])))
+    penalty = min(0.3, 0.1 * errors)
     return round(max(0.0, base - penalty), 3)
 
 
@@ -219,13 +250,16 @@ def composite(g: dict) -> float:
 # Network: fetch an analysis + optional LLM judge
 # ──────────────────────────────────────────────────────────────────────────────
 def fetch_analysis(base_url: str, story: str, language: str = "en") -> dict:
+    """The six sections of one /analyze answer (HTML entities decoded)."""
     body = json.dumps({"client_story": story, "language": language}).encode("utf-8")
     req = urllib.request.Request(
         base_url.rstrip("/") + "/analyze", data=body,
         headers={"Content-Type": "application/json"}, method="POST")
     with urllib.request.urlopen(req, timeout=180) as r:
         payload = json.loads(r.read().decode("utf-8"))
-    return payload.get("sections") or {}
+    import html
+    return {k: html.unescape(v) if isinstance(v, str) else v
+            for k, v in (payload.get("sections") or {}).items()}
 
 
 def llm_judge(combined: str, scenario: dict) -> dict:
@@ -236,14 +270,14 @@ def llm_judge(combined: str, scenario: dict) -> dict:
               "(invents nothing), complete, professional. "
               "Return JSON {\"score\": <1-5>, \"reason\": \"...\"}.")
     msg = f"Client situation:\n{scenario['story']}\n\nAnalysis:\n{combined[:6000]}"
-    comp = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "system", "content": rubric},
-                  {"role": "user", "content": msg}],
-        temperature=0.0, max_tokens=300,
-        response_format={"type": "json_object"})
+    import llm_provider
+    text = llm_provider.groq_complete(
+        client,
+        [{"role": "system", "content": rubric},
+         {"role": "user", "content": msg}],
+        temperature=0.0, max_tokens=300, response_format={"type": "json_object"})
     try:
-        return json.loads(comp.choices[0].message.content)
+        return json.loads(text)
     except Exception:  # noqa: BLE001
         return {"score": None, "reason": "judge parse error"}
 
@@ -262,13 +296,16 @@ def main() -> None:
     ap.add_argument("--retry-wait", type=int, default=1500,
                     help="Seconds to wait between retries (default 1500 = 25 min, "
                          "sized for Groq's rolling free-tier window).")
+    ap.add_argument("--out-dir", default=str(OUT_DIR),
+                    help="Where to write pipeline_eval_report.{json,md} (default data/finetune).")
     args = ap.parse_args()
 
     scenarios = GOLD_SCENARIOS[:args.limit] if args.limit else GOLD_SCENARIOS
     known = known_bns_sections()
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    report_path = OUT_DIR / "pipeline_eval_report.json"
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    report_path = out_dir / "pipeline_eval_report.json"
 
     # Resume: keep prior good results, only run the scenarios still missing.
     results = []
@@ -303,6 +340,7 @@ def main() -> None:
             continue
         g = grade_analysis(sections, sc, known)
         g["composite"] = composite(g)
+        _save_output(sc["id"], args.base_url, sections)
         if args.judge:
             combined = "\n".join((sections.get(k) or "") for k in SECTION_KEYS)
             g["judge"] = llm_judge(combined, sc)
@@ -312,24 +350,28 @@ def main() -> None:
         print(f"  {sc['id']:32s} composite {g['composite']:.2f}  "
               f"sections {g['sections_present']}/6  "
               f"cite {g['citations'][0]}/{g['citations'][1]}  "
-              f"ungrounded {len(g['ungrounded_citations'])}{jw}")
+              f"ungrounded {len(g['ungrounded_citations'])}  "
+              f"wrong-pair {len(g['wrong_pairings'])}  bad-case {len(g['bad_precedents'])}{jw}")
 
     _write_report()
     lines = ["# Lex-Indic — full-pipeline answer eval", "",
-             "| Scenario | Composite | Sections | Citations | Mentions | Ungrounded |",
-             "|----------|----------:|---------:|----------:|---------:|-----------:|"]
+             "| Scenario | Composite | Sections | Citations | Mentions | Ungrounded | Wrong pair | Bad case |",
+             "|----------|----------:|---------:|----------:|---------:|-----------:|-----------:|---------:|"]
     for g in results:
         lines.append(
             f"| `{g['scenario']}` | **{g['composite']:.2f}** | {g['sections_present']}/6 "
             f"| {g['citations'][0]}/{g['citations'][1]} | {g['mentions'][0]}/{g['mentions'][1]} "
-            f"| {len(g['ungrounded_citations'])} |")
+            f"| {len(g['ungrounded_citations'])} | {len(g.get('wrong_pairings', []))} "
+            f"| {len(g.get('bad_precedents', []))} |")
     if results:
         avg = sum(g["composite"] for g in results) / len(results)
         lines += ["", f"**Mean composite: {avg:.2f}** across {len(results)} scenarios. "
                   "Ungrounded = BNS sections cited that are not in the knowledge base "
-                  "(hallucinated). Target: 0."]
-    (OUT_DIR / "pipeline_eval_report.md").write_text("\n".join(lines), encoding="utf-8")
-    print(f"\n✓ wrote {OUT_DIR/'pipeline_eval_report.md'}")
+                  "(hallucinated). Wrong pair = IPC→BNS pairing contradicting the govt "
+                  "concordance. Bad case = case law not in the verified judgments, "
+                  "overruled, or wrongly reported. Target for all three: 0."]
+    (out_dir / "pipeline_eval_report.md").write_text("\n".join(lines), encoding="utf-8")
+    print(f"\n✓ wrote {out_dir/'pipeline_eval_report.md'}")
 
 
 if __name__ == "__main__":

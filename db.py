@@ -138,6 +138,7 @@ if _SA_AVAILABLE:
         keywords    = Column(JSON, default=list)
         sections    = Column(JSON, default=list)
         created_at  = Column(DateTime(timezone=True), default=_now, nullable=False)
+        owner       = Column(String(40), default="", index=True)  # firm_id / user id
 
     class NalsaRegistration(Base):
         __tablename__ = "nalsa_registrations"
@@ -176,6 +177,8 @@ if _SA_AVAILABLE:
         description = Column(String(300), default="")
         active      = Column(Boolean, default=True, index=True)
         created_at  = Column(DateTime(timezone=True), default=_now, nullable=False)
+        firm_id     = Column(String(40), default="", index=True)   # "*" = operator
+        secret      = Column(String(80), default="")               # per-sub HMAC key
 
 
 def create_all():

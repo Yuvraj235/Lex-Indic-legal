@@ -26,7 +26,10 @@ import sys
 import time
 import json
 import hashlib
+import secrets
 import textwrap
+import urllib.error
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 
@@ -42,6 +45,7 @@ from groq import Groq
 
 # chromadb: In-memory vector database for our legal knowledge base (RAG)
 import chromadb
+from chromadb.config import Settings
 
 # rich: Beautiful terminal output (makes it look professional in VS Code)
 from rich.console import Console
@@ -53,6 +57,7 @@ from rich import box
 # ─── LOCAL MODULES ────────────────────────────────────────────────────────────
 # Our curated BNS knowledge base (the 'legal brain' we built)
 import data.bns_knowledge_base as kb
+import llm_provider
 # Day 11 — BNSS (procedure) + BSA (evidence) corpora.  Optional import: if the
 # file is absent, the RAG build still works with BNS-only.
 try:
@@ -70,8 +75,25 @@ console = Console(width=100)           # Rich console for beautiful terminal out
 # ══════════════════════════════════════════════════════════════════════════════
 # STEP 1A: CONFIGURE GEMINI (Embeddings only — RAG search)
 # ══════════════════════════════════════════════════════════════════════════════
+def embeddings_provider() -> str:
+    """Who turns text into vectors for RAG search — and therefore who sees the
+    client's story:
+      gemini  Google's embedding API (default). The story leaves the machine.
+      ollama  A local embedding model via Ollama (OLLAMA_EMBED_MODEL, default
+              nomic-embed-text). Nothing leaves the machine; pair it with
+              LLM_PROVIDER=ollama for a fully local deployment.
+    Switching provider means re-embedding the knowledge base (first start)."""
+    return (os.getenv("EMBEDDINGS_PROVIDER") or "gemini").strip().lower()
+
+
+def _ollama_embed_model() -> str:
+    return os.getenv("OLLAMA_EMBED_MODEL") or "nomic-embed-text"
+
+
 def configure_gemini_embeddings():
     """Configures Gemini API for embeddings only (RAG vector search)."""
+    if embeddings_provider() != "gemini":
+        return
     api_key = os.getenv("GEMINI_API_KEY")
     if api_key and api_key != "your_gemini_api_key_here":
         genai.configure(api_key=api_key)
@@ -110,6 +132,11 @@ STRICT RULES YOU MUST FOLLOW:
    this is critical because lawyers are still transitioning from IPC to BNS.
 2. NEVER hallucinate section numbers. Use ONLY the sections provided in the context.
    If you are unsure, say "Further legal research required."
+   When you pair an old IPC section with its BNS section, use the pairing given
+   in the context ("old IPC" line) — never infer one from the section number.
+2A. Cite case law ONLY from LANDMARK CASE entries in the context, with the
+   citation exactly as given there. NEVER cite a case from memory. NEVER rely on
+   a case whose GOOD-LAW STATUS is OVERRULED or SUPERSEDED as current law.
 3. Your language must be professional and precise — suitable for an Indian court.
 4. Prioritize the Immediate Advisory first — actions the client must take RIGHT NOW.
 5. Draft FIRs must follow the format required by Indian Police stations — they
@@ -170,18 +197,54 @@ def _save_embedding_cache(cache: dict):
         json.dump(cache, f)
 
 
+def _embed_ollama(text: str, task_type: str) -> list:
+    """One embedding from the local Ollama server — no third party involved."""
+    model = _ollama_embed_model()
+    if "nomic" in model:   # nomic-embed-text expects task prefixes
+        text = ("search_query: " if task_type == "retrieval_query" else "search_document: ") + text
+    host = (os.getenv("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
+    req = urllib.request.Request(
+        f"{host}/api/embed", data=json.dumps({"model": model, "input": text}).encode(),
+        headers={"Content-Type": "application/json"}, method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return json.loads(resp.read())["embeddings"][0]
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "replace")[:200]
+        raise RuntimeError(
+            f"Ollama could not embed with model {model!r} ({e.code}: {detail}). "
+            f"Use an embedding model: `ollama pull nomic-embed-text`."
+        ) from e
+
+
 def _get_embedding_with_cache(text: str, task_type: str, cache: dict) -> list:
     """
-    Returns a Gemini embedding, using disk cache to avoid redundant API calls.
-    On first run: calls API and saves to cache.
-    On subsequent runs: reads from cache instantly (0 API calls for indexing).
+    Returns an embedding from the configured provider, using the disk cache to
+    avoid redundant work. On first run: embeds and caches. On subsequent runs:
+    reads from cache instantly (0 calls for indexing).
     """
-    cache_key = hashlib.md5(f"{task_type}:{text}".encode()).hexdigest()
+    provider = embeddings_provider()
+    # Gemini keys keep their original form so the committed cache stays valid;
+    # other providers are namespaced so vectors of different sizes never mix.
+    raw_key = (f"{task_type}:{text}" if provider == "gemini"
+               else f"{provider}:{_ollama_embed_model()}:{task_type}:{text}")
+    cache_key = hashlib.md5(raw_key.encode(), usedforsecurity=False).hexdigest()
     if cache_key in cache:
         return cache[cache_key]
 
-    # Not in cache — call the API with retry on rate limit
-    for attempt in range(4):
+    if provider == "ollama":
+        embedding = _embed_ollama(text, task_type)
+        cache[cache_key] = embedding
+        return embedding
+    if provider != "gemini":
+        raise ValueError(f"Unknown EMBEDDINGS_PROVIDER {provider!r} (use gemini or ollama).")
+
+    # Not in cache — call the API with retry on rate limit. Indexing the KB at
+    # startup can afford long waits; a query inside a web request can't (it
+    # would hold the worker for minutes), so queries retry briefly.
+    patient = task_type == "retrieval_document"
+    for attempt in range(4 if patient else 2):
         try:
             result = genai.embed_content(
                 model="models/gemini-embedding-001",
@@ -192,8 +255,8 @@ def _get_embedding_with_cache(text: str, task_type: str, cache: dict) -> list:
             cache[cache_key] = embedding
             return embedding
         except Exception as e:
-            if "429" in str(e) and attempt < 3:
-                wait = 35 * (attempt + 1)
+            if "429" in str(e) and attempt < (3 if patient else 1):
+                wait = 35 * (attempt + 1) if patient else 2
                 console.print(f"[yellow]Rate limit hit. Waiting {wait}s before retry...[/yellow]")
                 time.sleep(wait)
             else:
@@ -202,12 +265,12 @@ def _get_embedding_with_cache(text: str, task_type: str, cache: dict) -> list:
 
 class GeminiEmbeddingFunction(chromadb.EmbeddingFunction):
     """
-    Uses Google Gemini's embedding model with disk-based caching.
+    Embeds the knowledge base with the configured provider (Gemini by default,
+    or local Ollama — see embeddings_provider), with disk-based caching.
 
-    WHY THIS IS BETTER THAN THE DEFAULT:
-    - Default ChromaDB downloads a 79MB model file on first run (slow, fails on bad internet).
-    - Gemini embeddings use the API (no download), optimized for legal/professional text.
-    - Disk cache: First run calls API once per document. Every subsequent run is INSTANT.
+    - Gemini: no model download; the API is optimised for professional text.
+    - Ollama: runs locally; the model is pulled once with `ollama pull`.
+    - Disk cache: the first run embeds each document once; later runs are instant.
     """
 
     def __init__(self):
@@ -242,10 +305,12 @@ def build_rag_knowledge_base() -> chromadb.Collection:
     - Only those relevant sections are sent to the AI, making it fast, cheap,
       and most importantly, ACCURATE (it can only cite sections we give it).
     """
-    console.print("[dim]Initializing BNS Legal Knowledge Base with Gemini embeddings...[/dim]")
+    console.print(f"[dim]Initializing BNS Legal Knowledge Base with {embeddings_provider()} embeddings...[/dim]")
 
-    # Create an in-memory Chroma client (no database file needed for Phase 1)
-    chroma_client = chromadb.Client()
+    # Create an in-memory Chroma client (no database file needed for Phase 1).
+    # Telemetry off: Chroma otherwise reports usage events to PostHog (a US
+    # analytics service) on every start — an outbound call this app must not make.
+    chroma_client = chromadb.Client(Settings(anonymized_telemetry=False))
 
     # Delete existing collection if it exists (for clean re-runs)
     try:
@@ -656,9 +721,11 @@ def save_raw_output(client_story: str, ai_response: str) -> str:
     """
     os.makedirs("outputs", exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"outputs/case_analysis_{timestamp}.txt"
+    # Random suffix: two analyses in the same second must never share a file
+    # (that would hand one client's case to another). "x" refuses to overwrite.
+    filename = f"outputs/case_analysis_{timestamp}_{secrets.token_hex(4)}.txt"
 
-    with open(filename, "w", encoding="utf-8") as f:
+    with open(filename, "x", encoding="utf-8") as f:
         f.write("LEX-INDIC: BNS TRANSITION ENGINE — CASE ANALYSIS REPORT\n")
         f.write("=" * 70 + "\n")
         f.write(f"Generated: {datetime.now().strftime('%d %B %Y, %H:%M:%S')}\n")
@@ -717,16 +784,13 @@ def run_legal_triage(client_story: str):
     ai_response = None
     for attempt in range(4):
         try:
-            completion = groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile",   # Groq's best free model
-                messages=[
-                    {"role": "system", "content": LEXI_SYSTEM_PROMPT},
-                    {"role": "user",   "content": prompt},
-                ],
+            ai_response = llm_provider.groq_complete(   # model: GROQ_MODEL
+                groq_client,
+                [{"role": "system", "content": LEXI_SYSTEM_PROMPT},
+                 {"role": "user",   "content": prompt}],
                 temperature=0.2,        # Low = precise, consistent legal output
                 max_tokens=8192,        # Long enough for full FIR + Legal Notice
             )
-            ai_response = completion.choices[0].message.content
             break
         except Exception as e:
             err = str(e)

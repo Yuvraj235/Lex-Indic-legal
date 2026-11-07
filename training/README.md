@@ -2,8 +2,10 @@
 
 Optional pipeline to fine-tune a small open model (Qwen 2.5 7B / Llama 3.1 8B) on
 the project's verified BNS/BNSS/BSA knowledge base, then serve it through the
-existing Ollama provider (`llm_provider.py`) for **air-gapped, zero-outbound
-deployments**.
+existing Ollama provider (`llm_provider.py`) for **air-gapped deployments**.
+Generation is only half the path: also set `EMBEDDINGS_PROVIDER=ollama` (with
+`ollama pull nomic-embed-text`) so RAG search embeds stories locally — otherwise
+they still go to Google's embedding API.
 
 > **Scope.** The fine-tune reproduces the *factual* layer — section numbers,
 > IPC→BNS mappings, punishments, bailable/cognizable status — reliably and locally.

@@ -734,7 +734,7 @@
             <i class="bi bi-search"></i><span>Searching KB</span>
           </div>
           <div class="load-stage" data-stage="model">
-            <i class="bi bi-cpu"></i><span>Llama-3.3-70B</span>
+            <i class="bi bi-cpu"></i><span id="modelStageLabel">AI model</span>
           </div>
           <div class="load-stage" data-stage="render">
             <i class="bi bi-file-earmark-text"></i><span>Drafting outputs</span>
@@ -1423,6 +1423,7 @@ async function runSupplementAnalysis() {
 // ── Render results into the DOM ──────────────────────────────────────────────
 let lastStory = '';
 let lastPdfFilename = '';
+let lastDownloadToken = '';   // signed by /analyze; lets anonymous runs fetch their PDF
 
 // Human-in-the-loop gate: the download link only works after the advocate
 // ticks the review box. The server also enforces this (?approved=1 → 403
@@ -1431,7 +1432,8 @@ function toggleDownloadGate() {
   const btn = document.getElementById('downloadBtn');
   const ok = document.getElementById('approveCheck').checked && lastPdfFilename;
   if (ok) {
-    btn.href = '/download/' + lastPdfFilename + '?approved=1';
+    btn.href = '/download/' + lastPdfFilename + '?approved=1'
+             + (lastDownloadToken ? '&t=' + encodeURIComponent(lastDownloadToken) : '');
     btn.classList.remove('disabled');
     btn.removeAttribute('aria-disabled');
   } else {
@@ -1449,8 +1451,8 @@ function renderVerification(v) {
   if (!v || !Array.isArray(v.citations)) { el.classList.add('d-none'); return; }
 
   const chip = (c) => c.status === 'verified'
-    ? `<span class="badge bg-success me-1 mb-1"><i class="bi bi-check-lg me-1"></i>${c.statute} ${c.section}</span>`
-    : `<span class="badge bg-danger me-1 mb-1"><i class="bi bi-x-lg me-1"></i>${c.statute} ${c.section} — UNVERIFIED</span>`;
+    ? `<span class="badge bg-success me-1 mb-1"><i class="bi bi-check-lg me-1"></i>${escapeHtml(c.statute)} ${escapeHtml(c.section)}</span>`
+    : `<span class="badge bg-danger me-1 mb-1"><i class="bi bi-x-lg me-1"></i>${escapeHtml(c.statute)} ${escapeHtml(c.section)} — UNVERIFIED</span>`;
   const chips = v.citations.map(chip).join('');
 
   const clean = v.all_verified && !v.ipc_without_bns;
@@ -1465,9 +1467,19 @@ function renderVerification(v) {
   } else {
     const problems = [];
     if (v.ungrounded && v.ungrounded.length)
-      problems.push(`<strong>Unverified citations:</strong> ${v.ungrounded.join(', ')} — the knowledge base cannot vouch for these. Check the bare act on indiacode.nic.in before relying on them.`);
+      problems.push(`<strong>Unverified citations:</strong> ${v.ungrounded.map(escapeHtml).join(', ')} — the knowledge base cannot vouch for these. Check the bare act on indiacode.nic.in before relying on them.`);
     if (v.foreign_citations && v.foreign_citations.length)
-      problems.push(`<strong>Foreign-law references detected:</strong> ${v.foreign_citations.map(f => f.match).join(', ')} — this analysis should cite Indian law only.`);
+      problems.push(`<strong>Foreign-law references detected:</strong> ${v.foreign_citations.map(f => escapeHtml(f.match)).join(', ')} — this analysis should cite Indian law only.`);
+    const prec = v.precedents || {};
+    if (prec.unverified && prec.unverified.length)
+      problems.push(`<strong>Unverified case law:</strong> ${prec.unverified.map(escapeHtml).join('; ')} — not in the verified judgments; confirm on SCC Online / Indian Kanoon before citing (SC: zero tolerance for AI-fabricated precedents).`);
+    if (prec.bad_law && prec.bad_law.length)
+      problems.push(`<strong>No longer good law:</strong> ${prec.bad_law.map(b => `${escapeHtml(b.case)} (${escapeHtml(b.status.replace('_', ' '))})`).join('; ')}.`);
+    if (prec.wrong_citation && prec.wrong_citation.length)
+      problems.push(`<strong>Wrong report citation:</strong> ${prec.wrong_citation.map(w => `${escapeHtml(w.case)} is ${escapeHtml(w.correct)}, not ${escapeHtml(w.cited)}`).join('; ')}.`);
+    if (v.mapping_mismatches && v.mapping_mismatches.length)
+      problems.push(`<strong>Wrong IPC→BNS pairing:</strong> ${v.mapping_mismatches.map(m =>
+        `IPC ${escapeHtml(m.ipc)} is BNS ${m.expected_bns.map(escapeHtml).join(' / ')}, not BNS ${escapeHtml(m.cited_bns)}`).join('; ')} — per the government concordance.`);
     if (v.ipc_without_bns)
       problems.push(`<strong>IPC cited with no BNS equivalent</strong> — valid only if the incident predates 01 July 2024.`);
     el.innerHTML =
@@ -1487,6 +1499,7 @@ function renderResults(data) {
 
   // PDF download link — locked behind the advocate-review checkbox.
   lastPdfFilename = data.pdf_filename || '';
+  lastDownloadToken = data.download_token || '';
   document.getElementById('approveCheck').checked = false;
   toggleDownloadGate();
   if (data.pdf_filename) {
@@ -1529,7 +1542,7 @@ function renderResults(data) {
 
   for (const [key, elId] of Object.entries(sectionMap)) {
     const raw = data.sections[key] || '';
-    // Already has <strong> from server; convert newlines to <br>
+    // Server escaped the model text and added <strong>; convert newlines to <br>
     let html = raw.replace(/\n/g, '<br>');
     // Wrap each "BNS Section NN" / "BNS Section NN(N)" mention in a clickable badge
     // that opens the verified KB entry. This is what makes the output trustworthy.
@@ -1709,8 +1722,13 @@ function linkifyCitations(html) {
 async function loadHistory() {
   try {
     const resp = await fetch('/history');
-    const cases = await resp.json();
     const list = document.getElementById('historyList');
+    if (resp.status === 401) {
+      list.innerHTML = '<div class="text-muted small px-3 py-2">'
+        + '<a href="/login">Sign in</a> to see your saved cases.</div>';
+      return;
+    }
+    const cases = await resp.json();
 
     if (!cases || cases.length === 0) {
       list.innerHTML = '<div class="text-muted small px-3 py-2">No past cases yet.</div>';
@@ -1719,7 +1737,7 @@ async function loadHistory() {
 
     list.innerHTML = cases.map(c => `
       <div class="history-item" onclick="loadCase('${c.txt_file}', '${c.pdf_file || ''}')">
-        <div class="history-date"><i class="bi bi-clock me-1"></i>${c.date}</div>
+        <div class="history-date"><i class="bi bi-clock me-1"></i>${escapeHtml(c.date)}</div>
         <div class="history-snippet">${escapeHtml(c.snippet)}</div>
         ${c.pdf_file
           ? `<a href="#" class="history-pdf-link"
@@ -1761,7 +1779,8 @@ async function loadCase(txtFile, pdfFile) {
 }
 
 function escapeHtml(text) {
-  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(text ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                           .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 // ── Privilege notice: shown whenever the active LLM provider is a cloud one ──
@@ -1769,7 +1788,11 @@ function escapeHtml(text) {
   try {
     const resp = await fetch('/llm/status');
     const st = await resp.json();
-    if (st.provider !== 'ollama') {
+    const label = st.provider === 'ollama' ? 'Local model' : (st.groq_model || '').split('/').pop();
+    if (label) document.getElementById('modelStageLabel').textContent = label;
+    // Embeddings count too: with Gemini embeddings the story still leaves
+    // the machine even when generation runs on local Ollama.
+    if (!st.fully_local) {
       document.getElementById('privilegeNotice').classList.remove('d-none');
     }
   } catch (e) { /* status endpoint unavailable — leave the notice hidden */ }

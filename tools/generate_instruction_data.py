@@ -528,15 +528,14 @@ def augment_with_groq(kb_records: list[dict], n: int, holdout: set[str],
             f"Section: {section} ({title})\nText: {desc}"
         )
         try:
-            comp = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[{"role": "system", "content": SYSTEM_EN},
-                          {"role": "user", "content": prompt}],
-                temperature=0.5,
-                max_tokens=900,
+            import llm_provider
+            obj = json.loads(llm_provider.groq_complete(
+                client,
+                [{"role": "system", "content": SYSTEM_EN},
+                 {"role": "user", "content": prompt}],
+                temperature=0.5, max_tokens=900,
                 response_format={"type": "json_object"},
-            )
-            obj = json.loads(comp.choices[0].message.content)
+            ))
             for item in obj.get("pairs", []):
                 q, a = (item.get("q") or "").strip(), (item.get("a") or "").strip()
                 if q and a:

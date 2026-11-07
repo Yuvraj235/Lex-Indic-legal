@@ -190,9 +190,14 @@
   <div class="stamp">Lex-Indic v1.4 · SOC 2 readiness scaffolding</div>
 </main>
 
+<script src="/static/admin-auth.js"></script>
 <script>
   async function loadControls(){
-    const resp = await fetch('/admin/soc2/summary.json');
+    const resp = await lexAdmin.fetch('/admin/soc2/summary.json');
+    if (resp.status === 401 || resp.status === 503){
+      lexAdmin.prompt(document.getElementById('controls'), loadControls);
+      return;
+    }
     const data = await resp.json();
     document.getElementById('totalNum').textContent = data.total;
     document.getElementById('passedNum').textContent = data.passed;
@@ -255,7 +260,7 @@
     const btn = document.getElementById('snapshotBtn');
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
-      const r = await fetch('/admin/soc2/snapshot', {method:'POST'});
+      const r = await lexAdmin.fetch('/admin/soc2/snapshot', {method:'POST'});
       const d = await r.json();
       alert('Snapshot saved: ' + d.path);
     } catch (e) {

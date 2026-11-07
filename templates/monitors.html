@@ -291,10 +291,13 @@
                   .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
+  const SIGN_IN = '<div class="empty-state"><a href="/login">Sign in</a> to keep a watchlist.</div>';
+
   async function loadMatters(){
     const resp = await fetch('/monitors/api/matters');
-    const data = await resp.json();
     const el = document.getElementById('matterList');
+    if (resp.status === 401){ el.innerHTML = SIGN_IN; return; }
+    const data = await resp.json();
     if (!data.matters.length){
       el.innerHTML = `
         <div class="lex-empty">
@@ -359,6 +362,7 @@
   document.getElementById('runBtn').addEventListener('click', async () => {
     document.getElementById('digest').innerHTML = '<div class="empty-state">Running…</div>';
     const resp = await fetch('/monitors/api/digest');
+    if (resp.status === 401){ document.getElementById('digest').innerHTML = SIGN_IN; return; }
     const d = await resp.json();
     renderDigest(d);
   });

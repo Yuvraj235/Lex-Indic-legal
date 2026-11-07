@@ -308,20 +308,20 @@ class TestI18n:
 class TestWebhooks:
     def test_add_sub_requires_valid_url(self):
         from webhooks import add_sub
-        with pytest.raises(ValueError, match="http"):
-            add_sub("not-a-url", ["analysis.completed"])
+        with pytest.raises(ValueError, match="https"):
+            add_sub("not-a-url", ["analysis.completed"], firm_id="firm_t")
 
-    def test_add_sub_requires_valid_event(self):
+    def test_add_sub_requires_valid_event(self, fake_dns):
         from webhooks import add_sub
         with pytest.raises(ValueError, match="event"):
-            add_sub("https://x.example", ["pretend.event"])
+            add_sub("https://x.example", ["pretend.event"], firm_id="firm_t")
 
-    def test_add_then_list_then_remove(self):
+    def test_add_then_list_then_remove(self, fake_dns):
         from webhooks import add_sub, list_subs, remove_sub
-        s = add_sub("https://x.example/hook", ["analysis.completed"])
-        subs = list_subs()
+        s = add_sub("https://x.example/hook", ["analysis.completed"], firm_id="firm_t")
+        subs = list_subs("firm_t")
         assert any(x["id"] == s["id"] for x in subs)
-        assert remove_sub(s["id"]) is True
+        assert remove_sub(s["id"], "firm_t") is True
         assert not any(x["id"] == s["id"] for x in list_subs())
 
     def test_remove_unknown_returns_false(self):
@@ -551,7 +551,8 @@ class TestDualBackendIndicators:
         import db; db._engine = None
         db.create_all()
         import monitors
-        m = monitors.add_matter("dowry matters", ["dowry", "BNS 85"], ["BNS 85", "BNS 80"])
+        m = monitors.add_matter("dowry matters", ["dowry", "BNS 85"], ["BNS 85", "BNS 80"],
+                                owner="firm_t")
         assert m["id"].startswith("m_")
         listing = monitors.list_matters()
         assert any(x["id"] == m["id"] for x in listing)
@@ -1784,6 +1785,7 @@ class TestReadiness:
             "MAIL_PROVIDER": "ses", "SMS_PROVIDER": "msg91",
             "DATABASE_URL": "postgres://u:p@h/db",
             "AUDIT_HASH_SALT": "a-long-random-production-salt-abcdef123456",
+            "SECRET_KEY": "a-separate-long-random-signing-key-0123456",
             "ADMIN_TOKEN": "adm",
         }.items():
             monkeypatch.setenv(k, v)

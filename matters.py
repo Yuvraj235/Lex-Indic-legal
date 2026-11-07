@@ -271,33 +271,21 @@ def add_lawyer(firm_id: str, full_name: str, bar_council_no: str = "",
 
 
 # ─── Matter CRUD ────────────────────────────────────────────────────────────
-def _next_matter_seq_json(firm_id: str, year: int) -> int:
-    matters = _load(_MATTERS_PATH, Matter)
-    pat = re.compile(rf"^[A-Z]+/{year}/(\d+)$")
-    seq = 0
-    for m in matters:
-        if m.firm_id != firm_id:
-            continue
-        match = pat.match(m.id)
-        if match:
-            seq = max(seq, int(match.group(1)))
-    return seq + 1
+# The sequence is counted per ID prefix ("ABBR/YEAR/") across ALL firms, not
+# per firm: two firms whose names truncate to the same 8-letter abbreviation
+# ("Mehta Associates" / "Mehta Associates LLP") must never mint the same id.
+def _max_seq(ids, prefix: str) -> int:
+    pat = re.compile(rf"^{re.escape(prefix)}(\d+)$")
+    return max((int(m.group(1)) for i in ids if (m := pat.match(i))), default=0)
 
 
-def _next_matter_seq_db(s, firm_id: str, year: int) -> int:
-    """Count existing matters for this firm+year to derive next seq."""
-    pat = f"%/{year}/%"
-    rows = s.query(db.Matter).filter(
-        db.Matter.firm_id == firm_id,
-        db.Matter.id.like(pat),
-    ).all()
-    seq = 0
-    pat_re = re.compile(rf"^[A-Z]+/{year}/(\d+)$")
-    for r in rows:
-        m = pat_re.match(r.id)
-        if m:
-            seq = max(seq, int(m.group(1)))
-    return seq + 1
+def _next_matter_seq_json(prefix: str) -> int:
+    return _max_seq((m.id for m in _load(_MATTERS_PATH, Matter)), prefix) + 1
+
+
+def _next_matter_seq_db(s, prefix: str) -> int:
+    rows = s.query(db.Matter.id).filter(db.Matter.id.like(prefix + "%")).all()
+    return _max_seq((r[0] for r in rows), prefix) + 1
 
 
 def add_matter(firm_id: str, lawyer_id: str, client_name: str,
@@ -320,7 +308,7 @@ def add_matter(firm_id: str, lawyer_id: str, client_name: str,
             if not lawyer:
                 raise ValueError("Lawyer not registered with this firm.")
             firm_abbr = re.sub(r"[^A-Z]", "", firm.name.upper())[:8] or "FIRM"
-            seq = _next_matter_seq_db(s, firm_id, year)
+            seq = _next_matter_seq_db(s, f"{firm_abbr}/{year}/")
             matter_id = f"{firm_abbr}/{year}/{seq:04d}"
             now = datetime.now(timezone.utc)
             s.add(db.Matter(
@@ -351,7 +339,7 @@ def add_matter(firm_id: str, lawyer_id: str, client_name: str,
         raise ValueError("Lawyer not registered with this firm.")
 
     firm_abbr = re.sub(r"[^A-Z]", "", firm.name.upper())[:8] or "FIRM"
-    seq = _next_matter_seq_json(firm_id, year)
+    seq = _next_matter_seq_json(f"{firm_abbr}/{year}/")
     matter_id = f"{firm_abbr}/{year}/{seq:04d}"
 
     matters = _load(_MATTERS_PATH, Matter)

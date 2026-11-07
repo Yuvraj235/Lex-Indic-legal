@@ -17,9 +17,13 @@ services:
     autoDeploy:  true                  # redeploy on every push to main
     envVars:
       # Sync from a Render env-group (preferred) OR set in dashboard manually:
-      #   GEMINI_API_KEY, GROQ_API_KEY, ADMIN_TOKEN, AUDIT_HASH_SALT,
+      #   GEMINI_API_KEY, GROQ_API_KEY, ADMIN_TOKEN, SECRET_KEY, AUDIT_HASH_SALT,
       #   DISABLE_RATE_LIMITS, MAIL_PROVIDER, SMTP_*, LEAD_NOTIFY_EMAIL, ...
       - key:    PYTHONUNBUFFERED
+        value:  "1"
+      - key:    LEX_ENV
+        value:  "production"
+      - key:    TRUST_PROXY_HOPS         # Render's load balancer is one hop
         value:  "1"
       - key:    FLASK_APP
         value:  "app"

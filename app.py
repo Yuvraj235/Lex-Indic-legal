@@ -21,6 +21,10 @@ import sys
 import time
 import json
 import base64
+import html as _html
+import hashlib
+import hmac
+import secrets
 import textwrap
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -51,7 +55,40 @@ from pdf_generator import generate_pdf, parse_sections
 
 # ─────────────────────────────────────────────────────────────────────────────
 load_dotenv()
+import envmode
+envmode.check_production_config()   # no signing secret → refuse to boot
 app = Flask(__name__)
+
+# Behind a reverse proxy (Fly, Render, nginx), trust exactly TRUST_PROXY_HOPS
+# hops of X-Forwarded-For/-Proto: remote_addr becomes the address the proxy
+# saw and request.scheme the client's real scheme (so the session cookie gets
+# Secure). Unset = no proxy trusted; a client-sent X-Forwarded-For is ignored.
+from werkzeug.middleware.proxy_fix import ProxyFix
+_PROXY_HOPS = int(os.getenv("TRUST_PROXY_HOPS", "0") or 0)
+if _PROXY_HOPS > 0:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=_PROXY_HOPS, x_proto=_PROXY_HOPS)
+
+
+def _section_html(text: str) -> str:
+    """Model output → safe HTML for the browser. The text echoes the client's
+    story, uploaded documents and WhatsApp messages, so it's escaped first;
+    only **bold** is then turned back into markup."""
+    return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", _html.escape(text, quote=False))
+
+
+def _client_ip() -> str:
+    """The caller's address for quotas and the audit log. Never read
+    X-Forwarded-For directly — anyone can send one."""
+    return request.remote_addr or ""
+
+
+def _per_ip_limit(bucket: str, per_minute: int):
+    """429 response when this IP exceeds `per_minute` calls to `bucket`, else
+    None. For public endpoints that spend LLM credits on every call."""
+    allowed, _ = api_keys_module.check_rate_limit(f"{bucket}:{_client_ip()}", per_minute)
+    if allowed:
+        return None
+    return jsonify({"error": "Too many requests. Wait a minute and try again."}), 429
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.jinja_env.auto_reload = True
 
@@ -60,10 +97,63 @@ app.jinja_env.auto_reload = True
 import uuid as _uuid_mod
 @app.before_request
 def _attach_request_id():
+    # Reuse a caller's X-Request-Id only if it looks like an id: it's echoed
+    # into logs and response headers.
+    supplied = request.headers.get("X-Request-Id", "")
     request.request_id = (
-        request.headers.get("X-Request-Id")
-        or f"req_{_uuid_mod.uuid4().hex[:14]}"
+        supplied if re.fullmatch(r"[A-Za-z0-9_.\-]{1,64}", supplied)
+        else f"req_{_uuid_mod.uuid4().hex[:14]}"
     )
+
+
+# Whole-request cap, checked before Flask reads the body into memory: without
+# it one oversized upload to /analyze, /convert or /tabular could exhaust RAM.
+app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_REQUEST_MB", "25")) * 1024 * 1024
+
+# Endpoints called by other services, not browsers: no Origin check.
+_ORIGIN_EXEMPT = ("/wa/inbound", "/billing/stripe-webhook", "/api/v1/")
+
+
+@app.before_request
+def _reject_cross_site_writes():
+    """Defence in depth on top of SameSite=Lax cookies: a state-changing
+    request that carries a browser Origin must come from this site (or a
+    CORS-allowlisted origin). Requests without Origin (curl, servers) pass —
+    they carry no ambient browser cookies to abuse."""
+    if request.method in ("GET", "HEAD", "OPTIONS") or request.path.startswith(_ORIGIN_EXEMPT):
+        return None
+    origin = request.headers.get("Origin")
+    if not origin:
+        return None
+    if origin.rstrip("/") == request.host_url.rstrip("/") or _cors_allowed_origin():
+        return None
+    return jsonify({"error": "Cross-site request refused."}), 403
+
+
+@app.errorhandler(413)
+def _too_large(e):
+    return jsonify({"error": "Upload too large. "
+                             f"The limit is {app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)} MB."}), 413
+
+
+@app.after_request
+def _security_headers(response):
+    h = response.headers
+    h.setdefault("X-Content-Type-Options", "nosniff")
+    h.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    h.setdefault("Permissions-Policy", "camera=(), geolocation=(self), microphone=(self), payment=()")
+    if request.path.startswith("/addin/"):
+        # Word frames the task pane; everything else may not be framed at all.
+        h.setdefault("Content-Security-Policy",
+                     "object-src 'none'; base-uri 'self'; frame-ancestors 'self' "
+                     "https://*.office.com https://*.officeapps.live.com https://*.microsoft.com")
+    else:
+        h.setdefault("X-Frame-Options", "DENY")
+        h.setdefault("Content-Security-Policy",
+                     "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
+    if request.is_secure:
+        h.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
 
 
 @app.after_request
@@ -228,7 +318,9 @@ def convert_upload():
     out_dir.mkdir(parents=True, exist_ok=True)
     safe = secure_filename(f.filename).removesuffix(".docx") or "pleading"
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_name = f"{safe}_{ts}.bns.docx"
+    # The download link is the only access control for a converted pleading,
+    # so the name carries 64 random bits instead of being guessable.
+    out_name = f"{safe}_{ts}_{secrets.token_hex(8)}.bns.docx"
     out_path = out_dir / out_name
     with open(out_path, "wb") as out_f:
         out_f.write(new_bytes)
@@ -242,7 +334,7 @@ def convert_upload():
 @app.route("/convert/download/<filename>")
 def convert_download(filename):
     """Serve a converted .docx file from outputs/converted/."""
-    if not re.match(r"^[A-Za-z0-9_\-]+_\d{8}_\d{6}\.bns\.docx$", filename):
+    if not re.match(r"^[A-Za-z0-9_\-]+_\d{8}_\d{6}_[0-9a-f]{16}\.bns\.docx$", filename):
         return "Invalid filename.", 400
     return send_from_directory(
         Path("outputs/converted").resolve(),
@@ -277,6 +369,9 @@ import billing as billing_module    # Day 31 (Stripe)
 import prefs as prefs_module         # Day 34 (notification preferences)
 import uploads as uploads_module     # Day 35 (per-matter document storage)
 import verifier as verifier_module   # v1.9 — runtime citation verification
+import case_access                   # who may read a generated case file
+import statute_lookup                # table answers: IPC→BNS, bailable, punishment
+import mailer as mailer_module       # pluggable email (stdout / SMTP / SES)
 
 
 @app.route("/monitors")
@@ -284,13 +379,34 @@ def monitors_page():
     return render_template("monitors.html")
 
 
+def _monitor_owner():
+    """(owner, None) for whoever's watching: "*" for the operator (all
+    monitors), else the caller's firm — or their user id if they have none."""
+    if _is_admin_request():
+        return "*", None
+    u = _current_user()
+    if not u:
+        return None, (jsonify({"error": "Sign in to manage your watchlist."}), 401)
+    return (u.get("firm_id") or u["id"]), None
+
+
+def _scope(owner: str):
+    return None if owner == "*" else owner
+
+
 @app.route("/monitors/api/matters", methods=["GET"])
 def monitors_list_matters():
-    return jsonify({"matters": monitors_module.list_matters()})
+    owner, err = _monitor_owner()
+    if err:
+        return err
+    return jsonify({"matters": monitors_module.list_matters(_scope(owner))})
 
 
 @app.route("/monitors/api/matters", methods=["POST"])
 def monitors_add_matter():
+    owner, err = _monitor_owner()
+    if err:
+        return err
     data = request.get_json() or {}
     label = (data.get("label") or "").strip()
     sections = data.get("sections") or []
@@ -301,15 +417,19 @@ def monitors_add_matter():
         return jsonify({"error": "Sections and keywords must be arrays."}), 400
     if not sections and not keywords:
         return jsonify({"error": "Provide at least one section or one keyword."}), 400
-    saved = monitors_module.add_matter(label, keywords=keywords, sections=sections)
+    saved = monitors_module.add_matter(label, keywords=keywords, sections=sections,
+                                       owner=owner)
     return jsonify({"matter": saved})
 
 
 @app.route("/monitors/api/matters/<matter_id>", methods=["DELETE"])
 def monitors_remove_matter(matter_id):
-    if not re.match(r"^m_\d+$", matter_id):
+    owner, err = _monitor_owner()
+    if err:
+        return err
+    if not re.match(r"^m_\d+(?:_[0-9a-f]{6})?$", matter_id):
         return jsonify({"error": "Invalid matter id."}), 400
-    ok = monitors_module.remove_matter(matter_id)
+    ok = monitors_module.remove_matter(matter_id, _scope(owner))
     if not ok:
         return jsonify({"error": "Matter not found."}), 404
     return jsonify({"ok": True})
@@ -317,8 +437,11 @@ def monitors_remove_matter(matter_id):
 
 @app.route("/monitors/api/digest", methods=["GET"])
 def monitors_digest():
+    owner, err = _monitor_owner()
+    if err:
+        return err
     since = request.args.get("since")  # optional YYYY-MM-DD
-    d = monitors_module.run_digest(since=since)
+    d = monitors_module.run_digest(since=since, owner=_scope(owner))
     if request.args.get("save") == "1":
         monitors_module.save_digest(d)
     return jsonify(d)
@@ -327,7 +450,10 @@ def monitors_digest():
 @app.route("/monitors/digest.txt")
 def monitors_digest_text():
     """Plain-text digest — pipe-friendly for cron + email."""
-    d = monitors_module.run_digest()
+    owner, err = _monitor_owner()
+    if err:
+        return err
+    d = monitors_module.run_digest(owner=_scope(owner))
     response = make_response(monitors_module.format_digest_text(d))
     response.headers["Content-Type"] = "text/plain; charset=utf-8"
     return response
@@ -385,11 +511,16 @@ def nalsa_stats():
 
 @app.route("/nalsa/api/export.csv")
 def nalsa_export_csv():
-    """SLSA spot-check CSV.  Production: gate behind admin auth."""
-    if os.getenv("NALSA_EXPORT_TOKEN"):
-        provided = request.headers.get("X-Export-Token", "")
-        if provided != os.getenv("NALSA_EXPORT_TOKEN"):
-            return ("Unauthorised.", 401)
+    """SLSA spot-check CSV of registered advocates (names, phones, Bar Council
+    numbers). Needs the SLSA's NALSA_EXPORT_TOKEN in X-Export-Token, or the
+    operator's admin token — never open by default."""
+    export_token = os.getenv("NALSA_EXPORT_TOKEN", "")
+    provided = request.headers.get("X-Export-Token", "")
+    if not (export_token and provided
+            and hmac.compare_digest(provided.encode(), export_token.encode())):
+        guard = _require_admin()
+        if guard:
+            return guard
     csv_body = nalsa_module.export_csv()
     response = make_response(csv_body)
     response.headers["Content-Type"] = "text/csv; charset=utf-8"
@@ -438,22 +569,25 @@ def matters_page():
 
 @app.route("/matters/api/firms", methods=["GET", "POST"])
 def matters_firms():
-    """Day-16 multi-tenant rules:
-      GET  — anonymous: returns all firms (demo).
-             authenticated: returns only the user's firm.
-      POST — anyone can create a firm; if user is authenticated and has
-             no firm_id yet, auto-bind them to the new firm as 'partner'.
+    """Multi-tenant rules (sign-in required):
+      GET  — the caller's own firm only ([] until they create or join one).
+      POST — create a firm; the creator becomes its 'partner'. A user who
+             already belongs to a firm can't create another; colleagues join
+             through a partner's invite (/auth/invites → /auth/bind-firm).
       Polish: stricter input validation (no HTML/JS/null bytes, length caps)."""
+    import response_helpers as _rh
     u = _current_user()
+    if not u:
+        return jsonify({"error": "Sign in to manage your firm."}), 401
     if request.method == "GET":
-        firms = matters_module.list_firms()
-        if u and u.get("firm_id"):
-            firms = [f for f in firms if f["id"] == u["firm_id"]]
+        firms = [f for f in matters_module.list_firms()
+                 if u.get("firm_id") and f["id"] == u["firm_id"]]
         return jsonify({"firms": firms})
+    if u.get("firm_id"):
+        return _rh.error("You already belong to a firm.", status=409, code="already_bound")
 
     data = request.get_json(silent=True) or {}
     # Validate inputs
-    import response_helpers as _rh
     name, err = _rh.require_string(data, "name", min_len=2, max_len=120)
     if err:
         return _rh.error(err, status=422, code="validation_failed")
@@ -465,24 +599,33 @@ def matters_firms():
 
     try:
         firm = matters_module.add_firm(name, address)
-        if u and not u.get("firm_id"):
-            auth_module.bind_user_to_firm(u["id"], firm["id"], role="partner")
+        auth_module.bind_user_to_firm(u["id"], firm["id"], role="partner")
         return jsonify({"ok": True, "firm": firm})
     except ValueError as e:
         return _rh.error(str(e), status=409, code="duplicate")
 
 
+def _require_firm_user():
+    """(user, None) for a signed-in user who belongs to a firm, else
+    (None, error_response). Every matters endpoint is scoped by this firm_id —
+    never by a firm_id the caller sends."""
+    u = _current_user()
+    if not u:
+        return None, (jsonify({"error": "Sign in to use matters."}), 401)
+    if not u.get("firm_id"):
+        return None, (jsonify({"error": "Create your firm or redeem an invite first."}), 403)
+    return u, None
+
+
 @app.route("/matters/api/lawyers", methods=["GET", "POST"])
 def matters_lawyers():
-    u = _current_user()
+    u, err = _require_firm_user()
+    if err:
+        return err
     if request.method == "GET":
-        lawyers = matters_module.list_lawyers()
-        if u and u.get("firm_id"):
-            lawyers = [l for l in lawyers if l["firm_id"] == u["firm_id"]]
-        return jsonify({"lawyers": lawyers})
+        return jsonify({"lawyers": matters_module.list_lawyers_for_firm(u["firm_id"])})
     data = request.get_json() or {}
-    # Authenticated user: silently override firm_id to their own
-    firm_id = u["firm_id"] if (u and u.get("firm_id")) else data.get("firm_id", "")
+    firm_id = u["firm_id"]
     try:
         lwy = matters_module.add_lawyer(
             firm_id=firm_id,
@@ -498,14 +641,13 @@ def matters_lawyers():
 
 @app.route("/matters/api/matters", methods=["GET", "POST"])
 def matters_matters():
-    u = _current_user()
+    u, err = _require_firm_user()
+    if err:
+        return err
     if request.method == "GET":
-        matters = matters_module.list_matters()
-        if u and u.get("firm_id"):
-            matters = [m for m in matters if m["firm_id"] == u["firm_id"]]
-        return jsonify({"matters": matters})
+        return jsonify({"matters": matters_module.list_matters(firm_id=u["firm_id"])})
     data = request.get_json() or {}
-    firm_id = u["firm_id"] if (u and u.get("firm_id")) else data.get("firm_id", "")
+    firm_id = u["firm_id"]
     try:
         m = matters_module.add_matter(
             firm_id=firm_id,
@@ -529,9 +671,9 @@ def matters_matters():
                 "matter_type": m.get("matter_type"),
                 "conflicts_count": len(conflicts),
                 "by_user_id": (u or {}).get("id"),
-            })
-        except Exception:
-            pass
+            }, firm_id=m["firm_id"])
+        except Exception:  # noqa: BLE001 — never fail the user's request
+            app.logger.exception("webhook emit failed")
         return jsonify({"matter": m, "conflicts": conflicts})
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -539,15 +681,13 @@ def matters_matters():
 
 def _matter_or_403(matter_id: str):
     """Tenant guard for per-matter routes. Returns (matter, None) if the caller
-    may touch this matter, else (None, error_response). An authenticated firm
-    user is scoped to their own firm; a cross-tenant matter id returns 404 so its
-    existence isn't even revealed. Anonymous/unbound callers (dev/free tier) are
-    not firm-scoped."""
-    u = _current_user()
-    if u and u.get("firm_id"):
-        m = matters_module.get_matter_for_firm(matter_id, u["firm_id"])
-    else:
-        m = matters_module.get_matter(matter_id)
+    may touch this matter, else (None, error_response). Only a signed-in member
+    of the matter's firm gets through; a cross-tenant matter id returns 404 so
+    its existence isn't even revealed."""
+    u, err = _require_firm_user()
+    if err:
+        return None, err
+    m = matters_module.get_matter_for_firm(matter_id, u["firm_id"])
     if not m:
         return None, (jsonify({"error": "Matter not found."}), 404)
     return m, None
@@ -555,21 +695,22 @@ def _matter_or_403(matter_id: str):
 
 @app.route("/matters/api/conflict-check", methods=["POST"])
 def matters_conflict_check():
-    """Pre-create conflict check — call before adding a matter."""
+    """Pre-create conflict check — call before adding a matter. Runs only
+    within the caller's own firm: never probe another firm's client /
+    opposing-party graph."""
+    u, err = _require_firm_user()
+    if err:
+        return err
     data = request.get_json() or {}
-    u = _current_user()
-    # Authenticated firm users can only run conflict checks within their own
-    # firm — never probe another firm's client / opposing-party graph.
-    firm_id = u["firm_id"] if (u and u.get("firm_id")) else data.get("firm_id", "")
     hits = matters_module.check_conflict(
-        firm_id=firm_id,
+        firm_id=u["firm_id"],
         client_name=data.get("client_name", ""),
         opposing_party=data.get("opposing_party", ""),
     )
     return jsonify({"conflicts": hits})
 
 
-@app.route("/matters/api/<matter_id>/status", methods=["PATCH"])
+@app.route("/matters/api/<path:matter_id>/status", methods=["PATCH"])
 def matters_status(matter_id):
     if not re.match(r"^[A-Z]+/\d{4}/\d{4}$", matter_id):
         return jsonify({"error": "Invalid matter ID."}), 400
@@ -722,12 +863,11 @@ def _wa_draft(story: str) -> str:
     ctx, _sources = retrieve_relevant_sections_structured(
         rag_collection, story, n_results=6)
     prompt = build_legal_prompt(story, ctx)
-    comp = groq_client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "system", "content": LEXI_SYSTEM_PROMPT},
-                  {"role": "user", "content": prompt}],
+    return llm_provider_module.groq_complete(
+        groq_client,
+        [{"role": "system", "content": LEXI_SYSTEM_PROMPT},
+         {"role": "user", "content": prompt}],
         temperature=0.2, max_tokens=4096)
-    return comp.choices[0].message.content or ""
 
 
 def _wa_file_draft(sender: str, story: str, draft: str) -> str:
@@ -759,6 +899,29 @@ def _wa_file_draft(sender: str, story: str, draft: str) -> str:
     return str(folder.relative_to(Path("outputs")))
 
 
+def _wa_inbound_authorised(is_twilio: bool) -> bool:
+    """Only the messaging provider may call /wa/inbound — otherwise anyone could
+    speak as any client's phone number and trigger drafting.
+      Twilio: X-Twilio-Signature = base64(HMAC-SHA1(TWILIO_AUTH_TOKEN,
+              URL + sorted form name/value pairs)). Set WA_PUBLIC_URL if the
+              URL Twilio calls differs from what this server sees.
+      MSG91 / n8n (can't sign): WA_INBOUND_TOKEN in the X-Lex-Inbound-Token
+              header or ?token= on the webhook URL.
+    With neither configured it's closed, except under LEX_ENV=development."""
+    twilio_token = os.getenv("TWILIO_AUTH_TOKEN", "")
+    shared = os.getenv("WA_INBOUND_TOKEN", "")
+    if is_twilio and twilio_token:
+        url = os.getenv("WA_PUBLIC_URL") or request.url
+        signed = url + "".join(k + v for k, v in sorted(request.form.items(multi=True)))
+        expected = base64.b64encode(
+            hmac.new(twilio_token.encode(), signed.encode(), hashlib.sha1).digest()).decode()
+        return hmac.compare_digest(expected, request.headers.get("X-Twilio-Signature", ""))
+    if shared:
+        provided = request.headers.get("X-Lex-Inbound-Token") or request.args.get("token", "")
+        return bool(provided) and hmac.compare_digest(provided.encode(), shared.encode())
+    return envmode.is_dev()
+
+
 @app.route("/wa/inbound", methods=["POST"])
 def wa_inbound():
     """Inbound WhatsApp webhook (Twilio form OR MSG91/generic JSON). Runs a
@@ -766,6 +929,8 @@ def wa_inbound():
     and replies (TwiML for Twilio, JSON otherwise)."""
     import intake as intake_module
     is_twilio = bool(request.form.get("From") or request.form.get("Body"))
+    if not _wa_inbound_authorised(is_twilio):
+        return jsonify({"error": "Unauthorised inbound webhook."}), 403
     form = request.form.to_dict() if request.form else {}
     body = request.get_json(silent=True) if request.is_json else None
     sender, text = intake_module.parse_inbound(form, body)
@@ -843,29 +1008,28 @@ def matters_history(matter_id):
 # ROUTES — Multi-tenant auth (Day-10).
 # Magic-link login: POST /auth/code, POST /auth/verify, GET /auth/me, /auth/logout.
 # ═══════════════════════════════════════════════════════════════════════════════
-from flask import make_response  # already imported earlier; harmless re-import
-
-_DEV_MODE_AUTH = not os.getenv("AUDIT_HASH_SALT")  # dev iff salt unset
-
-
 @app.route("/login")
 def login_page():
-    return render_template("login.html", dev_mode=_DEV_MODE_AUTH)
+    return render_template("login.html", dev_mode=envmode.is_dev())
 
 
 @app.route("/auth/code", methods=["POST"])
 def auth_code():
     data = request.get_json() or {}
     email = (data.get("email") or "").strip().lower()
+    limited = _per_ip_limit("auth-code", 10)
+    if limited:
+        return limited
     try:
         code = auth_module.issue_code(email)
+    except auth_module.RateLimited as e:
+        return jsonify({"error": str(e)}), 429
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    # In dev we expose the code in the response for easy testing.  In prod
-    # (AUDIT_HASH_SALT set) we hide it and the operator's email provider
-    # delivers the code.
+    # Only an explicit LEX_ENV=development echoes the code back; everywhere
+    # else the mail provider delivers it.
     resp = {"ok": True}
-    if _DEV_MODE_AUTH:
+    if envmode.is_dev():
         resp["dev_code"] = code
     return jsonify(resp)
 
@@ -905,26 +1069,51 @@ def auth_me():
 
 @app.route("/auth/logout", methods=["POST"])
 def auth_logout():
+    """Signs this user out everywhere: the cookie is cleared here and every
+    token issued before now stops working, including a copied one."""
+    user_id = auth_module.verify_session_token(request.cookies.get("lex_session", ""))
+    if user_id:
+        auth_module.revoke_sessions(user_id)
     response = make_response(jsonify({"ok": True}))
     response.set_cookie("lex_session", "", expires=0)
     return response
 
 
+@app.route("/auth/invites", methods=["POST"])
+def auth_create_invite():
+    """A partner mints a single-use invite code for their own firm."""
+    u, err = _require_firm_user()
+    if err:
+        return err
+    if u.get("role") != "partner":
+        return jsonify({"error": "Only a partner can invite people to the firm."}), 403
+    data = request.get_json(silent=True) or {}
+    try:
+        invite = auth_module.create_invite(
+            u["firm_id"], role=(data.get("role") or "associate").strip(),
+            created_by=u["id"])
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify(invite)
+
+
 @app.route("/auth/bind-firm", methods=["POST"])
 def auth_bind_firm():
-    """Bind the currently-authenticated user to a firm_id.  Caller pre-creates
-    the firm via /matters/api/firms.  Idempotent."""
-    token = request.cookies.get("lex_session", "")
-    user_id = auth_module.verify_session_token(token)
-    if not user_id:
+    """Join a firm by redeeming a partner's invite code. The firm and the
+    role both come from the invite — never from the caller."""
+    u = _current_user()
+    if not u:
         return jsonify({"error": "Not signed in."}), 401
-    data = request.get_json() or {}
-    firm_id = (data.get("firm_id") or "").strip()
-    role    = (data.get("role") or "associate").strip()
+    if u.get("firm_id"):
+        return jsonify({"error": "You already belong to a firm."}), 409
+    data = request.get_json(silent=True) or {}
+    code = (data.get("invite_code") or "").strip()
+    if not code:
+        return jsonify({"error": "invite_code is required."}), 400
+    firm_id = auth_module.redeem_invite(code, u["id"])
     if not firm_id:
-        return jsonify({"error": "firm_id is required."}), 400
-    ok = auth_module.bind_user_to_firm(user_id, firm_id, role=role)
-    return jsonify({"ok": ok})
+        return jsonify({"error": "Invalid, used or expired invite."}), 400
+    return jsonify({"ok": True, "firm_id": firm_id})
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -982,6 +1171,9 @@ def tabular_page():
 def tabular_compare():
     """Multipart: 'files' = N file uploads, 'clauses' = JSON array of
     {label, question}."""
+    limited = _per_ip_limit("tabular", 5)
+    if limited:
+        return limited
     files = request.files.getlist("files")
     if not files:
         return jsonify({"error": "Upload at least one contract."}), 400
@@ -1037,16 +1229,11 @@ def tabular_compare():
             )
             return out.get("text", "") or ""
         # Groq path
-        completion = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_prompt},
-            ],
-            temperature=0.0,
-            max_tokens=2048,
-        )
-        return completion.choices[0].message.content or ""
+        return llm_provider_module.groq_complete(
+            groq_client,
+            [{"role": "system", "content": system_prompt},
+             {"role": "user",   "content": user_prompt}],
+            temperature=0.0, max_tokens=2048)
 
     try:
         result = tabular_module.run_comparison(contracts, clauses, _llm_call)
@@ -1075,23 +1262,32 @@ _sys.path.insert(0, str(Path(__file__).parent / "tools" / "soc2"))
 import controls as soc2_module
 
 
+def _is_admin_request() -> bool:
+    """True iff the request carries the operator's ADMIN_TOKEN in the
+    X-Admin-Token header. Header only: a ?token= query string ends up in
+    server logs, proxies and browser history."""
+    expected = os.getenv("ADMIN_TOKEN", "")
+    provided = request.headers.get("X-Admin-Token", "")
+    return bool(expected and provided) and hmac.compare_digest(
+        provided.encode(), expected.encode())
+
+
 def _require_admin():
-    """Tiny token-gate so the admin dashboard isn't world-readable in prod.
-    Set ADMIN_TOKEN in .env; pass it via ?token=… or X-Admin-Token header.
-    If ADMIN_TOKEN is unset (dev), allow without a check."""
-    expected = os.getenv("ADMIN_TOKEN")
-    if not expected:
-        return None  # dev mode — no gate
-    provided = request.args.get("token") or request.headers.get("X-Admin-Token", "")
-    if provided != expected:
-        return ("Unauthorised. Set ADMIN_TOKEN and pass it via X-Admin-Token.", 401)
+    """Token gate for the operator surface. Fails closed: with ADMIN_TOKEN
+    unset the admin API is disabled, unless LEX_ENV=development."""
+    if not os.getenv("ADMIN_TOKEN"):
+        if envmode.is_dev():
+            return None
+        return (jsonify({"error": "Admin API disabled: set ADMIN_TOKEN."}), 503)
+    if not _is_admin_request():
+        return (jsonify({"error": "Unauthorised. Send ADMIN_TOKEN in the X-Admin-Token header."}), 401)
     return None
 
 
 @app.route("/admin/soc2")
 def admin_soc2_page():
-    guard = _require_admin()
-    if guard: return guard
+    # Data-free shell: a browser navigation can't send X-Admin-Token, so the
+    # page asks for the token and its JSON calls (below) are what's gated.
     return render_template("admin_soc2.html")
 
 
@@ -1149,8 +1345,6 @@ def addin_manifest():
     body = render_template("addin/manifest.xml")
     response = make_response(body)
     response.headers["Content-Type"] = "application/xml; charset=utf-8"
-    # Always allow Word to fetch this without a CORS preflight.
-    response.headers["Access-Control-Allow-Origin"] = "*"
     return response
 
 
@@ -1158,10 +1352,8 @@ def addin_manifest():
 def addin_taskpane():
     """The iframe HTML Word loads inside its task pane."""
     response = make_response(render_template("addin/taskpane.html"))
-    # Office's iframe lives in an https://word-edit.officeapps.live.com origin
-    # (or the desktop app's webview).  Allow framing + cross-origin XHR back to
-    # this server.
-    response.headers["Access-Control-Allow-Origin"] = "*"
+    # Office frames this page from its own origin, but the page itself is
+    # served from here, so its calls back to /convert/* are same-origin.
     # Don't deny framing — Office WILL frame us; setting X-Frame-Options=DENY
     # would break the add-in entirely.
     response.headers.pop("X-Frame-Options", None)
@@ -1185,15 +1377,26 @@ def addin_commands():
 </body></html>"""
 
 
-# ─── CORS for the /convert/text endpoint (the task pane calls it from an
-#     iframe whose origin differs from our server's).  We only allow the
-#     two endpoints the add-in actually needs.
+# ─── CORS for /convert/* and /addin/*. The Word task pane is served from this
+#     server (BACKEND = window.location.origin), so it needs none. A front-end
+#     on another origin must be listed in CORS_ALLOWED_ORIGINS (comma-separated);
+#     there is no "*".
+def _cors_allowed_origin() -> str | None:
+    origin = request.headers.get("Origin", "").rstrip("/")
+    allowed = {o.strip().rstrip("/")
+               for o in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if o.strip()}
+    return origin if origin and origin in allowed else None
+
+
 @app.after_request
 def _allow_addin_xhr(response):
-    if request.path.startswith("/convert/") or request.path.startswith("/addin/"):
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    if request.path.startswith(("/convert/", "/addin/")):
+        origin = _cors_allowed_origin()
+        if origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+            response.headers.add("Vary", "Origin")
     return response
 
 
@@ -1207,6 +1410,50 @@ def _convert_preflight():
 # ═══════════════════════════════════════════════════════════════════════════════
 # ROUTE 2: Run legal triage — the core API endpoint
 # ═══════════════════════════════════════════════════════════════════════════════
+class _ProviderBusy(Exception):
+    """The hosted LLM is rate-limiting us; the caller should retry later."""
+
+
+def _repair_prompt(prompt: str, draft: str, feedback: list[str]) -> str:
+    return (prompt
+            + "\n\n=== YOUR PREVIOUS DRAFT ===\n" + draft
+            + "\n\n=== REVIEW FINDINGS — fix every one ===\n"
+            + "\n".join(f"- {line}" for line in feedback)
+            + "\n\nRewrite the COMPLETE analysis with all six sections under the exact "
+              "headings given above. Change only what the findings require, and cite "
+              "only sections from the retrieved law above.")
+
+
+def _check_and_repair(draft: str, prompt: str, generate) -> tuple[str, dict]:
+    """Verify a draft and, if the verifier finds problems (missing sections,
+    sections outside the knowledge base, IPC→BNS pairings that contradict the
+    concordance, foreign law), give the model ONE correction pass listing
+    exactly those problems. The draft with the lower issue score wins, so a
+    worse rewrite can never replace a better first draft."""
+    sections = parse_sections(draft)
+    check = verifier_module.verify_analysis(sections)
+    feedback = verifier_module.repair_feedback(sections, check)
+    info = {"attempted": False, "issues_before": len(feedback), "issues_after": len(feedback)}
+    if not feedback:
+        return draft, info
+    info["attempted"] = True
+    try:
+        fixed = generate(_repair_prompt(prompt, draft, feedback))
+    except Exception as e:  # noqa: BLE001 — keep the first draft; it is still verified
+        app.logger.warning("self-correction pass failed: %s", e)
+        info["error"] = type(e).__name__
+        return draft, info
+    fixed_sections = parse_sections(fixed or "")
+    fixed_check = verifier_module.verify_analysis(fixed_sections)
+    if (fixed and verifier_module.issue_score(fixed_sections, fixed_check)
+            < verifier_module.issue_score(sections, check)):
+        info["issues_after"] = len(verifier_module.repair_feedback(fixed_sections, fixed_check))
+        info["accepted"] = True
+        return fixed, info
+    info["accepted"] = False
+    return draft, info
+
+
 @app.route("/analyze", methods=["POST"])
 def analyze():
     """
@@ -1222,7 +1469,7 @@ def analyze():
     """
     # Capture audit context up-front so it's available on every code path
     t_start    = time.monotonic()
-    client_ip  = (request.headers.get("X-Forwarded-For") or request.remote_addr or "")
+    client_ip  = _client_ip()
     user_agent = request.headers.get("User-Agent", "")
     # Day-16: enrich audit with user_id/firm_id when authenticated.
     _u = _current_user()
@@ -1339,42 +1586,43 @@ def analyze():
         if language == "hi":
             system_messages.append(i18n_module.HINDI_SYSTEM_INSTRUCTION)
 
-        ai_response = None
-        # Day-13: route through llm_provider so Ollama users get local inference
-        # with zero sub-processors.  Groq remains the default; ollama users set
-        # LLM_PROVIDER=ollama in .env.
-        if llm_provider_module.get_provider() == "ollama":
-            result = llm_provider_module.complete(
-                system_messages=system_messages,
-                user_message=prompt,
-                temperature=0.2,
-                max_tokens=8192,
-                timeout_s=180,
-            )
-            ai_response = result["text"]
-        else:
-            # Groq path (unchanged): keep the rate-limit retry loop
+        def generate(user_message: str) -> str:
+            # Day-13: route through llm_provider so Ollama users get local
+            # generation. Groq remains the default; ollama users set
+            # LLM_PROVIDER=ollama (and EMBEDDINGS_PROVIDER=ollama for retrieval).
+            if llm_provider_module.get_provider() == "ollama":
+                return llm_provider_module.complete(
+                    system_messages=system_messages,
+                    user_message=user_message,
+                    temperature=0.2,
+                    max_tokens=8192,
+                    timeout_s=180,
+                )["text"]
+            # Groq path: brief retries on a rate limit, then give up with a 503.
+            # The wait blocks this worker, so it stays short (≤ 6 s total)
+            # instead of the minutes a long backoff would hold it.
             messages = [{"role": "system", "content": s} for s in system_messages]
-            messages.append({"role": "user", "content": prompt})
-            for attempt in range(4):
+            messages.append({"role": "user", "content": user_message})
+            for attempt in range(3):
                 try:
-                    completion = groq_client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
-                        messages=messages,
-                        temperature=0.2,
-                        max_tokens=8192,
-                    )
-                    ai_response = completion.choices[0].message.content
-                    break
+                    return llm_provider_module.groq_complete(
+                        groq_client, messages, temperature=0.2, max_tokens=8192)
                 except Exception as e:
                     err = str(e)
-                    if ("429" in err or "rate_limit" in err.lower()) and attempt < 3:
-                        time.sleep(20 * (attempt + 1))
-                    else:
+                    if not ("429" in err or "rate_limit" in err.lower()):
                         raise
+                    if attempt == 2:
+                        raise _ProviderBusy("The AI provider is rate-limiting requests.") from e
+                    time.sleep(2 * (attempt + 1))
+            return ""
 
+        ai_response = generate(prompt)
         if not ai_response:
             return jsonify({"error": "AI model did not return a response. Try again."}), 500
+
+        # ── Step 2b: check the draft; one targeted correction pass if needed ──
+        ai_response, repair = _check_and_repair(ai_response, prompt, generate)
+        _audit_extra["self_correction"] = repair
 
         # ── Step 3: Save text output ──────────────────────────────────────────
         txt_path = save_raw_output(client_story, ai_response)
@@ -1389,11 +1637,14 @@ def analyze():
         # ── Step 5: Generate PDF (carries the verification panel) ─────────────
         pdf_path = generate_pdf(txt_path, verification=verification)
         pdf_filename = Path(pdf_path).name
+        case_access.record(Path(txt_path).name, pdf_filename,
+                           user_id=_audit_extra["user_id"],
+                           firm_id=_audit_extra["firm_id"])
 
-        # Clean markdown bold markers for web display
+        # Escape + bold for web display (the PDF was built from the raw text)
         for key in sections:
             if isinstance(sections[key], str):
-                sections[key] = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", sections[key])
+                sections[key] = _section_html(sections[key])
 
         # ── Audit log: success ────────────────────────────────────────────────
         _audit_extra["ungrounded_citations"] = verification["ungrounded"] or None
@@ -1421,14 +1672,16 @@ def analyze():
                 "pdf_filename": pdf_filename,
                 "sources":    [s.get("id") for s in sources],
                 "duration_ms": int((time.monotonic() - t_start) * 1000),
-            })
-        except Exception:
-            pass  # webhooks must not affect the user response
+            }, firm_id=_audit_extra["firm_id"])
+        except Exception:  # noqa: BLE001 — never fail the user's request
+            app.logger.exception("webhook emit failed")
 
         return jsonify({
             "sections":          sections,
             "client_statement":  client_story,
             "pdf_filename":      pdf_filename,
+            # Lets whoever ran this analysis (even anonymously) fetch the PDF.
+            "download_token":    case_access.make_download_token(pdf_filename),
             "generated":         sections.get("generated", datetime.now().strftime("%d %B %Y, %H:%M:%S")),
             "sources":           sources,
             "verification":      verification,
@@ -1449,6 +1702,11 @@ def analyze():
             error=str(e),
             extra=_audit_extra,
         )
+        if isinstance(e, _ProviderBusy):
+            return jsonify({
+                "error": f"{e} Please try again in a minute.",
+                "request_id": request_id,
+            }), 503
         return jsonify({
             "error": f"Analysis failed: {str(e)[:300]}",
             "request_id": request_id,
@@ -1461,72 +1719,43 @@ def analyze():
 @app.route("/history")
 def history():
     """
-    Returns a list of past cases from the outputs/ folder.
+    The signed-in user's past cases (their own + their firm's), newest first.
     Each entry: { "txt_file": "case_analysis_...", "pdf_file": "CaseBrief_...",
                   "date": "04 March 2026, 20:52", "snippet": "Client is a 28..." }
     """
+    user = _current_user()
+    if not user:
+        return jsonify({"error": "Sign in to see your saved cases."}), 401
+
     output_dir = Path("outputs")
     cases = []
-
-    txt_files = sorted(output_dir.glob("case_analysis_*.txt"), reverse=True)
-    # Build a map of pdf files by timestamp for matching
-    pdf_map = {}
-    for pdf in output_dir.glob("CaseBrief_*.pdf"):
-        # Extract timestamp from CaseBrief_YYYYMMDD_HHMMSS.pdf
-        m = re.search(r"CaseBrief_(\d{8}_\d{6})\.pdf", pdf.name)
-        if m:
-            pdf_map[m.group(1)] = pdf.name
-
-    for txt in txt_files:
+    for rec in case_access.files_for(user):
+        txt = output_dir / rec["txt_file"]
         try:
             content = txt.read_text(encoding="utf-8")
-
-            # Extract date from file
-            date_match = re.search(r"Generated:\s*(.+)", content)
-            date_str = date_match.group(1).strip() if date_match else txt.stem
-
-            # Extract client statement snippet
-            cs_match = re.search(
-                r"CLIENT'S STATEMENT:\s*\n(.*?)(?:={10,}|SECTION 1)",
-                content, re.DOTALL
-            )
-            snippet = ""
-            if cs_match:
-                snippet = cs_match.group(1).strip()
-                snippet = " ".join(snippet.split())[:100]  # 100 chars, no newlines
-
-            # Match PDF by timestamp
-            ts_match = re.search(r"case_analysis_(\d{8}_\d{6})\.txt", txt.name)
-            pdf_name = None
-            if ts_match:
-                # Find the closest PDF (generated right after)
-                ts = ts_match.group(1)
-                # Look for a PDF with a timestamp within 60 seconds
-                for pdf_ts, pdf_fn in pdf_map.items():
-                    if abs(_ts_diff(ts, pdf_ts)) <= 120:
-                        pdf_name = pdf_fn
-                        break
-
-            cases.append({
-                "txt_file":  txt.name,
-                "pdf_file":  pdf_name,
-                "date":      date_str,
-                "snippet":   snippet or "No preview available",
-            })
-        except Exception:
+        except OSError:
             continue
 
+        date_match = re.search(r"Generated:\s*(.+)", content)
+        date_str = date_match.group(1).strip() if date_match else txt.stem
+
+        cs_match = re.search(
+            r"CLIENT'S STATEMENT:\s*\n(.*?)(?:={10,}|SECTION 1)",
+            content, re.DOTALL
+        )
+        snippet = ""
+        if cs_match:
+            snippet = " ".join(cs_match.group(1).strip().split())[:100]
+
+        pdf_name = rec["pdf_file"]
+        cases.append({
+            "txt_file":  txt.name,
+            "pdf_file":  pdf_name if pdf_name and (output_dir / pdf_name).exists() else None,
+            "date":      date_str,
+            "snippet":   snippet or "No preview available",
+        })
+
     return jsonify(cases)
-
-
-def _ts_diff(ts1: str, ts2: str) -> int:
-    """Returns absolute difference in seconds between two YYYYMMDD_HHMMSS strings."""
-    try:
-        t1 = datetime.strptime(ts1, "%Y%m%d_%H%M%S")
-        t2 = datetime.strptime(ts2, "%Y%m%d_%H%M%S")
-        return abs(int((t2 - t1).total_seconds()))
-    except Exception:
-        return 9999
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1534,13 +1763,17 @@ def _ts_diff(ts1: str, ts2: str) -> int:
 # ═══════════════════════════════════════════════════════════════════════════════
 @app.route("/load/<filename>")
 def load_case(filename):
-    """Load a previously saved case analysis from outputs/ folder."""
+    """Load a previously saved case analysis the caller is allowed to read."""
     # Security: only allow reading files from outputs/ with expected name pattern
-    if not re.match(r"^case_analysis_\d{8}_\d{6}\.txt$", filename):
+    if not re.match(r"^case_analysis_\d{8}_\d{6}(?:_[0-9a-f]{8})?\.txt$", filename):
         return jsonify({"error": "Invalid filename."}), 400
+    user = _current_user()
+    if not user:
+        return jsonify({"error": "Sign in to open saved cases."}), 401
 
     txt_path = Path("outputs") / filename
-    if not txt_path.exists():
+    # Someone else's file answers exactly like a missing one.
+    if not case_access.can_access(user, filename) or not txt_path.exists():
         return jsonify({"error": "Case file not found."}), 404
 
     try:
@@ -1549,18 +1782,10 @@ def load_case(filename):
 
         for key in sections:
             if isinstance(sections[key], str):
-                sections[key] = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", sections[key])
+                sections[key] = _section_html(sections[key])
 
-        # Find matching PDF
-        ts_match = re.search(r"case_analysis_(\d{8}_\d{6})\.txt", filename)
-        pdf_filename = None
-        if ts_match:
-            ts = ts_match.group(1)
-            for pdf in Path("outputs").glob("CaseBrief_*.pdf"):
-                m = re.search(r"CaseBrief_(\d{8}_\d{6})\.pdf", pdf.name)
-                if m and abs(_ts_diff(ts, m.group(1))) <= 120:
-                    pdf_filename = pdf.name
-                    break
+        rec = case_access.lookup(filename) or {}
+        pdf_filename = rec.get("pdf_file")
 
         return jsonify({
             "sections":         sections,
@@ -1570,7 +1795,8 @@ def load_case(filename):
             "error":            None,
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        app.logger.exception("load_case failed for %s", filename)
+        return jsonify({"error": "Could not read this case file."}), 500
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1583,8 +1809,11 @@ def download(filename):
     Human-in-the-loop gate (v1.9): the export requires ?approved=1, which the
     UI only sets after the advocate ticks the review-confirmation checkbox.
     Every approved export is audit-logged with the approver's identity.
+
+    Access: the owner (or their firm) via the session cookie, or whoever ran
+    the analysis via the signed ?t= token /analyze returned.
     """
-    if not re.match(r"^CaseBrief_\d{8}_\d{6}\.pdf$", filename):
+    if not re.match(r"^CaseBrief_\d{8}_\d{6}(?:_[0-9a-f]{8})?\.pdf$", filename):
         return "Invalid filename.", 400
     if request.args.get("approved") != "1":
         return jsonify({
@@ -1593,9 +1822,15 @@ def download(filename):
                       "confirmation to enable the export."),
         }), 403
     _u = _current_user()
+    if not (case_access.verify_download_token(filename, request.args.get("t", ""))
+            or case_access.can_access(_u, filename)):
+        if not _u:
+            return jsonify({"error": "This download link has expired. Sign in to "
+                                     "download your saved cases."}), 401
+        return jsonify({"error": "File not found."}), 404
     audit.log_request(
         endpoint="/download",
-        client_ip=(request.headers.get("X-Forwarded-For") or request.remote_addr or ""),
+        client_ip=_client_ip(),
         user_agent=request.headers.get("User-Agent", ""),
         status="ok",
         pdf_filename=filename,
@@ -1663,8 +1898,11 @@ def chat():
     Accepts: { "message": "What is BNS 85?" }
     Returns: { "reply": "...", "suggest_intake": true/false, "request_id": "..." }
     """
+    limited = _per_ip_limit("chat", 20)
+    if limited:
+        return limited
     t_start    = time.monotonic()
-    client_ip  = (request.headers.get("X-Forwarded-For") or request.remote_addr or "")
+    client_ip  = _client_ip()
     user_agent = request.headers.get("User-Agent", "")
 
     data = request.get_json()
@@ -1673,20 +1911,33 @@ def chat():
     if not user_msg:
         return jsonify({"reply": "Please type a question.", "suggest_intake": False})
 
+    # Questions with one right answer in our tables (IPC→BNS, bailable,
+    # punishment) are answered from the tables — no model, nothing to invent.
+    direct = statute_lookup.answer(user_msg)
+    if direct:
+        request_id = audit.log_request(
+            endpoint="/chat", client_ip=client_ip, user_agent=user_agent,
+            story=user_msg, status="ok", response_chars=len(direct["answer"]),
+            duration_ms=int((time.monotonic() - t_start) * 1000),
+            extra={"answered_by": "statute_lookup"},
+        )
+        return jsonify({
+            "reply": f"{direct['answer']}\n\nSource: {direct['source']}.",
+            "suggest_intake": False,
+            "sources": [],
+            "deterministic": True,
+            "request_id": request_id,
+        })
+
     try:
         retrieved_context, sources = _retrieve_for_chat(user_msg, n_results=4)
 
-        completion = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": ASSISTANT_SYSTEM_PROMPT},
-                {"role": "system", "content": retrieved_context},
-                {"role": "user",   "content": user_msg},
-            ],
-            temperature=0.2,
-            max_tokens=400,
-        )
-        reply = completion.choices[0].message.content.strip()
+        reply = llm_provider_module.groq_complete(
+            groq_client,
+            [{"role": "system", "content": ASSISTANT_SYSTEM_PROMPT},
+             {"role": "system", "content": retrieved_context},
+             {"role": "user",   "content": user_msg}],
+            temperature=0.2, max_tokens=400).strip()
 
         suggest_intake = any(kw in reply.lower() for kw in [
             "intake form", "case analysis", "full analysis", "use the form",
@@ -1761,8 +2012,8 @@ def try_submit():
             "role":        lead.role,
             "interests":   lead.interests,
         })
-    except Exception:
-        pass
+    except Exception:  # noqa: BLE001 — never fail the user's request
+        app.logger.exception("webhook emit failed")
     # Day 17: also email the operator if LEAD_NOTIFY_EMAIL is configured
     try:
         op = os.getenv("LEAD_NOTIFY_EMAIL", "")
@@ -1812,24 +2063,23 @@ def _read_recent_audit(n: int = 5) -> list[dict]:
     return list(reversed(records))[:n]
 
 
-import urllib.request as _urllib_req
-
-
 def _self_probe(paths: list[tuple[str, int]]) -> list[dict]:
-    """Probe a list of internal paths over loopback and report status/latency.
-    Errors are caught — the status page must never crash."""
+    """Probe a list of internal paths in-process and report status/latency.
+    In-process (Flask test client), not over loopback HTTP: no guessing the
+    port we're served on, and a single-worker server can't stall waiting on
+    itself. Errors are caught — the status page must never crash."""
     results = []
+    probe = app.test_client()
     for path, expected in paths:
         start = time.monotonic()
         try:
-            req = _urllib_req.Request(f"http://127.0.0.1:{_LISTEN_PORT}{path}")
-            with _urllib_req.urlopen(req, timeout=2.5) as resp:
-                ok = (resp.status == expected)
-                results.append({
-                    "path": path, "status": resp.status, "ok": ok,
-                    "latency_ms": int((time.monotonic() - start) * 1000),
-                })
-        except Exception as e:
+            resp = probe.get(path)
+            results.append({
+                "path": path, "status": resp.status_code,
+                "ok": resp.status_code == expected,
+                "latency_ms": int((time.monotonic() - start) * 1000),
+            })
+        except Exception as e:  # noqa: BLE001 — report, never crash the page
             results.append({
                 "path": path, "status": 0, "ok": False,
                 "latency_ms": int((time.monotonic() - start) * 1000),
@@ -1937,17 +2187,34 @@ def status_json():
 # ROUTES — Webhooks (Day-15).
 # Outbound HTTP POSTs to subscriber URLs when events happen.
 # ═══════════════════════════════════════════════════════════════════════════════
+def _webhook_owner():
+    """(firm_id, None) for whoever is managing webhooks: "*" for the operator
+    (admin token), the caller's own firm for a firm member."""
+    if _is_admin_request():
+        return "*", None
+    u, err = _require_firm_user()
+    if err:
+        return None, err
+    return u["firm_id"], None
+
+
 @app.route("/webhooks/api/subscriptions", methods=["GET", "POST"])
 def webhooks_subscriptions():
+    owner, err = _webhook_owner()
+    if err:
+        return err
     if request.method == "GET":
-        return jsonify({"subscriptions": webhooks_module.list_subs()})
+        return jsonify({"subscriptions": webhooks_module.list_subs(
+            None if owner == "*" else owner)})
     data = request.get_json() or {}
     try:
         sub = webhooks_module.add_sub(
             url=data.get("url", ""),
             events=data.get("events", []),
             description=data.get("description", ""),
+            firm_id=owner,
         )
+        # The signing secret is in this response only — it's never listed again.
         return jsonify({"subscription": sub})
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -1955,23 +2222,27 @@ def webhooks_subscriptions():
 
 @app.route("/webhooks/api/subscriptions/<sub_id>", methods=["DELETE"])
 def webhooks_remove(sub_id):
+    owner, err = _webhook_owner()
+    if err:
+        return err
     if not re.match(r"^wh_[a-z0-9]+$", sub_id):
         return jsonify({"error": "Invalid subscription id."}), 400
-    if not webhooks_module.remove_sub(sub_id):
+    if not webhooks_module.remove_sub(sub_id, None if owner == "*" else owner):
         return jsonify({"error": "Not found."}), 404
     return jsonify({"ok": True})
 
 
 @app.route("/webhooks/api/deliveries")
 def webhooks_deliveries():
-    return jsonify({
-        "deliveries":    webhooks_module.recent_deliveries(20),
-        "retry_queue":   webhooks_module.retry_queue_stats(),   # Day 22
-    })
-
-
-# Need this for the self-probe latency measurement; track the port we boot on.
-_LISTEN_PORT = 8080
+    owner, err = _webhook_owner()
+    if err:
+        return err
+    if owner == "*":
+        return jsonify({
+            "deliveries":    webhooks_module.recent_deliveries(20),
+            "retry_queue":   webhooks_module.retry_queue_stats(),   # Day 22
+        })
+    return jsonify({"deliveries": webhooks_module.recent_deliveries(20, firm_id=owner)})
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1981,8 +2252,7 @@ _LISTEN_PORT = 8080
 # ═══════════════════════════════════════════════════════════════════════════════
 @app.route("/dashboard")
 def dashboard_page():
-    guard = _require_admin()
-    if guard: return guard
+    # Data-free shell; /dashboard/data.json is the gated part.
     return render_template("dashboard.html")
 
 
@@ -2275,13 +2545,16 @@ def pricing_page():
 
 @app.route("/billing/checkout", methods=["POST"])
 def billing_checkout():
-    """Create a Stripe Checkout session and redirect the user."""
+    """Create a Stripe Checkout session for the signed-in user."""
     user = _current_user()
+    if not user:
+        return jsonify({"error": "Sign in to subscribe."}), 401
+    if not billing_module.is_live() and not envmode.is_dev():
+        # Stub checkout activates a plan without payment: development only.
+        return jsonify({"error": "Billing isn't configured on this server yet."}), 503
     data = request.get_json(silent=True) or {}
     tier = (data.get("tier") or request.form.get("tier") or "firm").lower()
-    # In dev mode without auth, allow specifying user_id via body for testing
-    user_id    = (user or {}).get("id")    or data.get("user_id")    or "anon_demo"
-    user_email = (user or {}).get("email") or data.get("user_email") or "anon@demo"
+    user_id, user_email = user["id"], user.get("email", "")
     try:
         cs = billing_module.create_checkout_session(
             user_id=user_id, user_email=user_email, tier=tier,
@@ -2295,18 +2568,24 @@ def billing_checkout():
 
 @app.route("/billing/stub-confirm")
 def billing_stub_confirm():
-    """Stub-mode landing — pretends the user paid and activates them.
-    Hit only when STRIPE_MODE != 'live'."""
+    """Stub-mode landing — pretends the signed-in user paid and activates
+    them. Development only (LEX_ENV=development, STRIPE_MODE != live): it hands
+    out a paid tier for free, so it must never be reachable in production."""
     if billing_module.is_live():
         return ("Stub flow disabled in live mode.", 400)
-    user = (request.args.get("user") or "").strip()
+    if not envmode.is_dev():
+        return ("Stub billing is available only with LEX_ENV=development.", 403)
+    current = _current_user()
+    if not current:
+        return ("Sign in first.", 401)
     tier = (request.args.get("tier") or "firm").strip().lower()
-    if not user:
-        return ("Missing user.", 400)
-    sub = billing_module.activate_subscription(
-        user_id=user, user_email=user + "@stub.invalid", tier=tier,
-        stripe_session_id=request.args.get("session", ""),
-    )
+    try:
+        sub = billing_module.activate_subscription(
+            user_id=current["id"], user_email=current.get("email", ""), tier=tier,
+            stripe_session_id=request.args.get("session", ""),
+        )
+    except ValueError as e:
+        return (str(e), 400)
     return render_template("billing_success.html", subscription=sub,
                            mode="stub", tier=tier)
 
@@ -2385,24 +2664,25 @@ def profile_delete():
             user_email=user.get("email", ""),
             reason=reason,
         )
-        # Fire-and-forget confirmation email
-        try:
-            mailer_module.send(
-                to=user["email"],
-                subject="Lex-Indic — account deletion scheduled",
-                text=(
-                    f"Your Lex-Indic account is scheduled for permanent deletion "
-                    f"on {req['scheduled_for']} ({erasure_module.GRACE_DAYS}-day grace period).\n\n"
-                    f"You can cancel within the grace period via /profile/delete/cancel.\n\n"
-                    f"After deletion, the salted hash that links your past audit-log "
-                    f"entries to your account will be rotated, making historical entries "
-                    f"un-correlatable. Matters (case files) are soft-preserved per Bar "
-                    f"Council records-retention rules but become unlinked from your "
-                    f"identity.\n\nIf this was a mistake, cancel immediately."
-                ),
-            )
-        except Exception:
-            pass
+        # Confirmation email. mailer.send never raises; a failure is logged,
+        # not fatal — the erasure is already scheduled.
+        sent = mailer_module.send(
+            to=user["email"],
+            subject="Lex-Indic — account deletion scheduled",
+            text=(
+                f"Your Lex-Indic account is scheduled for permanent deletion "
+                f"on {req['scheduled_for']} ({erasure_module.GRACE_DAYS}-day grace period).\n\n"
+                f"You can cancel within the grace period via /profile/delete/cancel.\n\n"
+                f"After deletion, the salted hash that links your past audit-log "
+                f"entries to your account will be rotated, making historical entries "
+                f"un-correlatable. Matters (case files) are soft-preserved per Bar "
+                f"Council records-retention rules but become unlinked from your "
+                f"identity.\n\nIf this was a mistake, cancel immediately."
+            ),
+        )
+        if not sent.ok:
+            app.logger.warning("erasure confirmation email to %s failed: %s",
+                               user["id"], sent.error)
         return jsonify(req)
     except Exception as exc:
         return jsonify({"error": f"Could not schedule erasure: {str(exc)[:200]}"}), 500
@@ -2556,7 +2836,7 @@ def api_analyze():
 
     # Day 23 — pricing check for API key
     _price = pricing_module.check(
-        client_ip=request.remote_addr or "",
+        client_ip=_client_ip(),
         api_key_id=key["key_id"],
         api_key_tier=key.get("tier", "firm"),
     )
@@ -2574,36 +2854,42 @@ def api_analyze():
             rag_collection, story, n_results=8,
         )
         prompt = build_legal_prompt(story, retrieved_context)
-        completion = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": LEXI_SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.2, max_tokens=8192,
-        )
-        ai_response = completion.choices[0].message.content
+
+        def generate(user_message: str) -> str:
+            return llm_provider_module.groq_complete(
+                groq_client,
+                [{"role": "system", "content": LEXI_SYSTEM_PROMPT},
+                 {"role": "user", "content": user_message}],
+                temperature=0.2, max_tokens=8192)
+
+        ai_response, repair = _check_and_repair(generate(prompt), prompt, generate)
         txt_path = save_raw_output(story, ai_response)
-        pdf_path = generate_pdf(txt_path)
         with open(txt_path, "r", encoding="utf-8") as f:
             raw_text = f.read()
         sections = parse_sections(raw_text)
+        verification = verifier_module.verify_analysis(sections)
+        pdf_path = generate_pdf(txt_path, verification=verification)
         for k in sections:
             if isinstance(sections[k], str):
-                sections[k] = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", sections[k])
+                sections[k] = _section_html(sections[k])
+        case_access.record(Path(txt_path).name, Path(pdf_path).name,
+                           user_id=key["user_id"], firm_id=key.get("firm_id") or None)
         request_id = audit.log_request(
             endpoint="/api/v1/analyze",
-            client_ip=request.remote_addr or "",
+            client_ip=_client_ip(),
             user_agent=f"api-key:{key['key_id']}",
             story=story, sources=sources, status="ok",
             duration_ms=0, response_chars=len(ai_response or ""),
             pdf_filename=Path(pdf_path).name,
             extra={"user_id": key["user_id"], "firm_id": key.get("firm_id") or None,
-                   "api_key_id": key["key_id"]},
+                   "api_key_id": key["key_id"], "self_correction": repair,
+                   "citation_check": "passed" if verification["all_verified"] else "attention"},
         )
         return jsonify({
             "sections": sections, "client_statement": story,
             "pdf_filename": Path(pdf_path).name, "sources": sources,
+            "download_token": case_access.make_download_token(Path(pdf_path).name),
+            "verification": verification,
             "language": "en", "request_id": request_id,
         })
     except Exception as e:
@@ -2642,7 +2928,8 @@ def api_monitors_digest():
     key, err = _require_api_key()
     if err: return err
     since = request.args.get("since")
-    return jsonify(monitors_module.run_digest(since=since))
+    owner = key.get("firm_id") or key.get("user_id") or ""
+    return jsonify(monitors_module.run_digest(since=since, owner=owner))
 
 
 @app.route("/api/v1/sections")
@@ -2690,8 +2977,8 @@ def api_leads():
             "lead_id": lead.id, "email": lead.email,
             "firm_or_org": lead.firm_or_org, "via": "api",
         })
-    except Exception:
-        pass
+    except Exception:  # noqa: BLE001 — never fail the user's request
+        app.logger.exception("webhook emit failed")
     return jsonify({"lead": {"id": lead.id, "full_name": lead.full_name}})
 
 
@@ -2720,13 +3007,12 @@ def api_tabular_review():
 
 @app.route("/api/v1/matters", methods=["GET"])
 def api_matters_list():
-    """List all matters (firm-scoped if the API key has a firm_id)."""
+    """The key's firm's matters. A key with no firm sees none — matters are
+    tenant data, never listed across firms."""
     key, err = _require_api_key()
     if err: return err
-    matters = matters_module.list_matters()
     firm_id = key.get("firm_id") or ""
-    if firm_id:
-        matters = [m for m in matters if m.get("firm_id") == firm_id]
+    matters = matters_module.list_matters(firm_id=firm_id) if firm_id else []
     return jsonify({"matters": matters, "count": len(matters)})
 
 
@@ -2739,7 +3025,7 @@ def api_me_usage():
     tier = key.get("tier", "firm")
     # Re-run pricing.check() to get used + limit without actually consuming
     res = pricing_module.check(
-        client_ip=request.remote_addr or "",
+        client_ip=_client_ip(),
         api_key_id=key["key_id"],
         api_key_tier=tier,
     )
@@ -2784,6 +3070,9 @@ def api_status():
 
 
 # ─── Admin endpoints to manage API keys ────────────────────────────────────
+_SELF_SERVICE_RATE_PER_MIN = 60
+
+
 @app.route("/admin/api-keys", methods=["GET", "POST"])
 def admin_api_keys():
     """Sign-in-required: list / issue API keys for the current user."""
@@ -2812,11 +3101,13 @@ def admin_api_keys():
         return jsonify({"keys": api_keys_module.list_keys(user_id=user["id"])})
     data = request.get_json() or {}
     try:
+        # Self-service keys get the standard rate; only the operator sets others.
+        rate = max(1, min(int(data.get("rate_per_min", 60)), _SELF_SERVICE_RATE_PER_MIN))
         key = api_keys_module.issue_key(
             user_id=user["id"],
             firm_id=user.get("firm_id") or "",
             label=data.get("label", ""),
-            rate_per_min=int(data.get("rate_per_min", 60)),
+            rate_per_min=rate,
         )
         return jsonify({"key": key})
     except ValueError as e:
@@ -2825,13 +3116,20 @@ def admin_api_keys():
 
 @app.route("/admin/api-keys/<key_id>", methods=["DELETE"])
 def admin_api_key_revoke(key_id):
-    user = _current_user()
-    if not user:
-        guard = _require_admin()
-        if guard: return guard
+    """A user revokes their own keys; the operator (admin token) any key."""
+    owner = None
+    if not _is_admin_request():
+        user = _current_user()
+        if not user:
+            guard = _require_admin()
+            if guard: return guard
+        else:
+            owner = user["id"]
     if not re.match(r"^lex_live_[a-f0-9]+$", key_id):
         return jsonify({"error": "invalid key id"}), 400
-    if not api_keys_module.revoke_key(key_id):
+    # ?immediate=1 for a leaked key; otherwise a 60-min grace for rotation.
+    grace = 0 if request.args.get("immediate") == "1" else 60
+    if not api_keys_module.revoke_key(key_id, grace_period_min=grace, user_id=owner):
         return jsonify({"error": "key not found or already revoked"}), 404
     return jsonify({"ok": True})
 
@@ -2853,8 +3151,9 @@ if __name__ == "__main__":
              "the Microsoft Word add-in, which only loads HTTPS URLs).",
     )
     parser.add_argument(
-        "--host", default="0.0.0.0",
-        help="Bind host (default 0.0.0.0; use 127.0.0.1 for air-gapped).",
+        "--host", default="127.0.0.1",
+        help="Bind host (default 127.0.0.1 — this machine only; pass 0.0.0.0 "
+             "deliberately to expose the dev server to your network).",
     )
     parser.add_argument(
         "--port", type=int, default=None,

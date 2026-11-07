@@ -1,5 +1,9 @@
+# google-generativeai 0.7.2 (deprecated SDK) and chromadb 0.5.5 pin protobuf
+# below 5, which keeps the current protobuf security fixes (5.29.6+) out of
+# reach. Clearing that means migrating to the google-genai SDK and a newer
+# chromadb together — tracked as a follow-up, not a pin bump.
 google-generativeai==0.7.2
-python-dotenv==1.0.1
+python-dotenv>=1.2.2,<2.0        # 1.0.1 had a published advisory
 numpy>=1.26,<2.0
 chromadb==0.5.5
 fpdf2==2.7.9

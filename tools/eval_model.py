@@ -18,7 +18,8 @@ is honest.
 
 WHAT IT CAN SCORE
 ─────────────────
-  groq            the generic big-model baseline (Llama-3.3-70B via Groq)
+  groq            the configured Groq model (GROQ_MODEL); groq:<id> for another
+  system          the product path: deterministic table answers first, then Groq
   ollama:<name>   any local Ollama model — a vanilla base (ollama:qwen2.5:7b)
                   or your fine-tune (ollama:lexindic-qwen).
 
@@ -65,7 +66,6 @@ EVAL_SYSTEM = (
     "(BNS) 2023. Answer concisely and factually."
 )
 
-GROQ_MODEL = "llama-3.3-70b-versatile"
 
 # 'BNS 103', 'BNS Section 103', 'BNS 103(2)', 'B.N.S. 103' → 103 / 103(2)
 _BNS_RE = re.compile(r"B\.?N\.?S\.?\s*(?:Section|Sec\.?|S\.?)?\s*(\d{1,4}[A-Z]?(?:\(\d+\))?)",
@@ -112,17 +112,14 @@ def score_one(gold: dict, response: str) -> bool:
 # ──────────────────────────────────────────────────────────────────────────────
 # Model adapters (network)
 # ──────────────────────────────────────────────────────────────────────────────
-def _query_groq(question: str, temperature: float) -> str:
+def _query_groq(question: str, temperature: float, model: str | None = None) -> str:
+    import llm_provider
     from main import configure_groq
-    client = configure_groq()
-    comp = client.chat.completions.create(
-        model=GROQ_MODEL,
-        messages=[{"role": "system", "content": EVAL_SYSTEM},
-                  {"role": "user", "content": question}],
-        temperature=temperature,
-        max_tokens=300,
-    )
-    return comp.choices[0].message.content or ""
+    return llm_provider.groq_complete(
+        configure_groq(),
+        [{"role": "system", "content": EVAL_SYSTEM},
+         {"role": "user", "content": question}],
+        temperature=temperature, max_tokens=300, model=model)
 
 
 def _query_ollama(model: str, question: str, temperature: float) -> str:
@@ -145,12 +142,20 @@ def _query_ollama(model: str, question: str, temperature: float) -> str:
 
 
 def query(model_spec: str, question: str, temperature: float) -> str:
+    if model_spec == "system":
+        # The product path: table answer when the question has one, else the
+        # configured Groq model — what a user of /chat actually gets.
+        import statute_lookup
+        hit = statute_lookup.answer(question)
+        return hit["answer"] if hit else _query_groq(question, temperature)
     if model_spec == "groq":
         return _query_groq(question, temperature)
+    if model_spec.startswith("groq:"):          # e.g. groq:openai/gpt-oss-120b
+        return _query_groq(question, temperature, model_spec.split(":", 1)[1])
     if model_spec.startswith("ollama:"):
         return _query_ollama(model_spec.split(":", 1)[1], question, temperature)
     raise ValueError(f"Unknown model spec '{model_spec}'. "
-                     f"Use 'groq' or 'ollama:<name>'.")
+                     f"Use 'system', 'groq', 'groq:<model id>' or 'ollama:<name>'.")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -272,8 +277,12 @@ def main() -> None:
     print(f"✓ wrote {OUT_DIR/'eval_report.md'} and eval_report.json")
     if len(scores) > 1:
         best = max(scores, key=lambda x: x.accuracy)
-        print(f"\nBest: {best.model} at {best.accuracy*100:.0f}%. "
-              f"Ship it via OLLAMA_MODEL and drop the number on /trust.")
+        how = {"system": "it is already the product path",
+               "groq": "it is the configured GROQ_MODEL"}.get(
+            best.model,
+            f"set GROQ_MODEL={best.model[5:]}" if best.model.startswith("groq:")
+            else f"set OLLAMA_MODEL={best.model.split(':', 1)[-1]}")
+        print(f"\nBest: {best.model} at {best.accuracy*100:.0f}% — {how}.")
 
 
 if __name__ == "__main__":

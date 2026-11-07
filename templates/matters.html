@@ -187,9 +187,24 @@
   const $ = id => document.getElementById(id);
   const escapeHtml = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
+  // Matters are private to your firm: signed-out callers get 401, signed-in
+  // users without a firm get 403. Show why instead of an empty screen.
+  async function getScoped(url, listId){
+    const r = await fetch(url);
+    if (r.status === 401 || r.status === 403){
+      const why = r.status === 401
+        ? '<a href="/login">Sign in</a> to see your firm\'s matters.'
+        : 'Add your firm below (or redeem an invite from a partner) to start.';
+      $(listId).innerHTML = `<div class="msg err">${why}</div>`;
+      return null;
+    }
+    return r.json();
+  }
+
   // ─── Firms ─────────────────────────────────────────────────────────────
   async function loadFirms(){
-    const data = await (await fetch('/matters/api/firms')).json();
+    const data = await getScoped('/matters/api/firms', 'firmList');
+    if (!data) return;
     const list = $('firmList');
     if (!data.firms.length){
       list.innerHTML = `
@@ -223,13 +238,14 @@
     if (d.error){ msg.innerHTML = `<div class="msg err">${escapeHtml(d.error)}</div>`; return; }
     msg.innerHTML = `<div class="msg ok">✓ ${escapeHtml(d.firm.name)} added.</div>`;
     $('firmName').value = ''; $('firmAddress').value = '';
-    loadFirms();
+    loadFirms(); loadLawyers(); loadMatters();   // creator is now the firm's partner
   }
 
   // ─── Lawyers ───────────────────────────────────────────────────────────
   let _lawyers = [];
   async function loadLawyers(){
-    const data = await (await fetch('/matters/api/lawyers')).json();
+    const data = await getScoped('/matters/api/lawyers', 'lawyerList');
+    if (!data) return;
     _lawyers = data.lawyers;
     const list = $('lawyerList');
     if (!_lawyers.length){
@@ -278,7 +294,8 @@
 
   // ─── Matters ───────────────────────────────────────────────────────────
   async function loadMatters(){
-    const data = await (await fetch('/matters/api/matters')).json();
+    const data = await getScoped('/matters/api/matters', 'matterList');
+    if (!data) return;
     const list = $('matterList');
     if (!data.matters.length){
       list.innerHTML = `

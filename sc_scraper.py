@@ -143,6 +143,20 @@ _FEED_URLS = {
 }
 
 
+_MAX_FEED_BYTES = 5 * 1024 * 1024
+
+
+def _check_feed(xml_bytes: bytes) -> None:
+    """Third-party XML: cap the size and refuse DTDs. RSS never needs a DTD,
+    and without one there's nothing to expand in an entity ("billion
+    laughs") attack — no defusedxml dependency needed."""
+    if len(xml_bytes) > _MAX_FEED_BYTES:
+        raise RuntimeError("RSS feed larger than 5 MB — refusing to parse.")
+    upper = xml_bytes.upper()
+    if b"<!DOCTYPE" in upper or b"<!ENTITY" in upper:
+        raise RuntimeError("RSS feed declares a DTD/entities — refusing to parse.")
+
+
 def _scrape_livelaw(max_items: int = 25) -> list[ScrapedRuling]:
     """Parse LiveLaw (or any other Indian-legal RSS) for Supreme Court rulings."""
     feed_url = os.getenv("LIVELAW_RSS_URL", _FEED_URLS["livelaw"])
@@ -152,9 +166,10 @@ def _scrape_livelaw(max_items: int = 25) -> list[ScrapedRuling]:
             headers={"User-Agent": "Lex-Indic SC-scraper/1.0 (+legal research)"},
         )
         with urllib.request.urlopen(req, timeout=15) as resp:
-            xml_bytes = resp.read()
+            xml_bytes = resp.read(_MAX_FEED_BYTES + 1)
     except urllib.error.URLError as e:
         raise RuntimeError(f"LiveLaw RSS fetch failed: {e}") from e
+    _check_feed(xml_bytes)
 
     rulings: list[ScrapedRuling] = []
     try:

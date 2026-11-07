@@ -34,10 +34,12 @@ the SQLite DB, leads, matters) is persisted in `./outputs/` on the host
 ```bash
 # Add to .env:
 #   LLM_PROVIDER=ollama
+#   EMBEDDINGS_PROVIDER=ollama      # without this, stories still go to Gemini
 #   OLLAMA_HOST=http://ollama:11434
 
 docker compose --profile local-llm up -d
 docker compose exec ollama ollama pull llama3.3:70b
+docker compose exec ollama ollama pull nomic-embed-text
 ```
 
 Requires a GPU on the host.  See `docs/OLLAMA_RUNBOOK.md` for hardware sizing.

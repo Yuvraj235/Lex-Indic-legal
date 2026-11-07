@@ -31,7 +31,6 @@ import base64
 import hashlib
 import hmac
 import json
-import os
 import secrets
 import sqlite3
 import time
@@ -40,20 +39,22 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
 
+import envmode
+
 _DB_PATH       = Path("outputs") / "auth.db"
 _CODE_TTL      = 600              # 10 minutes
+_MAX_CODE_ATTEMPTS = 5            # wrong guesses before a code is burned
+_MAX_CODES_PER_HOUR = 5           # codes one email can request per hour
 _SESSION_TTL   = 60 * 60 * 24 * 14   # 14 days
 _COOKIE_NAME   = "lex_session"
+_INVITE_TTL    = 60 * 60 * 24 * 7    # 7 days
+INVITE_ROLES   = ("partner", "senior_associate", "associate", "paralegal")
 
 
 def _secret() -> bytes:
-    """The HMAC key for session cookies.  AUDIT_HASH_SALT serves double duty —
-    if it's set, we derive a separate auth key from it.  If unset (dev),
-    fall back to a stable but local-only key."""
-    s = os.getenv("AUDIT_HASH_SALT", "")
-    if s and len(s) >= 16:
-        return hashlib.sha256(b"lex-indic-auth-key|" + s.encode()).digest()
-    return hashlib.sha256(b"lex-indic-dev-only-do-not-deploy").digest()
+    """The HMAC key for session cookies, derived from the deployment secret
+    (see envmode.secret_key). Raises in production when no secret is set."""
+    return hashlib.sha256(b"lex-indic-auth-key|" + envmode.secret_key().encode()).digest()
 
 
 @contextmanager
@@ -91,7 +92,25 @@ def init_db():
             consumed     INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_codes_email ON login_codes(email);
+
+        CREATE TABLE IF NOT EXISTS firm_invites (
+            code_hash    TEXT PRIMARY KEY,
+            firm_id      TEXT NOT NULL,
+            role         TEXT NOT NULL,
+            created_by   TEXT NOT NULL,
+            expires_at   INTEGER NOT NULL,
+            used_by      TEXT,
+            used_at      TEXT
+        );
         """)
+        user_cols = {r["name"] for r in c.execute("PRAGMA table_info(users)")}
+        if "session_epoch" not in user_cols:
+            c.execute("ALTER TABLE users ADD COLUMN session_epoch INTEGER NOT NULL DEFAULT 0")
+        cols = {r["name"] for r in c.execute("PRAGMA table_info(login_codes)")}
+        if "attempts" not in cols:
+            c.execute("ALTER TABLE login_codes ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0")
+        if "issued_at" not in cols:
+            c.execute("ALTER TABLE login_codes ADD COLUMN issued_at INTEGER NOT NULL DEFAULT 0")
 
 
 # ─── User lookup / upsert ───────────────────────────────────────────────────
@@ -127,6 +146,10 @@ def upsert_user(email: str, *, firm_id: str = "", full_name: str = "",
 
 
 # ─── Magic-link / 6-digit code ──────────────────────────────────────────────
+class RateLimited(Exception):
+    """Too many login codes requested for one email."""
+
+
 def _hash_code(code: str) -> str:
     return hashlib.sha256(b"lex-code|" + _secret() + b"|" + code.encode()).hexdigest()
 
@@ -138,13 +161,25 @@ def issue_code(email: str) -> str:
     email = email.lower().strip()
     if not email or "@" not in email:
         raise ValueError("Valid email is required.")
+    now = int(time.time())
+    with _db() as c:
+        recent = c.execute(
+            "SELECT COUNT(*) AS n FROM login_codes WHERE email = ? AND issued_at >= ?",
+            (email, now - 3600),
+        ).fetchone()["n"]
+    if recent >= _MAX_CODES_PER_HOUR:
+        raise RateLimited("Too many sign-in codes requested. Try again in an hour.")
     upsert_user(email)
     code = f"{secrets.randbelow(1_000_000):06d}"
-    expires_at = int(time.time()) + _CODE_TTL
     with _db() as c:
+        # Only the newest code is valid: older live codes would multiply an
+        # attacker's chance per guess.
+        c.execute("UPDATE login_codes SET consumed = 1 WHERE email = ? AND consumed = 0",
+                  (email,))
         c.execute(
-            "INSERT INTO login_codes(email,code_hash,expires_at,consumed) VALUES(?,?,?,0)",
-            (email, _hash_code(code), expires_at),
+            "INSERT INTO login_codes(email,code_hash,expires_at,consumed,attempts,issued_at) "
+            "VALUES(?,?,?,0,0,?)",
+            (email, _hash_code(code), now + _CODE_TTL, now),
         )
     _send_code(email, code)
     return code   # caller decides whether to expose this in the response (dev only)
@@ -167,7 +202,9 @@ def _send_code(email: str, code: str):
 
 
 def verify_code(email: str, code: str) -> Optional[str]:
-    """Returns user_id on success, None on bad/expired code."""
+    """Returns user_id on success, None on bad/expired code. Each wrong guess
+    counts against the email's live code; after _MAX_CODE_ATTEMPTS it's
+    burned and the user must request a new one."""
     init_db()
     email = email.lower().strip()
     code_hash = _hash_code(code.strip())
@@ -180,6 +217,12 @@ def verify_code(email: str, code: str) -> Optional[str]:
             (email, code_hash, now),
         ).fetchone()
         if not row:
+            c.execute(
+                "UPDATE login_codes SET attempts = attempts + 1, "
+                "consumed = CASE WHEN attempts + 1 >= ? THEN 1 ELSE consumed END "
+                "WHERE email = ? AND consumed = 0",
+                (_MAX_CODE_ATTEMPTS, email),
+            )
             return None
         # Consume the code (single-use)
         c.execute("UPDATE login_codes SET consumed = 1 WHERE rowid = ?", (row["rowid"],))
@@ -190,17 +233,33 @@ def verify_code(email: str, code: str) -> Optional[str]:
 
 
 # ─── Session cookie helpers ─────────────────────────────────────────────────
+def _session_epoch(user_id: str) -> int:
+    """Bumped by revoke_sessions(); a token minted under an older epoch is dead."""
+    init_db()
+    with _db() as c:
+        row = c.execute("SELECT session_epoch FROM users WHERE id = ?", (user_id,)).fetchone()
+        return int(row["session_epoch"]) if row else 0
+
+
+def revoke_sessions(user_id: str) -> None:
+    """Invalidate every session token issued to this user so far (logout,
+    account deletion). Stateless tokens can't be deleted, so they're outdated."""
+    init_db()
+    with _db() as c:
+        c.execute("UPDATE users SET session_epoch = session_epoch + 1 WHERE id = ?", (user_id,))
+
+
 def make_session_token(user_id: str) -> str:
-    """Compact signed token: '<base64(user_id|expires)>.<hex(hmac)>'."""
+    """Compact signed token: '<base64(user_id|expires|epoch)>.<hex(hmac)>'."""
     expires_at = int(time.time()) + _SESSION_TTL
-    payload = f"{user_id}|{expires_at}".encode()
+    payload = f"{user_id}|{expires_at}|{_session_epoch(user_id)}".encode()
     payload_b64 = base64.urlsafe_b64encode(payload).rstrip(b"=").decode()
     sig = hmac.new(_secret(), payload_b64.encode(), hashlib.sha256).hexdigest()
     return f"{payload_b64}.{sig}"
 
 
 def verify_session_token(token: str) -> Optional[str]:
-    """Return user_id if the token is valid and unexpired, else None."""
+    """Return user_id if the token is valid, unexpired and not revoked."""
     if not token or "." not in token:
         return None
     payload_b64, sig = token.split(".", 1)
@@ -210,16 +269,71 @@ def verify_session_token(token: str) -> Optional[str]:
     try:
         pad = "=" * (-len(payload_b64) % 4)
         payload = base64.urlsafe_b64decode(payload_b64 + pad).decode()
-        user_id, expires_at = payload.split("|", 1)
+        user_id, expires_at, *rest = payload.split("|")
+        epoch = int(rest[0]) if rest else 0
         if int(expires_at) < int(time.time()):
             return None
-        return user_id
-    except Exception:
+    except (ValueError, UnicodeDecodeError):
         return None
+    if epoch != _session_epoch(user_id):
+        return None   # logged out (or deleted) after this token was issued
+    return user_id
+
+
+# ─── Firm invites ──────────────────────────────────────────────────────────
+def _hash_invite(code: str) -> str:
+    return hashlib.sha256(b"lex-invite|" + _secret() + b"|" + code.encode()).hexdigest()
+
+
+def create_invite(firm_id: str, *, role: str = "associate", created_by: str) -> dict:
+    """Single-use code that lets one person join `firm_id` with `role`.
+    Only the hash is stored; the plaintext is returned once."""
+    init_db()
+    if role not in INVITE_ROLES:
+        raise ValueError(f"role must be one of: {', '.join(INVITE_ROLES)}")
+    code = secrets.token_urlsafe(16)
+    expires_at = int(time.time()) + _INVITE_TTL
+    with _db() as c:
+        c.execute(
+            "INSERT INTO firm_invites(code_hash,firm_id,role,created_by,expires_at) "
+            "VALUES(?,?,?,?,?)",
+            (_hash_invite(code), firm_id, role, created_by, expires_at),
+        )
+    return {
+        "invite_code": code, "firm_id": firm_id, "role": role,
+        "expires_at": datetime.fromtimestamp(expires_at, timezone.utc).isoformat(timespec="seconds"),
+    }
+
+
+def redeem_invite(code: str, user_id: str) -> Optional[str]:
+    """Bind user_id to the invite's firm with the invite's role.
+    Returns the firm_id, or None for an unknown / used / expired code."""
+    init_db()
+    h = _hash_invite(code.strip())
+    with _db() as c:
+        row = c.execute(
+            "SELECT firm_id, role FROM firm_invites "
+            "WHERE code_hash = ? AND used_by IS NULL AND expires_at >= ?",
+            (h, int(time.time())),
+        ).fetchone()
+        if not row:
+            return None
+        claimed = c.execute(
+            "UPDATE firm_invites SET used_by = ?, used_at = ? "
+            "WHERE code_hash = ? AND used_by IS NULL",
+            (user_id, datetime.now(timezone.utc).isoformat(timespec="seconds"), h),
+        )
+        if claimed.rowcount != 1:   # lost a race with another redeemer
+            return None
+        c.execute("UPDATE users SET firm_id = ?, role = ? WHERE id = ?",
+                  (row["firm_id"], row["role"], user_id))
+    return row["firm_id"]
 
 
 # ─── User-to-firm binding ──────────────────────────────────────────────────
 def bind_user_to_firm(user_id: str, firm_id: str, *, role: str = "associate") -> bool:
+    """Server-side only: firm creation and invite redemption call this.
+    Never expose it to a caller-chosen firm_id or role."""
     init_db()
     with _db() as c:
         cur = c.execute(

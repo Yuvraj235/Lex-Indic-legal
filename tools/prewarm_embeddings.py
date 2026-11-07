@@ -72,7 +72,7 @@ def main():
 
     misses = []
     for doc_id, doc_text in docs:
-        key = hashlib.md5(f"retrieval_document:{doc_text}".encode()).hexdigest()
+        key = hashlib.md5(f"retrieval_document:{doc_text}".encode(), usedforsecurity=False).hexdigest()
         if key not in cache:
             misses.append((doc_id, doc_text))
 

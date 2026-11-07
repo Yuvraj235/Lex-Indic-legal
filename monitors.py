@@ -44,6 +44,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -418,6 +419,7 @@ class Matter:
     keywords: list[str]       # plain-text keywords / phrases
     sections: list[str]       # BNS / BNSS / BSA / POCSO section codes
     created_at: str = ""      # ISO timestamp
+    owner: str = ""           # firm_id (or user id if no firm); "" = legacy, cron-only
 
 
 def _load_matters() -> list[Matter]:
@@ -441,6 +443,7 @@ def _row_to_matter(row) -> Matter:
         keywords=list(row.keywords or []),
         sections=list(row.sections or []),
         created_at=row.created_at.isoformat(timespec="seconds") if row.created_at else "",
+        owner=getattr(row, "owner", "") or "",
     )
 
 
@@ -451,19 +454,24 @@ def backend() -> str:
     return "postgres" if "postgres" in scheme else ("sqlite" if "sqlite" in scheme else scheme)
 
 
-def list_matters() -> list[dict]:
+def list_matters(owner: str | None = None) -> list[dict]:
+    """Watched matters — only `owner`'s when given (None: all, for cron)."""
     if db.is_enabled():
         with db.session() as s:
             rows = s.query(db.MonitorMatter).order_by(
                 db.MonitorMatter.created_at.asc()
             ).all()
-            return [asdict(_row_to_matter(r)) for r in rows]
-    return [asdict(m) for m in _load_matters()]
+            matters = [_row_to_matter(r) for r in rows]
+    else:
+        matters = _load_matters()
+    return [asdict(m) for m in matters if owner is None or m.owner == owner]
 
 
-def add_matter(label: str, keywords: list[str], sections: list[str]) -> dict:
-    """Register a new matter to watch. Returns the saved matter."""
-    new_id = f"m_{int(datetime.now(timezone.utc).timestamp())}"
+def add_matter(label: str, keywords: list[str], sections: list[str], *,
+               owner: str) -> dict:
+    """Register a new matter to watch for `owner`. Returns the saved matter."""
+    # Random suffix: two adds in the same second must not share an id.
+    new_id = f"m_{int(datetime.now(timezone.utc).timestamp())}_{secrets.token_hex(3)}"
     now = datetime.now(timezone.utc)
     clean_kw = [k.strip().lower() for k in keywords if k.strip()][:20]
     clean_sec = [s.strip().upper() for s in sections if s.strip()][:20]
@@ -476,11 +484,12 @@ def add_matter(label: str, keywords: list[str], sections: list[str]) -> dict:
                 keywords=clean_kw,
                 sections=clean_sec,
                 created_at=now,
+                owner=owner,
             ))
         return {
             "id": new_id, "label": label.strip()[:100],
             "keywords": clean_kw, "sections": clean_sec,
-            "created_at": now.isoformat(timespec="seconds"),
+            "created_at": now.isoformat(timespec="seconds"), "owner": owner,
         }
 
     matters = _load_matters()
@@ -490,29 +499,30 @@ def add_matter(label: str, keywords: list[str], sections: list[str]) -> dict:
         keywords=clean_kw,
         sections=clean_sec,
         created_at=now.isoformat(timespec="seconds"),
+        owner=owner,
     )
     matters.append(new)
     _save_matters(matters)
     return asdict(new)
 
 
-def remove_matter(matter_id: str) -> bool:
+def remove_matter(matter_id: str, owner: str | None = None) -> bool:
+    """Delete a watched matter `owner` holds (None: any, operator)."""
     if db.is_enabled():
         with db.session() as s:
             row = s.query(db.MonitorMatter).filter(
                 db.MonitorMatter.id == matter_id
             ).first()
-            if not row:
+            if not row or (owner is not None and (getattr(row, "owner", "") or "") != owner):
                 return False
             s.delete(row)
         return True
 
     matters = _load_matters()
-    n = len(matters)
-    matters = [m for m in matters if m.id != matter_id]
-    if len(matters) == n:
+    target = next((m for m in matters if m.id == matter_id), None)
+    if not target or (owner is not None and target.owner != owner):
         return False
-    _save_matters(matters)
+    _save_matters([m for m in matters if m.id != matter_id])
     return True
 
 
@@ -560,7 +570,7 @@ def _score_ruling(ruling: dict, matter: Matter) -> tuple[float, list[str]]:
     return min(score, 1.0), reasons
 
 
-def run_digest(*, since: str | None = None) -> dict:
+def run_digest(*, since: str | None = None, owner: str | None = None) -> dict:
     """
     Compute the digest for all registered matters.
 
@@ -579,7 +589,7 @@ def run_digest(*, since: str | None = None) -> dict:
             'totals': {'matters_with_hits': N, 'total_hits': N},
         }
     """
-    matters_raw = list_matters()  # dual-backend aware
+    matters_raw = list_matters(owner)  # dual-backend aware; owner=None → all
     matters = [Matter(**m) for m in matters_raw]
     rulings = load_rulings()
 
