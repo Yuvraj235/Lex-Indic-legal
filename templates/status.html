@@ -116,27 +116,6 @@
 <body>
   {% include '_nav.html' %}
 
-<header class="top">
-  <div class="top-inner">
-    <a href="/" class="brand">
-      <div class="brand-mark">L</div>
-      <span class="brand-name">Lex-Indic</span>
-    </a>
-    <nav class="nav">
-      <a href="/" data-i18n="nav.landing">Landing</a>
-      <a href="/app" data-i18n="nav.analyze">Analyze</a>
-      <a href="/trust" data-i18n="nav.trust">Trust</a>
-      <a href="/status" style="color:var(--gold-glow)" data-i18n="nav.status">Status</a>
-    
-      <div class="btn-group btn-group-sm" role="group" aria-label="Language" style="margin-left:auto;display:flex;gap:0">
-        <button type="button" onclick="setLexLang('en')" id="lexLangEn"
-                style="background:transparent;border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.78);padding:5px 12px;border-radius:6px 0 0 6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">EN</button>
-        <button type="button" onclick="setLexLang('hi')" id="lexLangHi"
-                style="background:transparent;border:1px solid rgba(255,255,255,.25);border-left:0;color:rgba(255,255,255,.78);padding:5px 12px;border-radius:0 6px 6px 0;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">हिन्दी</button>
-      </div>
-    </nav>
-  </div>
-</header>
 
 <main>
   <div class="hero">
@@ -298,7 +277,14 @@
   document.querySelectorAll('.event-chip').forEach(chip => chip.addEventListener('click', () => chip.classList.toggle('active')));
 
   async function refreshWebhooks(){
-    const subs = await (await fetch('/webhooks/api/subscriptions')).json();
+    const subsResp = await fetch('/webhooks/api/subscriptions');
+    if (!subsResp.ok) {
+      // Signed-out visitors get 401 here; say so instead of crashing the refresh loop.
+      $('whList').innerHTML = '<div style="font-size:12px;color:var(--grey-500);font-style:italic">Sign in to see webhook subscriptions.</div>';
+      $('whDeliveries').innerHTML = '';
+      return;
+    }
+    const subs = await subsResp.json();
     $('whList').innerHTML = subs.subscriptions.length === 0
       ? '<div style="font-size:12px;color:var(--grey-500);font-style:italic">No subscriptions yet.</div>'
       : subs.subscriptions.map(s => `
@@ -315,7 +301,7 @@
       `).join('');
 
     const dels = await (await fetch('/webhooks/api/deliveries')).json();
-    $('whDeliveries').innerHTML = dels.deliveries.length === 0
+    $('whDeliveries').innerHTML = !(dels.deliveries || []).length
       ? '<div style="font-size:12px;color:var(--grey-500);font-style:italic">No deliveries yet.</div>'
       : '<table style="margin-top:6px"><thead><tr><th>Time</th><th>URL</th><th>Status</th><th>Latency</th></tr></thead><tbody>' +
         dels.deliveries.map(r => `

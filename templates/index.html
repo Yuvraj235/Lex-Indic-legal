@@ -561,35 +561,9 @@
   {% include '_nav.html' %}
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
-     TOP NAVIGATION BAR
-═══════════════════════════════════════════════════════════════════════════ -->
-<nav class="navbar navbar-dark" id="topnav">
-  <div class="container-fluid px-3">
-    <span class="navbar-brand mb-0 h1">
-      <span class="brand-lex">LEX</span><span class="brand-indic">-INDIC</span>
-      <span class="brand-sub ms-2" data-i18n="app.header.title">BNS Transition Engine</span>
-    </span>
-    <div class="d-flex align-items-center" style="gap:14px">
-      <!-- Day-4: language toggle on the top bar. Reads/writes localStorage so
-           the choice persists across page loads. -->
-      <div class="btn-group btn-group-sm" role="group" aria-label="Interface language">
-        <button type="button" class="btn btn-outline-light" id="uiLangEn"
-                onclick="setUiLang('en')">EN</button>
-        <button type="button" class="btn btn-outline-light" id="uiLangHi"
-                onclick="setUiLang('hi')">हिन्दी</button>
-      </div>
-      <span class="text-light small opacity-75 d-none d-md-inline">
-        <i class="bi bi-shield-check me-1"></i>
-        <span data-i18n="app.header.sub">AI-Powered Junior Associate</span> &nbsp;|&nbsp; Bharatiya Nyaya Sanhita 2023
-      </span>
-    </div>
-  </div>
-</nav>
-
-<!-- ═══════════════════════════════════════════════════════════════════════════
      MAIN LAYOUT: sidebar + content
 ═══════════════════════════════════════════════════════════════════════════ -->
-<div class="d-flex" style="height: calc(100vh - 56px); overflow: hidden;">
+<div class="d-flex" style="height: calc(100vh - var(--lex-topbar-h, 56px)); overflow: hidden;">
 
   <!-- ── LEFT SIDEBAR ───────────────────────────────────────────────────── -->
   <aside id="sidebar">

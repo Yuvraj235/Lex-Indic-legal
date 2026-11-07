@@ -88,6 +88,27 @@
   .lex-nav-admin .lex-nav-link:hover {
     color: #f0a500;
   }
+  .lex-lang {
+    display: flex;
+    margin-left: 10px;
+  }
+  .lex-lang[hidden] { display: none; }
+  .lex-lang button {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.78);
+    padding: 4px 11px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .lex-lang button:first-child { border-radius: 6px 0 0 6px; }
+  .lex-lang button:last-child { border-radius: 0 6px 6px 0; border-left: 0; }
+  .lex-lang button.active {
+    background: rgba(240,196,79,0.18);
+    color: #f0c44f;
+  }
   @media (max-width: 900px) {
     .lex-nav-divider, .lex-brand { display: none; }
     .lex-nav-admin { margin-left: 0; }
@@ -97,6 +118,15 @@
   @media (max-width: 600px) {
     .lex-nav-link { padding: 5px 7px; font-size: 12px; }
     .lex-nav-admin .lex-nav-link { font-size: 11px; }
+    /* One swipeable row instead of links spilling past the screen edge
+       (which made phones render every page zoomed out). */
+    .lex-topbar-inner {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .lex-topbar-inner::-webkit-scrollbar { display: none; }
+    .lex-lang { order: -1; margin: 0 6px 0 0; }
   }
 
   /* Shared empty-state styling — used by /matters /monitors /webhooks etc. */
@@ -142,10 +172,16 @@
     <div class="lex-nav-admin">
       <a href="/api/v1/docs" class="lex-nav-link" data-path="/api/v1/docs">API Docs</a>
       <a href="/dashboard" class="lex-nav-link" data-path="/dashboard">Dashboard</a>
+      <a href="/admin/soc2" class="lex-nav-link" data-path="/admin/soc2">SOC 2</a>
       <a href="/admin/api-keys" class="lex-nav-link" data-path="/admin/api-keys">API Keys</a>
       <a href="/webhooks" class="lex-nav-link" data-path="/webhooks">Webhooks</a>
       <a href="/profile" class="lex-nav-link" data-path="/profile">Profile</a>
       <a href="/auth/login" class="lex-nav-link" data-path="/auth/login">Login</a>
+    </div>
+
+    <div class="lex-lang" id="lexLangSwitch" role="group" aria-label="Language" hidden>
+      <button type="button" id="lexLangEn" data-lang="en">EN</button>
+      <button type="button" id="lexLangHi" data-lang="hi">हिन्दी</button>
     </div>
   </div>
 </nav>
@@ -162,6 +198,40 @@
           (linkPath !== '/' && current.startsWith(linkPath))) {
         link.classList.add('active');
       }
+    });
+  })();
+
+  // Full-height layouts under the bar (e.g. /app) size themselves with
+  // calc(100vh - var(--lex-topbar-h)); the bar wraps to two rows on narrow screens.
+  (function() {
+    const topbar = document.getElementById('lexTopbar');
+    if (!topbar) return;
+    const setHeight = () =>
+      document.documentElement.style.setProperty('--lex-topbar-h', topbar.offsetHeight + 'px');
+    setHeight();
+    if (window.ResizeObserver) new ResizeObserver(setHeight).observe(topbar);
+  })();
+
+  // EN / हिन्दी switch — shown only on pages that ship an i18n runtime
+  // (setLexLang on most pages, setUiLang on /app).
+  (function() {
+    const sw = document.getElementById('lexLangSwitch');
+    if (!sw) return;
+    const mark = lang => sw.querySelectorAll('button').forEach(
+      b => b.classList.toggle('active', b.dataset.lang === lang));
+    sw.addEventListener('click', e => {
+      const lang = e.target.dataset && e.target.dataset.lang;
+      const setLang = window.setLexLang || window.setUiLang;
+      if (!lang || !setLang) return;
+      setLang(lang);
+      mark(lang);
+    });
+    window.addEventListener('DOMContentLoaded', () => {
+      if (typeof window.setLexLang !== 'function' && typeof window.setUiLang !== 'function') return;
+      sw.hidden = false;
+      let saved = 'en';
+      try { saved = localStorage.getItem('lexindic.lang') || 'en'; } catch (e) {}
+      mark(saved);
     });
   })();
 </script>

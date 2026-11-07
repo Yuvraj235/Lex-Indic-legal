@@ -16,7 +16,7 @@ short_description: AI Junior Associate for Indian law — BNS transition engine
 
 [![Status](https://img.shields.io/badge/status-v1.9-success)]()
 [![Stack](https://img.shields.io/badge/stack-Flask%20%2B%20Three.js%20%2B%20ChromaDB-blue)]()
-[![Tests](https://img.shields.io/badge/tests-447%20passing-success)]()
+[![Tests](https://img.shields.io/badge/tests-462%20passing-success)]()
 [![SOC2](https://img.shields.io/badge/SOC2-9%2F10%20controls%20passing-success)]()
 [![API](https://img.shields.io/badge/API-v1%20%2B%20OpenAPI-blue)]()
 [![License](https://img.shields.io/badge/license-Educational-lightgrey)]()
@@ -355,7 +355,7 @@ Then open: **http://localhost:8080** (or **https://localhost:8443** for the add-
 pip3 install -r requirements-dev.txt
 python3 -m pytest tests/
 ```
-447 tests, runs in ~5 seconds, zero network calls (DNS and the webhook retry thread are stubbed).
+462 tests, runs in ~5 seconds, zero network calls (DNS and the webhook retry thread are stubbed).
 `tests/test_security.py` pins every access-control rule — who gets a 401/403/404;
 `tests/test_accuracy.py` pins the citation, concordance, precedent and self-correction checks.
 See [`tests/README.md`](tests/README.md) for details.

@@ -135,6 +135,7 @@
 
   /* ─── Drop zone ──────────────────────────────────────────────────────── */
   .drop-zone{
+    display:block;
     background:var(--white);
     border:2px dashed var(--grey-300);
     border-radius:16px;
@@ -387,26 +388,6 @@
 <body>
   {% include '_nav.html' %}
 
-<header class="top">
-  <div class="top-inner">
-    <a href="/" class="brand">
-      <div class="brand-mark">L</div>
-      <span class="brand-name">Lex-Indic</span>
-    </a>
-    <nav class="top-nav">
-      <a href="/" data-i18n="nav.landing">Landing</a>
-      <a href="/app" data-i18n="nav.analyze">Analyze a case</a>
-      <a href="/convert" style="color:var(--gold-glow)" data-i18n="nav.convert">Convert IPC → BNS</a>
-    
-      <div class="btn-group btn-group-sm" role="group" aria-label="Language" style="margin-left:auto;display:flex;gap:0">
-        <button type="button" onclick="setLexLang('en')" id="lexLangEn"
-                style="background:transparent;border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.78);padding:5px 12px;border-radius:6px 0 0 6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">EN</button>
-        <button type="button" onclick="setLexLang('hi')" id="lexLangHi"
-                style="background:transparent;border:1px solid rgba(255,255,255,.25);border-left:0;color:rgba(255,255,255,.78);padding:5px 12px;border-radius:0 6px 6px 0;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">हिन्दी</button>
-      </div>
-    </nav>
-  </div>
-</header>
 
 <main>
   <div class="hero">

@@ -28,6 +28,20 @@ class TestPublicPages:
         assert r.status_code == 200, f"{path} returned {r.status_code}"
         assert len(r.data) > 1000, f"{path} returned suspiciously small body"
 
+    @pytest.mark.parametrize("path", [
+        "/", "/app", "/trust", "/convert", "/monitors", "/tabular",
+        "/ecourts", "/matters", "/nalsa", "/status", "/login", "/try",
+        "/pricing", "/dashboard", "/admin/soc2",
+    ])
+    def test_one_top_bar_per_page(self, client, path):
+        # Pages used to draw their own header under the shared bar, so two
+        # stacked nav bars showed on most of the app.
+        html = client.get(path).get_data(as_text=True)
+        assert html.count('id="lexTopbar"') == 1, path
+        assert '<header class="top">' not in html, path
+        assert 'id="topnav"' not in html, path
+        assert html.count('id="lexLangEn"') == 1, path
+
 
 # ────────────────────────────── JSON contracts ─────────────────────────────
 class TestJsonContracts:

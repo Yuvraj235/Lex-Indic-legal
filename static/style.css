@@ -102,7 +102,9 @@ body {
 .history-pdf-link:hover { color: #fff; }
 
 /* ── Main content area ───────────────────────────────────────── */
-#mainContent { background: #f4f6fb; }
+/* Bottom room so the fixed LEXI chat button never sits on the last controls
+   (Run Legal Analysis, file chips). Overrides Bootstrap's .p-4. */
+#mainContent { background: #f4f6fb; padding-bottom: 110px !important; }
 
 /* ── Intake form ─────────────────────────────────────────────── */
 .intake-header h4 { color: var(--navy); }

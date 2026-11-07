@@ -22,9 +22,12 @@
     background:
       radial-gradient(ellipse at 80% 10%, rgba(240,196,79,.10), transparent 50%),
       linear-gradient(135deg,var(--navy-deep) 0%,var(--navy) 60%,var(--navy-deep) 100%);
-    min-height:100vh;display:grid;place-items:center;padding:24px 16px;
+    min-height:100vh;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr;
+    place-items:center;padding:0 16px 24px;
     -webkit-font-smoothing:antialiased;
   }
+  /* Shared top bar spans the full width above the centred card. */
+  body>.lex-topbar{justify-self:stretch;width:auto;margin:0 -16px 24px}
   .card{
     background:#fff;border-radius:18px;padding:36px clamp(28px,5vw,48px);
     width:100%;max-width:540px;box-shadow:var(--shadow-lg);

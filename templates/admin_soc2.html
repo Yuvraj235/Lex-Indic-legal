@@ -45,6 +45,9 @@
   }
 
   main{max-width:1280px;margin:30px auto;padding:0 24px}
+  .page-title{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;
+              display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+  .page-title .top-pill{background:var(--navy);font-family:'Inter',sans-serif}
 
   /* Summary row */
   .summary{
@@ -129,17 +132,9 @@
 <body>
   {% include '_nav.html' %}
 
-<header class="top">
-  <div class="top-inner">
-    <a href="/" class="brand">
-      <div class="brand-mark">L</div>
-      <span class="top-title">Lex-Indic Admin · SOC 2 Readiness</span>
-    </a>
-    <span class="top-pill">Internal · Pre-audit</span>
-  </div>
-</header>
 
 <main>
+  <h1 class="page-title">SOC 2 Readiness <span class="top-pill">Internal · Pre-audit</span></h1>
   <div class="why-card">
     <strong>What this dashboard does:</strong>  Runs the 10 SOC 2 controls
     defined in <code style="background:var(--grey-200);padding:1px 6px;border-radius:3px">tools/soc2/controls.py</code>
