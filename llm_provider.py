@@ -12,16 +12,18 @@ can opt out of Groq + Gemini and run entirely on their own machine.  Until
 this module, that was a promise without code.  Now it's a single env-var
 flip:
 
-    LLM_PROVIDER=ollama     OLLAMA_MODEL=llama3.3:70b
+    LLM_PROVIDER=ollama     OLLAMA_MODEL=qwen3:8b       (or hybrid: local first, Groq fixes)
 
 Activation by zero-config: if the user has Ollama running on the default
 host (http://localhost:11434), we detect and use it automatically when
 LLM_PROVIDER=ollama is set.
 
 THE PROVIDERS:
-  - 'groq'    Groq Llama-3.3-70B via groq SDK.  Fast (~5s), US-hosted.
-  - 'ollama'  Local Llama via Ollama's HTTP API.  Slower (depends on GPU);
+  - 'groq'    Groq (GROQ_MODEL) via groq SDK.  Fast, US-hosted.
+  - 'ollama'  Local model via Ollama's HTTP API.  Slower (depends on GPU);
               generation stays on the machine.
+  - 'hybrid'  Local model drafts; the verifier checks the draft against the
+              official text; only a draft with problems is sent to Groq to fix.
 
 Generation is only half the path: RAG search embeds the client's story too
 (main.embeddings_provider — Google Gemini by default). Nothing leaves the
@@ -94,7 +96,7 @@ def ollama_host() -> str:
 
 
 def ollama_model() -> str:
-    return os.getenv("OLLAMA_MODEL", "llama3.3:70b")
+    return os.getenv("OLLAMA_MODEL", "qwen3:8b")     # fits a 16–18 GB laptop
 
 
 def is_ollama_reachable(timeout: float = 1.5) -> bool:
@@ -126,7 +128,7 @@ def complete(
     Raises if all providers fail.
     """
     provider = get_provider()
-    if provider == "ollama":
+    if provider in ("ollama", "hybrid"):
         return _complete_ollama(
             system_messages=system_messages,
             user_message=user_message,
@@ -140,6 +142,12 @@ def complete(
     return {"text": None, "model": None, "provider": "groq", "delegate": True}
 
 
+def complete_local(**kwargs) -> dict:
+    """The local model regardless of LLM_PROVIDER — the drafting step of
+    LLM_PROVIDER=hybrid (local draft, Groq only to fix rejected drafts)."""
+    return _complete_ollama(**kwargs)
+
+
 def _complete_ollama(
     *,
     system_messages: list[str],
@@ -147,6 +155,7 @@ def _complete_ollama(
     temperature: float,
     max_tokens: int,
     timeout_s: int,
+    think: bool | None = None,
 ) -> dict:
     """
     Ollama's /api/chat endpoint — drop-in replacement for OpenAI's
@@ -156,15 +165,23 @@ def _complete_ollama(
     messages = [{"role": "system", "content": s} for s in system_messages]
     messages.append({"role": "user", "content": user_message})
 
-    body = json.dumps({
+    payload_in = {
         "model": model,
         "messages": messages,
         "stream": False,
         "options": {
             "temperature": temperature,
             "num_predict": max_tokens,
+            # Ollama's default window (2–4K tokens) silently cuts a ~4K-token
+            # legal prompt — the model then drafts without most of the law.
+            "num_ctx": int(os.getenv("OLLAMA_NUM_CTX", "16384")),
         },
-    }).encode("utf-8")
+    }
+    if think is None and os.getenv("OLLAMA_THINK", "").strip().lower() in ("0", "false", "no"):
+        think = False
+    if think is not None:
+        payload_in["think"] = think          # thinking models (qwen3): answer directly
+    body = json.dumps(payload_in).encode("utf-8")
 
     req = urllib.request.Request(
         f"{ollama_host()}/api/chat",
@@ -199,11 +216,11 @@ def status() -> dict:
     embeddings = (os.getenv("EMBEDDINGS_PROVIDER") or "gemini").strip().lower()
     return {
         "provider": provider,
-        "groq_model": groq_model() if provider == "groq" else None,
+        "groq_model": groq_model() if provider in ("groq", "hybrid") else None,
         "embeddings_provider": embeddings,
         # True only when neither generation nor RAG search uses a third party.
         "fully_local": provider == "ollama" and embeddings == "ollama",
         "ollama_host": ollama_host(),
         "ollama_model": ollama_model(),
-        "ollama_reachable": is_ollama_reachable() if provider == "ollama" else None,
+        "ollama_reachable": is_ollama_reachable() if provider in ("ollama", "hybrid") else None,
     }

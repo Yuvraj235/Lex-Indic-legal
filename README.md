@@ -16,7 +16,7 @@ short_description: AI Junior Associate for Indian law — BNS transition engine
 
 [![Status](https://img.shields.io/badge/status-v1.9-success)]()
 [![Stack](https://img.shields.io/badge/stack-Flask%20%2B%20Three.js%20%2B%20ChromaDB-blue)]()
-[![Tests](https://img.shields.io/badge/tests-462%20passing-success)]()
+[![Tests](https://img.shields.io/badge/tests-519%20passing-success)]()
 [![SOC2](https://img.shields.io/badge/SOC2-9%2F10%20controls%20passing-success)]()
 [![API](https://img.shields.io/badge/API-v1%20%2B%20OpenAPI-blue)]()
 [![License](https://img.shields.io/badge/license-Educational-lightgrey)]()
@@ -34,6 +34,26 @@ and within seconds the system produces a **complete legal case brief with 6 outp
 > India replaced the 163-year-old Indian Penal Code (IPC) with the BNS on **1 July 2024**.
 > Lex-Indic helps lawyers navigate this transition instantly — without trusting a chatbot
 > that hallucinates section numbers.
+
+---
+
+## What's New — Local-first, checked against the official text
+
+The knowledge now lives on the machine: the full official text of the three
+criminal-law Acts, a local search index, a local model, and the official
+Supreme Court citation record. A hosted model is used only to fix drafts the
+checker rejects.
+
+| Area | Change | File(s) | Why it matters |
+|---|---|---|---|
+| **Full official text** | Every section of the BNS (358), BNSS (531) and BSA (170) from the Gazette of India, with official titles and the BNSS First Schedule classification (punishment, cognizable, bailable, court) for 452 offence rows | `data/legal_corpus/statutes/`, `statutes.py` | The curated KB covered 89 BNS sections; anything else was answered from model memory |
+| **Local search** | Index built with a local multilingual embedder (`EMBEDDINGS_PROVIDER=ollama`, default `OLLAMA_EMBED_MODEL=qwen3-embedding:4b`). Sections are found by plain-language search keys and returned with full official text, in fixed slots: curated offences, the rest of the Act, procedure, case law | `main.py`, `tools/eval_retrieval.py` | 94% of required sections retrieved on the 67-case stress set (bge-m3: 80%), with every section of the Acts reachable; with a local model the query also carries a short issue summary (`QUERY_REWRITE`) |
+| **Local first, hosted second** | `LLM_PROVIDER=hybrid`: the local model (`OLLAMA_MODEL`, default `qwen3:8b`) drafts; the verifier checks the draft; only a rejected draft goes to Groq with the exact findings (the local model fixes it if Groq is busy). LEXI chat follows the same route | `app.py`, `llm_provider.py` | Most answers never leave the machine; the hosted model does what the small one can't |
+| **Similar real cases** | 2,281 Supreme Court criminal judgments 2014–2025 from the CC-BY open dataset, each with its neutral citation, S.C.R. report and the provisions it cites, retrieved alongside the law (`tools/ingest_judgments.py`, store gitignored) | `sc_judgments.py` | Real examples the verifier can confirm against the official record |
+| **Special laws** | POCSO indexed; `tools/add_special_act.py` adds NDPS, IT Act, NI Act, SC/ST Act, JJ Act from official PDFs and refuses copies missing key amended sections | `statutes.py` | Special-law cases no longer depend on model memory |
+| **Official-text checks** | Sections that don't exist, a real number tied to the wrong offence ("BNS 302 (murder)"), provisions not in force (BNS 106(2)), and Supreme Court citations not in the official record (38,139 neutral citations, 1950–2026) | `verifier.py`, `tools/build_sc_citation_index.py` | A fabricated or misattributed precedent is caught deterministically |
+| **Look-alike guidance** | Retrieved law is presented as candidates, not a charge list; each charge needs an ingredient-by-ingredient test; notes separate commonly confused sections (theft / snatching / robbery …) | `main.py`, `data/legal_corpus/distinctions.json` | Wrong extra charges came from similar sections retrieved together |
+| **Stress test** | 67 scenarios easy → hard with gold sections checked against the Gazette; retrieval-only eval needs no model calls | `data/eval/stress_67.json`, `tools/eval_stress.py`, `tools/eval_retrieval.py` | Accuracy is measured, not assumed |
 
 ---
 
@@ -236,7 +256,7 @@ STEP 6: PDF CASE BRIEF + AUDIT LOG
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
-| **AI Model** | Groq GPT-OSS-120B (`GROQ_MODEL`) | Legal drafting, grounded in retrieved law and checked by the verifier |
+| **AI Model** | Local `qwen3:8b` via Ollama (`OLLAMA_MODEL`) + Groq GPT-OSS-120B (`GROQ_MODEL`) | `LLM_PROVIDER=hybrid`: local draft, Groq fixes drafts the verifier rejects; `groq` alone is the default |
 | **Embeddings** | Google Gemini text-embedding-001 | Semantic search across law sections |
 | **Vector Database** | ChromaDB (in-memory) | RAG retrieval of relevant BNS sections |
 | **Web Framework** | Flask (Python 3.10+) | Lightweight web server, REST API |
@@ -340,7 +360,8 @@ AUDIT_LOG_DIR=outputs/audit              # default; override to ship logs elsewh
 On your own machine, `LEX_ENV=development` relaxes this (random local key, login
 code shown on screen, admin open without a token). Behind Fly/Render/nginx set
 `TRUST_PROXY_HOPS=1`. For a deployment where no client data leaves the server,
-set **both** `LLM_PROVIDER=ollama` and `EMBEDDINGS_PROVIDER=ollama`. All settings
+set **both** `LLM_PROVIDER=ollama` and `EMBEDDINGS_PROVIDER=ollama` (local first with a
+hosted fallback for rejected drafts: `LLM_PROVIDER=hybrid`). All settings
 are documented in [`.env.example`](.env.example).
 
 ### 4. Run the web server
@@ -355,7 +376,7 @@ Then open: **http://localhost:8080** (or **https://localhost:8443** for the add-
 pip3 install -r requirements-dev.txt
 python3 -m pytest tests/
 ```
-462 tests, runs in ~5 seconds, zero network calls (DNS and the webhook retry thread are stubbed).
+519 tests, runs in ~5 seconds, zero network calls (DNS and the webhook retry thread are stubbed).
 `tests/test_security.py` pins every access-control rule — who gets a 401/403/404;
 `tests/test_accuracy.py` pins the citation, concordance, precedent and self-correction checks.
 See [`tests/README.md`](tests/README.md) for details.
@@ -592,7 +613,11 @@ can grep the audit log to find the exact request.
 
 ---
 
-## BNS Sections in the Knowledge Base (38)
+## BNS Sections in the Knowledge Base
+
+All 358 sections are indexed from the official text. The curated plain-language cards below add search keywords and practice notes.
+
+### Curated cards
 
 **Sexual offences:** 64, 74, 75, 77, 78, 79
 **Dowry / matrimonial:** 80, 83, 84, 85
@@ -639,7 +664,7 @@ circulars (MHA, SC, NHRC) — all retrievable via the same RAG pipeline.
 | **v2.0** | Cut over each JSON-registry module to Postgres (using db.py); formal SOC 2 Type II via Vanta/Drata | Planned |
 | **v2.1** | BNS full-358 corpus, regional languages (Marathi, Tamil, Bengali), AppSource Word add-in submission | Planned |
 | **v2.0** | Postgres + multi-tenant auth, India-region deployment guide, BNSS + BSA corpora | Planned |
-| **v2.1** | Hindi + regional language support, on-prem Llama-3.3-70B via Ollama | Planned |
+| **v2.1** | Hindi + regional language support; larger on-prem models via Ollama where hardware allows | Planned |
 
 ---
 

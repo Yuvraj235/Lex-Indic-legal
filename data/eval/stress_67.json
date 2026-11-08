@@ -1,0 +1,1211 @@
+{
+ "_note": "67-case accuracy stress test for /analyze, easy -> hard. require = groups of BNS base sections (any one in a group satisfies it); require_bnss = same for BNSS; require_ipc = IPC sections that must be cited (offence before 1 July 2024); forbid = BNS sections that would be a wrong charge on these facts (flagged unless negated in context, then reviewed); mention = groups of phrases (any one satisfies, case-insensitive). Every section number was checked against the official Gazette text in data/legal_corpus/statutes/.",
+ "scenarios": [
+  {
+   "id": "E01_pickpocket",
+   "tier": "easy",
+   "story": "My client was travelling in a crowded city bus in Jaipur. When she got off she found her purse had been taken out of her handbag. It had Rs 8,000 cash and her Aadhaar card. She did not feel anything at the time and nobody threatened her.",
+   "require": [
+    [
+     "303"
+    ]
+   ],
+   "forbid": [
+    "309",
+    "304"
+   ],
+   "mention": [
+    [
+     "theft"
+    ]
+   ]
+  },
+  {
+   "id": "E02_house_break_in",
+   "tier": "easy",
+   "story": "My client's family went to a wedding for three days. When they came back the main door lock of their house was broken and gold jewellery worth Rs 4 lakh and a laptop were missing from the cupboard. Neighbours saw two men leaving the house at night carrying bags.",
+   "require": [
+    [
+     "331"
+    ],
+    [
+     "305",
+     "303"
+    ]
+   ],
+   "forbid": [
+    "309",
+    "310"
+   ],
+   "mention": [
+    [
+     "theft"
+    ]
+   ]
+  },
+  {
+   "id": "E03_simple_hurt",
+   "tier": "easy",
+   "story": "During a parking argument outside a market, a man slapped my client twice and punched him in the face. He got a swollen cheek and a small cut on his lip. The doctor gave first aid and sent him home the same day.",
+   "require": [
+    [
+     "115"
+    ]
+   ],
+   "forbid": [
+    "117",
+    "109"
+   ],
+   "mention": [
+    [
+     "hurt"
+    ]
+   ]
+  },
+  {
+   "id": "E04_grievous_fracture",
+   "tier": "easy",
+   "story": "My client's neighbour beat him with fists and kicked him after a dispute over a drain. The X-ray shows his right forearm is fractured and it has been put in plaster for six weeks. There was no weapon.",
+   "require": [
+    [
+     "117"
+    ]
+   ],
+   "forbid": [
+    "109"
+   ],
+   "mention": [
+    [
+     "grievous"
+    ]
+   ]
+  },
+  {
+   "id": "E05_death_threat_call",
+   "tier": "easy",
+   "story": "A man who lost a property case against my client has been calling him and saying he will kill him and his son if he does not withdraw the execution petition. My client has recordings of three such calls.",
+   "require": [
+    [
+     "351"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "intimidation"
+    ]
+   ]
+  },
+  {
+   "id": "E06_stalking",
+   "tier": "easy",
+   "story": "A man from my client's office keeps following her to the metro station every evening and sends her 30 to 40 messages a day on Instagram even after she clearly told him she is not interested and blocked him. He creates new accounts to message her.",
+   "require": [
+    [
+     "78"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "stalking"
+    ]
+   ]
+  },
+  {
+   "id": "E07_dowry_cruelty",
+   "tier": "easy",
+   "story": "My client married four years ago. Her husband and in-laws keep demanding Rs 10 lakh from her father to start a business, taunt her daily and her husband has hit her several times. Last week they pushed her out of the house at night.",
+   "require": [
+    [
+     "85"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "dowry"
+    ],
+    [
+     "cruelty"
+    ]
+   ]
+  },
+  {
+   "id": "E08_stabbing_murder",
+   "tier": "easy",
+   "story": "In August 2025 my client's brother had an argument with a neighbour about money. Two days later the neighbour came to his shop with a kitchen knife and stabbed him three times in the chest saying 'today I will finish you'. He died before reaching hospital.",
+   "require": [
+    [
+     "103"
+    ]
+   ],
+   "forbid": [
+    "106"
+   ],
+   "mention": [
+    [
+     "murder"
+    ]
+   ]
+  },
+  {
+   "id": "E09_online_advance_fraud",
+   "tier": "easy",
+   "story": "My client wanted to buy a second-hand bike and found a listing online. The seller asked for Rs 25,000 as booking advance by UPI and promised delivery the next day. After the payment he blocked my client's number and the listing disappeared.",
+   "require": [
+    [
+     "318"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "cheating"
+    ]
+   ]
+  },
+  {
+   "id": "E10_house_trespass_abuse",
+   "tier": "easy",
+   "story": "My client's relative, with whom she has a property dispute, walked into her house without permission while she was alone, shouted abuses at her and refused to leave for half an hour. No one was hurt.",
+   "require": [
+    [
+     "329"
+    ]
+   ],
+   "forbid": [
+    "331"
+   ],
+   "mention": [
+    [
+     "trespass"
+    ]
+   ]
+  },
+  {
+   "id": "E11_facebook_defamation",
+   "tier": "easy",
+   "story": "A former business partner posted on Facebook that my client is a thief who ran away with investors' money. This is completely false and the post has been shared over 500 times. Clients have started cancelling orders.",
+   "require": [
+    [
+     "356"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "defamation"
+    ]
+   ]
+  },
+  {
+   "id": "E12_child_kidnapped",
+   "tier": "easy",
+   "story": "My client's 8-year-old daughter was taken from outside her school gate by an unknown man who told the guard he was her uncle. The parents had not given permission to anyone. The police found her the next morning at a bus stand 40 km away.",
+   "require": [
+    [
+     "137"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "kidnap"
+    ]
+   ]
+  },
+  {
+   "id": "E13_rash_driving_injury",
+   "tier": "easy",
+   "story": "A car driver who was racing on a busy road jumped the red light and hit my client who was crossing at the zebra crossing. My client's leg is fractured in two places. The driver stopped and was caught by people there.",
+   "require": [
+    [
+     "281"
+    ],
+    [
+     "125"
+    ]
+   ],
+   "forbid": [
+    "109"
+   ],
+   "mention": [
+    [
+     "rash"
+    ]
+   ]
+  },
+  {
+   "id": "E14_cashier_breach_of_trust",
+   "tier": "easy",
+   "story": "My client owns a petrol pump. His cashier was supposed to deposit the daily cash collection of Rs 1.8 lakh in the bank every evening. For two weeks he deposited nothing and kept the money, and now says he will return it later.",
+   "require": [
+    [
+     "316"
+    ]
+   ],
+   "forbid": [
+    "303"
+   ],
+   "mention": [
+    [
+     "breach of trust"
+    ]
+   ]
+  },
+  {
+   "id": "E15_hidden_camera",
+   "tier": "easy",
+   "story": "My client, a working woman, found a small camera hidden in the bathroom of the flat she rents. The landlord has a duplicate key and she suspects he installed it to record her. She found it pointing at the shower.",
+   "require": [
+    [
+     "77"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "voyeurism"
+    ]
+   ]
+  },
+  {
+   "id": "E16_lewd_comments",
+   "tier": "easy",
+   "story": "Every day a group of men sitting outside a paan shop make obscene comments and sing vulgar songs when my client's 19-year-old daughter walks past to her college. One of them makes obscene gestures at her.",
+   "require": [
+    [
+     "79"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "modesty"
+    ]
+   ]
+  },
+  {
+   "id": "E17_extortion_photos",
+   "tier": "easy",
+   "story": "A man has my client's private photographs and has told him to pay Rs 2 lakh or he will send them to his wife and colleagues. My client has already paid Rs 50,000 out of fear and he is now demanding the rest.",
+   "require": [
+    [
+     "308"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "extortion"
+    ]
+   ]
+  },
+  {
+   "id": "E18_car_vandalism",
+   "tier": "easy",
+   "story": "After a quarrel, my client's neighbour deliberately smashed the windscreen and side mirrors of my client's car parked outside his house and scratched the doors with a key. CCTV shows him doing it. Repair estimate is Rs 65,000.",
+   "require": [
+    [
+     "324"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "mischief"
+    ]
+   ]
+  },
+  {
+   "id": "E19_shot_at_survived",
+   "tier": "easy",
+   "story": "Two men on a bike fired a pistol at my client from close range outside his gym. The bullet hit his shoulder and he survived after surgery. The shooter shouted 'you will not escape next time'.",
+   "require": [
+    [
+     "109"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "attempt to murder"
+    ]
+   ]
+  },
+  {
+   "id": "E20_landlord_theft_belongings",
+   "tier": "easy",
+   "story": "My client vacated his rented room and left two cartons of books and a television with the landlord's permission for a week. When he came back, the landlord had sold the television and refused to return anything.",
+   "require": [
+    [
+     "316",
+     "314"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "dishonest"
+    ]
+   ]
+  },
+  {
+   "id": "M01_knife_robbery",
+   "tier": "medium",
+   "story": "My client was returning from an ATM at night when a man showed a knife and told him to hand over his wallet and phone or he would stab him. My client handed them over and the man ran away. The wallet had Rs 20,000.",
+   "require": [
+    [
+     "309"
+    ]
+   ],
+   "forbid": [
+    "304"
+   ],
+   "mention": [
+    [
+     "robbery"
+    ]
+   ]
+  },
+  {
+   "id": "M02_dacoity",
+   "tier": "medium",
+   "story": "Six masked men armed with rods and a country-made pistol entered my client's farmhouse at 2 am, tied up the family and looted cash and jewellery worth Rs 12 lakh. They threatened to shoot anyone who raised an alarm.",
+   "require": [
+    [
+     "310"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "dacoity"
+    ]
+   ]
+  },
+  {
+   "id": "M03_dowry_death_burns",
+   "tier": "medium",
+   "story": "My client's sister got married three years ago. Her husband and mother-in-law were constantly harassing her for a car and cash. Two weeks ago she died of burn injuries at her matrimonial home. The in-laws say it was a cooking accident. A week before her death she had told her brother on the phone that they would kill her if the car was not given.",
+   "require": [
+    [
+     "80"
+    ],
+    [
+     "85"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "dowry death"
+    ]
+   ]
+  },
+  {
+   "id": "M04_moneylender_suicide",
+   "tier": "medium",
+   "story": "My client's son, a 24-year-old auto driver, died by suicide last month. He left a note saying a local moneylender had been humiliating him in public, threatening to take his auto and beat his mother, and that he could not take it anymore. The moneylender had come to the house the day before.",
+   "require": [
+    [
+     "108"
+    ]
+   ],
+   "forbid": [
+    "103"
+   ],
+   "mention": [
+    [
+     "abetment"
+    ]
+   ]
+  },
+  {
+   "id": "M05_boss_sexual_favours",
+   "tier": "medium",
+   "story": "My client works in a private bank. Her branch manager repeatedly sends her messages asking her to spend weekends with him, touches her shoulder and back without consent, and told her that her confirmation depends on 'keeping him happy'.",
+   "require": [
+    [
+     "75"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "sexual harassment"
+    ]
+   ]
+  },
+  {
+   "id": "M06_acquaintance_rape",
+   "tier": "medium",
+   "story": "My client, a 23-year-old, went to a party at an acquaintance's flat. He forced himself on her in a bedroom despite her repeatedly saying no and trying to push him away. She went to a hospital the next day and the medical examination was done.",
+   "require": [
+    [
+     "64"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "rape"
+    ],
+    [
+     "consent"
+    ]
+   ]
+  },
+  {
+   "id": "M07_false_promise_marriage",
+   "tier": "medium",
+   "story": "My client was in a relationship for two years with a man who repeatedly promised to marry her and on that basis had a physical relationship with her. She has now found out that he was engaged to another woman the whole time and he married her last month. His family says he never intended to marry my client.",
+   "require": [
+    [
+     "69"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "promise to marry"
+    ]
+   ]
+  },
+  {
+   "id": "M08_gang_rape",
+   "tier": "medium",
+   "story": "My client's 20-year-old cousin was dragged into a car by three men she knew from her locality and raped by all of them in turns at an isolated farmhouse. She escaped in the morning and reached a police post.",
+   "require": [
+    [
+     "70"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "gang rape"
+    ]
+   ]
+  },
+  {
+   "id": "M09_acid_attack",
+   "tier": "medium",
+   "story": "A man whose proposal my client rejected threw acid on her face outside her coaching centre. She has severe burns on her face and has lost vision in one eye. He had threatened her earlier on phone.",
+   "require": [
+    [
+     "124"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "acid"
+    ]
+   ]
+  },
+  {
+   "id": "M10_forged_sale_deed",
+   "tier": "medium",
+   "story": "My client's late father owned a plot. A property dealer prepared a sale deed showing my client's father sold the plot to him in 2024, with a forged signature, and got it registered using a fake Aadhaar. He has now sold the plot to someone else using that deed.",
+   "require": [
+    [
+     "338",
+     "336"
+    ],
+    [
+     "340"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "forg"
+    ]
+   ]
+  },
+  {
+   "id": "M11_fake_bank_officer",
+   "tier": "medium",
+   "story": "My client got a call from a person claiming to be from the fraud department of her bank, who knew her name and account details. He said her card would be blocked unless she shared the OTP to 'verify'. She shared it and Rs 1.4 lakh was transferred out of her account within minutes.",
+   "require": [
+    [
+     "319"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "personation"
+    ]
+   ]
+  },
+  {
+   "id": "M12_bought_stolen_phone",
+   "tier": "medium",
+   "story": "My client bought a used iPhone from a shop in Gaffar Market for Rs 30,000 with a bill. Three months later police came to his house saying the phone was stolen in a robbery and that he is accused of receiving stolen property. What is his position?",
+   "require": [
+    [
+     "317"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "stolen property"
+    ],
+    [
+     "knowledge",
+     "reason to believe"
+    ]
+   ]
+  },
+  {
+   "id": "M13_domestic_worker_locked",
+   "tier": "medium",
+   "story": "My client, a 30-year-old domestic worker, was locked inside her employer's flat for eleven days whenever the family went out. They took her phone, did not pay her salary for four months and did not allow her to leave.",
+   "require": [
+    [
+     "127"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "confinement"
+    ]
+   ]
+  },
+  {
+   "id": "M14_kidnap_for_ransom",
+   "tier": "medium",
+   "story": "My client's 15-year-old son was picked up while returning from tuition. That night the family got a WhatsApp call demanding Rs 50 lakh for his release and threatening to kill him if they went to the police.",
+   "require": [
+    [
+     "140"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "ransom"
+    ]
+   ]
+  },
+  {
+   "id": "M15_extortion_syndicate",
+   "tier": "medium",
+   "story": "A gang led by a local strongman has been collecting 'protection money' from shopkeepers in our market for the last four years. Its members have more than a dozen FIRs against them for extortion and assault, and they use violence against anyone who refuses. My client, a shop owner, was beaten last week for not paying.",
+   "require": [
+    [
+     "111"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "organised crime"
+    ]
+   ]
+  },
+  {
+   "id": "M16_ticket_scalping_gang",
+   "tier": "medium",
+   "story": "A group of eight people is running an organised racket at the railway station, buying confirmed tickets in bulk through fake IDs and selling them at three times the price, and picking pockets of passengers in the rush. My client, a passenger, lost his wallet to them and later saw the same group operating daily.",
+   "require": [
+    [
+     "112"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "petty organised crime"
+    ]
+   ]
+  },
+  {
+   "id": "M17_mob_lynching_caste",
+   "tier": "medium",
+   "story": "My client's brother, a Dalit labourer, was accused by villagers of stealing a goat. A group of about fifteen people tied him to a tree and beat him with sticks for hours, abusing his caste. He died the next day. Videos show the attackers.",
+   "require": [
+    [
+     "103"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "five or more",
+     "group of five",
+     "mob",
+     "lynch"
+    ],
+    [
+     "Atrocities",
+     "SC/ST",
+     "Scheduled Castes"
+    ]
+   ]
+  },
+  {
+   "id": "M18_single_blow_sudden_fight",
+   "tier": "medium",
+   "story": "Two neighbours had a sudden heated quarrel over water supply. In the heat of the moment one of them picked up a bamboo stick lying nearby and hit the other once on the head. The injured man died in hospital three days later. There was no previous enmity and no planning.",
+   "require": [
+    [
+     "105"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "culpable homicide"
+    ]
+   ]
+  },
+  {
+   "id": "M19_electrician_negligence",
+   "tier": "medium",
+   "story": "A building contractor left live electric wires exposed on the ground at a construction site next to a public footpath despite complaints. My client's 10-year-old son touched them while walking past and died of electrocution.",
+   "require": [
+    [
+     "106"
+    ]
+   ],
+   "forbid": [
+    "103"
+   ],
+   "mention": [
+    [
+     "negligence"
+    ]
+   ]
+  },
+  {
+   "id": "M20_investment_scam_trio",
+   "tier": "medium",
+   "story": "Three people jointly ran a 'crypto trading' office, showed fake profit screenshots, and convinced my client and 40 others to invest Rs 2 crore in total. Their chats show they had planned from the start to shut the office and disappear, which they did last month.",
+   "require": [
+    [
+     "61"
+    ],
+    [
+     "318"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "conspiracy"
+    ]
+   ]
+  },
+  {
+   "id": "M21_two_men_beating",
+   "tier": "medium",
+   "story": "Two brothers together caught my client on the road, one held his arms while the other hit him with an iron rod, breaking his collarbone and two ribs. They said it was revenge for a complaint he had made against them.",
+   "require": [
+    [
+     "117",
+     "118"
+    ],
+    [
+     "3"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "common intention"
+    ]
+   ]
+  },
+  {
+   "id": "M22_shop_attacked_by_crowd",
+   "tier": "medium",
+   "story": "A crowd of about twenty people with sticks and stones came to my client's shop shouting slogans after a rumour spread on social media, broke the shutters, smashed the glass counters and injured two employees.",
+   "require": [
+    [
+     "191"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "unlawful assembly",
+     "rioting"
+    ]
+   ]
+  },
+  {
+   "id": "M23_hate_speech_video",
+   "tier": "medium",
+   "story": "A local leader posted a video calling on people of his religion to boycott and drive out members of another community from the town, saying they are traitors. Within days there were threats against families of that community, including my client's.",
+   "require": [
+    [
+     "196"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "enmity"
+    ]
+   ]
+  },
+  {
+   "id": "M24_police_refuse_fir",
+   "tier": "medium",
+   "story": "My client's shop was burgled and goods worth Rs 3 lakh were stolen. When he went to the police station, the duty officer refused to register an FIR and told him to first find the thieves himself. What can he do?",
+   "require": [
+    [
+     "303",
+     "305",
+     "331"
+    ]
+   ],
+   "require_bnss": [
+    [
+     "173"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "Lalita Kumari"
+    ]
+   ]
+  },
+  {
+   "id": "H01_snatching_no_force",
+   "tier": "hard",
+   "story": "My client was talking on her phone while standing at a bus stop when a teenager on a bicycle grabbed the phone out of her hand and rode off. She was not touched, threatened or hurt. The phone was worth Rs 60,000.",
+   "require": [
+    [
+     "304"
+    ]
+   ],
+   "forbid": [
+    "309"
+   ],
+   "mention": [
+    [
+     "snatching"
+    ]
+   ]
+  },
+  {
+   "id": "H02_entrusted_car_sold",
+   "tier": "hard",
+   "story": "My client lent his car to a close friend for a family wedding in another city for four days and gave him the keys and RC. The friend never returned it and two months later my client found that he had sold it to a dealer using a fake sale letter.",
+   "require": [
+    [
+     "316"
+    ],
+    [
+     "336",
+     "340"
+    ]
+   ],
+   "forbid": [
+    "303"
+   ],
+   "mention": [
+    [
+     "breach of trust"
+    ]
+   ]
+  },
+  {
+   "id": "H03_murder_before_bns",
+   "tier": "hard",
+   "story": "My client's father was murdered in March 2024 by a man who shot him at his farm. The accused absconded and has just been arrested, and the FIR is being registered now in 2026 because the earlier complaint was never formally registered. Under which law will he be charged?",
+   "require": [],
+   "require_ipc": [
+    "302"
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "IPC",
+     "Indian Penal Code"
+    ],
+    [
+     "1 July 2024",
+     "1st July 2024",
+     "July 1, 2024",
+     "01.07.2024"
+    ]
+   ]
+  },
+  {
+   "id": "H04_cheque_bounce",
+   "tier": "hard",
+   "story": "My client lent Rs 3 lakh to a friend who gave him a post-dated cheque for repayment. The cheque bounced with the remark 'funds insufficient'. The friend is now avoiding calls. My client wants to file a criminal case.",
+   "require": [],
+   "forbid": [],
+   "mention": [
+    [
+     "138"
+    ],
+    [
+     "Negotiable Instruments"
+    ]
+   ]
+  },
+  {
+   "id": "H05_adultery",
+   "tier": "hard",
+   "story": "My client found out that his wife has been having an affair with a colleague for a year. He wants to file a criminal case against the colleague for adultery and get him arrested.",
+   "require": [],
+   "forbid": [],
+   "mention": [
+    [
+     "adultery"
+    ],
+    [
+     "not an offence",
+     "not a criminal offence",
+     "not a crime",
+     "no longer",
+     "struck down",
+     "decriminali",
+     "Joseph Shine"
+    ]
+   ]
+  },
+  {
+   "id": "H06_consensual_same_sex",
+   "tier": "hard",
+   "story": "My client's 26-year-old son is in a consensual relationship with another adult man. Some relatives are threatening to report them to the police for an 'unnatural offence' and are demanding money to stay quiet.",
+   "require": [
+    [
+     "308"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "not an offence",
+     "not a criminal offence",
+     "not a crime",
+     "Navtej",
+     "no offence"
+    ]
+   ]
+  },
+  {
+   "id": "H07_criticism_of_government",
+   "tier": "hard",
+   "story": "My client, a student, posted a strongly worded post on X criticising the state government's handling of floods and calling the ministers incompetent. Police have called him for questioning and someone said he can be booked for sedition.",
+   "require": [],
+   "forbid": [],
+   "mention": [
+    [
+     "152"
+    ],
+    [
+     "sedition"
+    ]
+   ]
+  },
+  {
+   "id": "H08_child_touched_by_tutor",
+   "tier": "hard",
+   "story": "My client's 11-year-old daughter told her mother that her home tutor has been touching her private parts during lessons for the last two months and told her not to tell anyone. The family wants to take strict action.",
+   "require": [],
+   "forbid": [],
+   "mention": [
+    [
+     "POCSO",
+     "Protection of Children from Sexual Offences"
+    ]
+   ]
+  },
+  {
+   "id": "H09_juvenile_accused",
+   "tier": "hard",
+   "story": "My client's 16-year-old son has been caught by police for stealing a bicycle from the society parking. The police are saying they will put him in jail with adults. What will happen to him?",
+   "require": [],
+   "forbid": [],
+   "mention": [
+    [
+     "Juvenile Justice",
+     "JJ Act",
+     "Juvenile Justice Board"
+    ]
+   ]
+  },
+  {
+   "id": "H10_ganja_possession",
+   "tier": "hard",
+   "story": "Police stopped my client's car at a checkpost and found 300 grams of ganja in the dickey. They have arrested him. He says it belonged to a friend who had borrowed the car the day before.",
+   "require": [],
+   "forbid": [],
+   "mention": [
+    [
+     "NDPS",
+     "Narcotic Drugs"
+    ]
+   ]
+  },
+  {
+   "id": "H11_email_hacked_obscene",
+   "tier": "hard",
+   "story": "Someone hacked my client's email and Instagram account, changed the passwords, and used them to send obscene messages and morphed pictures to her contacts pretending to be her.",
+   "require": [],
+   "forbid": [],
+   "mention": [
+    [
+     "Information Technology Act",
+     "IT Act"
+    ]
+   ]
+  },
+  {
+   "id": "H12_contractor_quality_dispute",
+   "tier": "hard",
+   "story": "My client paid a contractor Rs 8 lakh out of Rs 12 lakh to renovate his house. The contractor did about 60% of the work, but the quality is poor and he has stopped coming, saying he will return when the balance is paid. My client wants to file a cheating case.",
+   "require": [],
+   "forbid": [],
+   "mention": [
+    [
+     "civil"
+    ],
+    [
+     "intention"
+    ]
+   ]
+  },
+  {
+   "id": "H13_knife_hand_over_wallet",
+   "tier": "hard",
+   "story": "A man put a knife to my client's neck in a dark lane and said 'give me your chain and wallet right now or you are dead'. My client gave them immediately and the man ran. Is this extortion or robbery?",
+   "require": [
+    [
+     "309"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "robbery"
+    ]
+   ]
+  },
+  {
+   "id": "H14_rod_on_legs_lesson",
+   "tier": "hard",
+   "story": "Over a land dispute my client's cousin attacked him with an iron rod, hitting only his legs repeatedly while saying 'I will teach you a lesson so you can't walk to the court'. Both his shin bones are fractured.",
+   "require": [
+    [
+     "117",
+     "118"
+    ]
+   ],
+   "forbid": [
+    "109"
+   ],
+   "mention": [
+    [
+     "grievous"
+    ]
+   ]
+  },
+  {
+   "id": "H15_night_burglary_weapon",
+   "tier": "hard",
+   "story": "At 3 am a man broke the window grill of my client's house, entered with a screwdriver and a knife, and was stealing cash from the drawer when my client woke up. The man threatened him with the knife and escaped with Rs 40,000.",
+   "require": [
+    [
+     "331"
+    ],
+    [
+     "309",
+     "305",
+     "307"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "house-breaking",
+     "house breaking",
+     "house-trespass"
+    ]
+   ]
+  },
+  {
+   "id": "H16_suicide_after_nine_years",
+   "tier": "hard",
+   "story": "My client's daughter married nine years ago. She was continuously harassed by her husband for money and beaten. Last month she died by suicide at her matrimonial home and left a note blaming her husband's cruelty.",
+   "require": [
+    [
+     "108"
+    ],
+    [
+     "85"
+    ]
+   ],
+   "forbid": [
+    "80"
+   ],
+   "mention": [
+    [
+     "seven years",
+     "7 years",
+     "7-year",
+     "seven-year"
+    ]
+   ]
+  },
+  {
+   "id": "H17_hit_and_run_flee",
+   "tier": "hard",
+   "story": "A truck hit my client's husband on a highway at night and killed him. The driver did not stop, did not report the accident to police or a magistrate, and fled. He was traced a week later. The family wants the strictest punishment available for running away.",
+   "require": [
+    [
+     "106"
+    ]
+   ],
+   "forbid": [
+    "103"
+   ],
+   "mention": [
+    [
+     "not been brought into force",
+     "not brought into force",
+     "not in force",
+     "not yet in force",
+     "not notified",
+     "not been notified",
+     "abeyance",
+     "kept on hold",
+     "put on hold"
+    ]
+   ]
+  },
+  {
+   "id": "H18_manager_scolding_suicide",
+   "tier": "hard",
+   "story": "An employee of my client's company died by suicide. His family has filed a complaint against my client, the manager, because the employee had been given a warning letter and scolded in a meeting for poor performance two weeks earlier. There were no threats or personal harassment.",
+   "require": [
+    [
+     "108"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "instigat"
+    ]
+   ]
+  },
+  {
+   "id": "H19_maid_stole_jewellery",
+   "tier": "hard",
+   "story": "My client's full-time domestic help, who has the house keys, took gold bangles from the bedroom almirah over several weeks. She confessed when her bag was checked and some bangles were found.",
+   "require": [
+    [
+     "306",
+     "305",
+     "303"
+    ]
+   ],
+   "forbid": [
+    "309",
+    "316"
+   ],
+   "mention": [
+    [
+     "theft"
+    ]
+   ]
+  },
+  {
+   "id": "H20_secret_second_marriage",
+   "tier": "hard",
+   "story": "My client discovered that her husband, with whom she has two children and has not divorced, married another woman in a temple ceremony in another state six months ago.",
+   "require": [
+    [
+     "82"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "bigamy",
+     "marrying again"
+    ]
+   ]
+  },
+  {
+   "id": "H21_sextortion_morphed",
+   "tier": "hard",
+   "story": "A man my client met online took screenshots from a video call, morphed them into nude images and is threatening to post them on social media unless she pays Rs 1 lakh. He keeps messaging her from different numbers and tracks when she is online.",
+   "require": [
+    [
+     "308"
+    ],
+    [
+     "78",
+     "351"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "Information Technology Act",
+     "IT Act"
+    ]
+   ]
+  },
+  {
+   "id": "H22_anticipatory_bail",
+   "tier": "hard",
+   "story": "A business rival has filed a cheating complaint against my client claiming he did not supply goods after taking payment. My client has delivery receipts. He has learnt that police may arrest him any day. How can he protect himself from arrest?",
+   "require": [
+    [
+     "318"
+    ]
+   ],
+   "require_bnss": [
+    [
+     "482"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "anticipatory bail"
+    ]
+   ]
+  },
+  {
+   "id": "H23_arrest_without_notice",
+   "tier": "hard",
+   "story": "Police came to my client's house at night to arrest him on his wife's complaint of cruelty, without giving him any notice to appear. He has never been called for questioning before. What are his rights?",
+   "require": [
+    [
+     "85"
+    ]
+   ],
+   "require_bnss": [
+    [
+     "35"
+    ]
+   ],
+   "forbid": [],
+   "mention": [
+    [
+     "Arnesh Kumar"
+    ],
+    [
+     "notice"
+    ]
+   ]
+  }
+ ]
+}

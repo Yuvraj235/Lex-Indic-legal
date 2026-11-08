@@ -25,6 +25,7 @@ import os
 import sys
 import time
 import json
+import re
 import hashlib
 import secrets
 import textwrap
@@ -66,6 +67,10 @@ except ImportError:
     bnss_bsa_kb = None
 # Case summaries, circulars, and IPC-BNS mapping corpus
 import data.download_legal_corpus as corpus
+# Official Gazette text of every BNS / BNSS / BSA section
+import statutes
+# Supreme Court criminal judgments (local store, optional)
+import sc_judgments
 
 # ─── INITIALIZATION ───────────────────────────────────────────────────────────
 load_dotenv()                          # Read the .env file into environment
@@ -80,14 +85,14 @@ def embeddings_provider() -> str:
     client's story:
       gemini  Google's embedding API (default). The story leaves the machine.
       ollama  A local embedding model via Ollama (OLLAMA_EMBED_MODEL, default
-              nomic-embed-text). Nothing leaves the machine; pair it with
+              qwen3-embedding:4b). Nothing leaves the machine; pair it with
               LLM_PROVIDER=ollama for a fully local deployment.
     Switching provider means re-embedding the knowledge base (first start)."""
     return (os.getenv("EMBEDDINGS_PROVIDER") or "gemini").strip().lower()
 
 
 def _ollama_embed_model() -> str:
-    return os.getenv("OLLAMA_EMBED_MODEL") or "nomic-embed-text"
+    return os.getenv("OLLAMA_EMBED_MODEL") or "qwen3-embedding:4b"   # 90% vs 80% (bge-m3) on the stress set
 
 
 def configure_gemini_embeddings():
@@ -128,15 +133,27 @@ ALL your output must be tailored to HELP THE CLIENT based on their role.
 - NEVER apply sections against the client who has come to seek help.
 
 STRICT RULES YOU MUST FOLLOW:
-1. ONLY cite BNS sections (2023). ALWAYS mention the old IPC section it replaced —
+1. Cite BNS sections (2023) and ALWAYS mention the old IPC section each replaced —
    this is critical because lawyers are still transitioning from IPC to BNS.
+1A. The date of the OFFENCE decides the law: an offence committed before
+   1 July 2024 is charged under the IPC (give the BNS equivalent for reference
+   only); procedure for an FIR registered on or after 1 July 2024 follows the BNSS.
 2. NEVER hallucinate section numbers. Use ONLY the sections provided in the context.
    If you are unsure, say "Further legal research required."
    When you pair an old IPC section with its BNS section, use the pairing given
    in the context ("old IPC" line) — never infer one from the section number.
-2A. Cite case law ONLY from LANDMARK CASE entries in the context, with the
-   citation exactly as given there. NEVER cite a case from memory. NEVER rely on
+   Write each section's title exactly as the context gives it.
+2B. The sections in the context are CANDIDATES found by similarity search, not a
+   charge list — they include look-alikes on purpose. Charge a section ONLY when
+   every ingredient in its text is shown by the facts; leave out the rest. Apply
+   the DISTINGUISH notes in the context before choosing.
+2A. Cite case law ONLY from LANDMARK CASE and SUPREME COURT JUDGMENT entries in
+   the context, with the citation exactly as given there, and say only what the
+   entry itself says about the case. NEVER cite a case from memory. NEVER rely on
    a case whose GOOD-LAW STATUS is OVERRULED or SUPERSEDED as current law.
+   A SUPREME COURT JUDGMENT entry is a real case on related provisions — present
+   it as an example of how the Court dealt with similar facts, not as binding on
+   the client's facts unless the extract shows the same point of law.
 3. Your language must be professional and precise — suitable for an Indian court.
 4. Prioritize the Immediate Advisory first — actions the client must take RIGHT NOW.
 5. Draft FIRs must follow the format required by Indian Police stations — they
@@ -179,22 +196,39 @@ def configure_groq() -> Groq:
 # ══════════════════════════════════════════════════════════════════════════════
 # STEP 2: GEMINI EMBEDDING FUNCTION (replaces ChromaDB's local model download)
 # ══════════════════════════════════════════════════════════════════════════════
-EMBEDDING_CACHE_FILE = Path("data/legal_corpus/embedding_cache.json")
+EMBEDDING_CACHE_FILE = Path("data/legal_corpus/embedding_cache.json")          # Gemini (committed)
+LOCAL_EMBEDDING_CACHE_FILE = Path("data/legal_corpus/embedding_cache.local.json")  # Ollama (gitignored)
+_CACHES: dict[Path, dict] = {}
+
+
+def _embedding_cache_file() -> Path:
+    """Gemini vectors ship with the repo for warm deploys; local-model vectors
+    are larger (one set per model) and stay on the machine that made them."""
+    return EMBEDDING_CACHE_FILE if embeddings_provider() == "gemini" else LOCAL_EMBEDDING_CACHE_FILE
 
 
 def _load_embedding_cache() -> dict:
-    """Load cached embeddings from disk to avoid redundant API calls."""
-    if EMBEDDING_CACHE_FILE.exists():
-        with open(EMBEDDING_CACHE_FILE, "r") as f:
-            return json.load(f)
-    return {}
+    """Cached embeddings for the current provider, read from disk once per
+    process (the file is large; queries reuse the in-memory copy)."""
+    path = _embedding_cache_file()
+    if path not in _CACHES:
+        cache = {}
+        if path.exists():
+            with open(path, "r") as f:
+                cache = json.load(f)
+        _CACHES[path] = cache
+    return _CACHES[path]
 
 
 def _save_embedding_cache(cache: dict):
-    """Persist embeddings to disk so next run is instant (no API calls)."""
-    EMBEDDING_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(EMBEDDING_CACHE_FILE, "w") as f:
+    """Persist embeddings to disk so next run is instant (no API calls).
+    Written to a temp file and renamed, so a concurrent reader never sees half a file."""
+    path = _embedding_cache_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    with open(tmp, "w") as f:
         json.dump(cache, f)
+    tmp.replace(path)
 
 
 def _embed_ollama(text: str, task_type: str) -> list:
@@ -202,6 +236,10 @@ def _embed_ollama(text: str, task_type: str) -> list:
     model = _ollama_embed_model()
     if "nomic" in model:   # nomic-embed-text expects task prefixes
         text = ("search_query: " if task_type == "retrieval_query" else "search_document: ") + text
+    elif "qwen3-embedding" in model and task_type == "retrieval_query":
+        # Qwen3-Embedding: queries carry a one-line task instruction; documents don't.
+        text = ("Instruct: Given a client's account of what happened, retrieve the Indian "
+                "criminal-law provisions and judgments that apply\nQuery: " + text)
     host = (os.getenv("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
     req = urllib.request.Request(
         f"{host}/api/embed", data=json.dumps({"model": model, "input": text}).encode(),
@@ -218,6 +256,15 @@ def _embed_ollama(text: str, task_type: str) -> list:
         ) from e
 
 
+def _embedding_cache_key(text: str, task_type: str) -> str:
+    """Gemini keys keep their original form so the committed cache stays valid;
+    other providers are namespaced so vectors of different sizes never mix."""
+    provider = embeddings_provider()
+    raw_key = (f"{task_type}:{text}" if provider == "gemini"
+               else f"{provider}:{_ollama_embed_model()}:{task_type}:{text}")
+    return hashlib.md5(raw_key.encode(), usedforsecurity=False).hexdigest()
+
+
 def _get_embedding_with_cache(text: str, task_type: str, cache: dict) -> list:
     """
     Returns an embedding from the configured provider, using the disk cache to
@@ -225,11 +272,7 @@ def _get_embedding_with_cache(text: str, task_type: str, cache: dict) -> list:
     reads from cache instantly (0 calls for indexing).
     """
     provider = embeddings_provider()
-    # Gemini keys keep their original form so the committed cache stays valid;
-    # other providers are namespaced so vectors of different sizes never mix.
-    raw_key = (f"{task_type}:{text}" if provider == "gemini"
-               else f"{provider}:{_ollama_embed_model()}:{task_type}:{text}")
-    cache_key = hashlib.md5(raw_key.encode(), usedforsecurity=False).hexdigest()
+    cache_key = _embedding_cache_key(text, task_type)
     if cache_key in cache:
         return cache[cache_key]
 
@@ -326,39 +369,48 @@ def build_rag_knowledge_base() -> chromadb.Collection:
         metadata={"hnsw:space": "cosine"},  # Cosine similarity = best for text
     )
 
-    # ── Load BNS Sections ─────────────────────────────────────────────────────
-    bns_docs, bns_metas, bns_ids = kb.get_all_documents()
-
-    # ── Day 11: Load BNSS (procedure) + BSA (evidence) sections ──────────────
-    if bnss_bsa_kb is not None:
-        bnss_bsa_docs, bnss_bsa_metas, bnss_bsa_ids = bnss_bsa_kb.get_all_documents()
-    else:
-        bnss_bsa_docs, bnss_bsa_metas, bnss_bsa_ids = [], [], []
-
-    # ── Load Case Summaries + Circulars + IPC-BNS Mappings ───────────────────
-    corpus_docs, corpus_metas, corpus_ids = corpus.get_corpus_as_rag_documents()
-
-    # ── Combine all sources ───────────────────────────────────────────────────
-    all_documents = bns_docs + bnss_bsa_docs + corpus_docs
-    all_metadatas = bns_metas + bnss_bsa_metas + corpus_metas
-    all_ids       = bns_ids  + bnss_bsa_ids  + corpus_ids
-
-    console.print(f"[dim]Embedding {len(all_documents)} legal documents via Gemini API...[/dim]")
-
-    # Add all documents — Gemini API generates embeddings (no local download)
+    all_documents, all_metadatas, all_ids, counts = knowledge_base_documents()
+    console.print(f"[dim]Embedding {len(all_documents)} legal documents via {embeddings_provider()}...[/dim]")
     collection.add(
         documents=all_documents,
         metadatas=all_metadatas,
         ids=all_ids,
+        embeddings=embedding_fn(embedding_texts(all_documents, all_metadatas)),
     )
 
     console.print(
         f"[green]✓[/green] Knowledge Base ready: "
-        f"[bold]{len(bns_docs)} BNS[/bold] + "
-        f"[bold]{len(bnss_bsa_docs)} BNSS+BSA[/bold] + "
-        f"[bold]{len(corpus_docs)} corpus[/bold] documents indexed."
+        f"[bold]{counts['statutes']} official BNS/BNSS/BSA sections[/bold] + "
+        f"[bold]{counts['corpus']} corpus[/bold] + "
+        f"[bold]{counts['judgments']} Supreme Court judgments[/bold] indexed."
     )
     return collection
+
+
+def knowledge_base_documents() -> tuple[list[str], list[dict], list[str], dict[str, int]]:
+    """Every document the index holds: (docs, metadatas, ids, counts by source).
+    Shared by build_rag_knowledge_base and tools/prewarm_embeddings.py."""
+    # ── Statutes: the official Gazette text of every BNS / BNSS / BSA section
+    #    (1,059), with the curated KB's plain-language keywords and practice
+    #    notes folded in. The curated KB alone covered 89 of 358 BNS sections,
+    #    so anything outside it was answered from the model's memory.
+    curated = kb.get_all_documents()[0]
+    if bnss_bsa_kb is not None:
+        curated += bnss_bsa_kb.get_all_documents()[0]
+    statute_docs, statute_metas, statute_ids = statutes.official_documents(curated)
+    # ── Case Summaries + Circulars + IPC-BNS Mappings, then SC judgments ─────
+    corpus_docs, corpus_metas, corpus_ids = corpus.get_corpus_as_rag_documents()
+    judgment_docs, judgment_metas, judgment_ids = sc_judgments.documents()
+    counts = {"statutes": len(statute_docs), "corpus": len(corpus_docs), "judgments": len(judgment_docs)}
+    return (statute_docs + corpus_docs + judgment_docs,
+            statute_metas + corpus_metas + judgment_metas,
+            statute_ids + corpus_ids + judgment_ids, counts)
+
+
+def embedding_texts(docs: list[str], metas: list[dict]) -> list[str]:
+    """What gets embedded: each document's search key (title + keywords +
+    opening text) where it has one; the full text is what the model reads."""
+    return [m.get("search_key") or d for d, m in zip(docs, metas)]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -409,6 +461,10 @@ def _normalize_source(rank: int, doc_id: str, doc: str, meta: dict, relevance: f
         label = f"{meta.get('title', '')} — {meta.get('issuer', '')}"
     elif kind == "ipc_bns_mapping":
         label = f"{meta.get('ipc_section', '')} → {meta.get('bns_section', '')}"
+    elif kind == "sc_ruling":
+        label = f"News report: {meta.get('title', '')} ({meta.get('date', '')})"
+    elif kind == "sc_judgment":
+        label = f"{meta.get('case_name', '')}, {meta.get('insc', '')}"
     else:
         label = doc_id
 
@@ -446,6 +502,149 @@ def _normalize_source(rank: int, doc_id: str, doc: str, meta: dict, relevance: f
     }
 
 
+_DISTINCTIONS_FILE = Path(__file__).parent / "data" / "legal_corpus" / "distinctions.json"
+_DISTINCTIONS: list[dict] | None = None
+
+
+def distinction_notes(bns_sections: set[str], limit: int = 3) -> list[str]:
+    """Notes that separate look-alike sections (theft vs snatching vs robbery …)
+    for the families the search returned — similarity ranks siblings almost
+    equally, so the model needs the ingredient that tells them apart."""
+    global _DISTINCTIONS
+    if _DISTINCTIONS is None:
+        try:
+            _DISTINCTIONS = json.loads(_DISTINCTIONS_FILE.read_text(encoding="utf-8"))["groups"]
+        except (OSError, ValueError, KeyError):
+            _DISTINCTIONS = []
+    hits = [(len(bns_sections & set(g["sections"])), i, g["note"])
+            for i, g in enumerate(_DISTINCTIONS)]
+    return [note for n, _, note in sorted(hits, key=lambda h: (-h[0], h[1])) if n][:limit]
+
+
+# Retrieval pools with fixed shares. With every section of three Acts indexed,
+# one similarity ranking let 701 procedure/evidence sections crowd the
+# offences out (a pickpocketing story retrieved BNSS 399 and BSA 119, not theft).
+# Offences come in two tiers: sections with a plain-language curated card are
+# matched far more reliably than the rest of the Act (measured on the stress
+# set: 6 curated + 1 other + 1 procedure slots = 80% recall vs 68% for one
+# ranking over everything), but one slot keeps every other section reachable.
+_POOLS = (("offences", {"$and": [{"type": "bns_section"}, {"curated": True}]}),
+          ("other_offences", {"type": {"$in": ["bns_section", "ipc_bns_mapping", "special_section"]}}),
+          ("procedure", {"type": {"$in": ["bnss_section", "bsa_section"]}}),
+          ("authorities", {"type": {"$in": ["case_summary", "circular", "sc_ruling", "sc_judgment"]}}))
+
+
+def _pool_sizes(n_results: int) -> dict[str, int]:
+    procedure = 1 if n_results >= 6 else 0
+    authorities = 2 if n_results >= 10 else 1
+    return {"offences": max(1, n_results - 1 - procedure - authorities), "other_offences": 1,
+            "procedure": procedure, "authorities": authorities}
+
+
+def _query_pools(collection, query_embedding, n_results: int,
+                 selected: list[str] | None = None) -> dict:
+    """collection.query, one pool at a time, merged in pool order (offences
+    first) into the single-query result shape. `selected` BNS sections (from
+    charge_selector) lead the offence pool, fetched by number; similarity
+    search fills the offence slots they leave."""
+    merged = {"documents": [[]], "metadatas": [[]], "distances": [[]], "ids": [[]]}
+    sizes = _pool_sizes(n_results)
+    if selected:
+        got = collection.get(ids=[f"bns_{n}" for n in selected[:sizes["offences"]]],
+                             include=["documents", "metadatas", "embeddings"])
+        order = {f"bns_{n}": i for i, n in enumerate(selected)}
+        for doc_id, doc, meta, emb in sorted(
+                zip(got["ids"], got["documents"], got["metadatas"], got["embeddings"]),
+                key=lambda row: order[row[0]]):
+            dot = sum(a * b for a, b in zip(query_embedding, emb))
+            norm = (sum(a * a for a in query_embedding) * sum(b * b for b in emb)) ** 0.5 or 1.0
+            merged["ids"][0].append(doc_id)
+            merged["documents"][0].append(doc)
+            merged["metadatas"][0].append(meta)
+            merged["distances"][0].append(1 - dot / norm)
+    for pool, where in _POOLS:
+        k = sizes[pool] - (len(merged["ids"][0]) if pool == "offences" else 0)
+        if k <= 0:
+            continue
+        try:
+            r = collection.query(query_embeddings=[query_embedding], n_results=k + 8,
+                                 where=where,
+                                 include=["documents", "metadatas", "distances"])
+        except Exception:  # noqa: BLE001 — pool empty in a partial index
+            continue
+        rows = [row for row in zip(r["ids"][0], r["documents"][0], r["metadatas"][0], r["distances"][0])
+                if row[0] not in merged["ids"][0]][:k]
+        for doc_id, doc, meta, dist in rows:
+            merged["ids"][0].append(doc_id)
+            merged["documents"][0].append(doc)
+            merged["metadatas"][0].append(meta)
+            merged["distances"][0].append(dist)
+    try:
+        _add_punishing_sections(collection, merged)
+    except Exception:  # noqa: BLE001 — partial index in tests / older collections
+        pass
+    return merged
+
+
+# The BNS often defines an offence in one section and punishes it in another;
+# a story that retrieves the definition must also bring the punishing section.
+_PUNISHED_IN = {"bns_101": "bns_103", "bns_100": "bns_105", "bns_63": "bns_64",
+                "bns_114": "bns_115", "bns_116": "bns_117", "bns_86": "bns_85"}
+
+_ISSUES_SYSTEM = (
+    "You are an Indian criminal lawyer. Restate the client's facts as the legal issues they raise, "
+    "in 2-3 short lines of plain legal English: the wrongs done (e.g. theft, cheating, assault, cruelty, "
+    "death, threat), how they were done, and any procedural problem (FIR refused, arrest, bail). "
+    "Do NOT give section numbers.")
+
+
+def _issue_summary(client_story: str) -> str:
+    """The client's facts restated as legal issues by the local model, added to
+    the search query (stress set: 90% → 93% of required sections retrieved).
+    On when a local model serves this app (LLM_PROVIDER=ollama/hybrid) or
+    QUERY_REWRITE=local; never a dependency — any failure searches the story alone."""
+    flag = (os.getenv("QUERY_REWRITE") or "").strip().lower()
+    if flag in ("off", "0", "false"):
+        return ""
+    if flag != "local" and llm_provider.get_provider() not in ("ollama", "hybrid"):
+        return ""
+    try:
+        return llm_provider.complete_local(
+            system_messages=[_ISSUES_SYSTEM], user_message=client_story,
+            temperature=0.0, max_tokens=120, timeout_s=60, think=False)["text"].strip()[:600]
+    except Exception as e:  # noqa: BLE001
+        console.print(f"[yellow]Issue summary unavailable ({type(e).__name__}); searching the story alone.[/yellow]")
+        return ""
+
+
+def _add_punishing_sections(collection, merged: dict) -> None:
+    """Append the punishing section of any retrieved definition section."""
+    want = [p for d, p in _PUNISHED_IN.items() if d in merged["ids"][0] and p not in merged["ids"][0]]
+    if not want:
+        return
+    got = collection.get(ids=want, include=["documents", "metadatas"])
+    for doc_id, doc, meta in zip(got["ids"], got["documents"], got["metadatas"]):
+        merged["ids"][0].append(doc_id)
+        merged["documents"][0].append(doc)
+        merged["metadatas"][0].append(meta)
+        merged["distances"][0].append(merged["distances"][0][merged["ids"][0].index(
+            next(d for d, p in _PUNISHED_IN.items() if p == doc_id))])
+
+
+def _selected_sections(client_story: str, n_results: int) -> list[str]:
+    """BNS sections the local model picks from the official title list, or []
+    when selection is off or the local model is unavailable."""
+    import charge_selector
+    if not charge_selector.enabled():
+        return []
+    try:
+        return charge_selector.select_sections(client_story, limit=_pool_sizes(n_results)["offences"])
+    except Exception as e:  # noqa: BLE001 — selection is an improvement, never a dependency
+        console.print(f"[yellow]Section selector unavailable ({type(e).__name__}); "
+                      f"using similarity search only.[/yellow]")
+        return []
+
+
 def retrieve_relevant_sections_structured(
     collection: chromadb.Collection, client_story: str, n_results: int = 8
 ):
@@ -462,16 +661,18 @@ def retrieve_relevant_sections_structured(
     Returns: (context_string, sources_list)
     """
     cache = _load_embedding_cache()
-    query_embedding = _get_embedding_with_cache(client_story, "retrieval_query", cache)
+    issues = _issue_summary(client_story)
+    query_text = f"{client_story}\nLEGAL ISSUES: {issues}" if issues else client_story
+    query_embedding = _get_embedding_with_cache(query_text, "retrieval_query", cache)
+    results = _query_pools(collection, query_embedding, n_results,
+                           _selected_sections(client_story, n_results))
 
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=n_results,
-        include=["documents", "metadatas", "distances"],
-    )
-
-    context_parts = ["=== RETRIEVED BNS LEGAL SECTIONS (USE ONLY THESE) ===\n"]
+    context_parts = ["=== RETRIEVED LAW — CANDIDATES, NOT A CHARGE LIST ===\n"
+                     "Cite only from these. They were found by similarity and include "
+                     "look-alike sections: charge a section only when the facts show every "
+                     "ingredient in its text.\n"]
     sources = []
+    retrieved_bns: set[str] = set()
     for i, (doc, meta, dist, doc_id) in enumerate(
         zip(
             results["documents"][0],
@@ -485,6 +686,12 @@ def retrieve_relevant_sections_structured(
             f"\n[SECTION {i+1} — Relevance: {relevance}%]\n{doc}\n"
         )
         sources.append(_normalize_source(i + 1, doc_id, doc, meta, relevance))
+        retrieved_bns.update(re.findall(r"\bBNS(?:\s+Section)?\s+(\d{1,3})\b", doc.split("\n", 1)[0]))
+
+    notes = distinction_notes(retrieved_bns)
+    if notes:
+        context_parts.append("\n=== DISTINGUISH LOOK-ALIKE SECTIONS (apply before choosing charges) ===")
+        context_parts.extend(f"- {n}" for n in notes)
 
     return "\n".join(context_parts), sources
 
@@ -554,13 +761,19 @@ SECTION 2: LEGAL ANALYSIS UNDER BNS 2023
     - If COMPLAINANT: sections under which they can file a case.
     - If RESPONDENT: sections for counter-complaint OR bail/defence provisions.
     For each: BNS number + title, old IPC replaced, punishment, bailable status,
-    how these facts support the CLIENT's position.
+    the ingredients of the offence with the fact that proves each one, and how
+    these facts support the CLIENT's position. Cite a section here only if
+    every ingredient is met.
 
  B. SECTIONS THE OPPOSING PARTY MAY USE (against the client):
     - List sections the other side might invoke against the client.
     - For each: punishment, bailable status, and how the CLIENT can defend.
     - If COMPLAINANT: possible false counter-allegations by the accused.
     - If RESPONDENT: the exact sections being threatened/filed against them.
+
+ C. SECTIONS CONSIDERED AND RULED OUT:
+    - Look-alike sections from the law above that do NOT apply — one line each
+      naming the ingredient the facts do not show.
 
  Always mention the old IPC section replaced and the KEY legal difference.]
 

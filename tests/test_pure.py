@@ -103,6 +103,13 @@ class TestAudit:
 
 
 # ────────────────────────────── monitors ───────────────────────────────────
+# Test fixture only (not a real judgment) — shapes like a scraped ruling.
+_RULING = {"id": "scr_test_snatching", "title": "Test ruling on snatching bail",
+           "court": "Supreme Court of India", "date": "2026-01-01", "neutral_citation": "",
+           "sections": ["BNS 304"], "tags": ["chain snatching", "bail"],
+           "ratio": "Bail principles in chain snatching cases.", "practice_impact": ""}
+
+
 class TestMonitors:
     def test_section_normalization(self):
         from monitors import _normalize_section
@@ -112,8 +119,8 @@ class TestMonitors:
         assert _normalize_section("bns 304") == "304"
 
     def test_score_ruling_section_match(self):
-        from monitors import _score_ruling, Matter, SEED_RULINGS
-        snatching = next(r for r in SEED_RULINGS if "Vijay Kumar" in r["title"])
+        from monitors import _score_ruling, Matter
+        snatching = _RULING
         m = Matter(id="m_test", label="snatching", keywords=[],
                    sections=["BNS 304"], created_at="")
         score, reasons = _score_ruling(snatching, m)
@@ -121,13 +128,18 @@ class TestMonitors:
         assert any("BNS 304" in r for r in reasons)
 
     def test_score_ruling_keyword_match(self):
-        from monitors import _score_ruling, Matter, SEED_RULINGS
-        snatching = next(r for r in SEED_RULINGS if "Vijay Kumar" in r["title"])
+        from monitors import _score_ruling, Matter
+        snatching = _RULING
         m = Matter(id="m_test", label="bail",
                    keywords=["chain snatching"], sections=[], created_at="")
         score, reasons = _score_ruling(snatching, m)
         assert score >= 0.1
         assert any("chain snatching" in r for r in reasons)
+
+    def test_no_fabricated_seed_rulings(self):
+        # The old seed list's citations did not match the official SC record.
+        from monitors import SEED_RULINGS
+        assert SEED_RULINGS == []
 
     def test_run_digest_with_no_matters(self):
         """Empty matters list → empty digest, no crash."""
@@ -2061,4 +2073,37 @@ class TestJudgmentsCorpus:
     def test_stub_sc_rulings_never_reach_rag(self):
         from data.download_legal_corpus import load_sc_rulings_for_rag
         for r in load_sc_rulings_for_rag():
-            assert r.get("source") and r["source"] != "stub"
+            assert r["source_url"].startswith("https://")
+            assert not r["id"].startswith(("scr_stub_", "scr_test_"))
+
+    def test_seed_rulings_never_reach_rag(self):
+        # monitors.SEED_RULINGS are hand-written with no source link; their
+        # citations could not be found in any public record.
+        import monitors
+        from data.download_legal_corpus import load_sc_rulings_for_rag
+        seed_ids = {r["id"] for r in monitors.SEED_RULINGS}
+        assert not seed_ids & {r["id"] for r in load_sc_rulings_for_rag()}
+
+    def test_rag_mappings_come_from_verified_file(self):
+        import json
+        from pathlib import Path
+        from data.download_legal_corpus import get_corpus_as_rag_documents
+        verified = json.loads((Path(__file__).resolve().parents[1] / "data" / "legal_corpus"
+                               / "ipc_bns_mapping.json").read_text(encoding="utf-8"))
+        docs = [d for d in get_corpus_as_rag_documents()[0] if d.startswith("SECTION MAPPING")]
+        assert len(docs) == len([k for k in verified if not k.startswith("_")])
+        assert "SECTION MAPPING: IPC 304 is now BNS 105" in docs[0] + "".join(docs)
+        assert not any("IPC 304 is now BNS 80" in d or "IPC 366 is now BNS 141" in d for d in docs)
+
+    def test_verified_mapping_targets_exist_in_official_text(self):
+        import json
+        import re
+        from pathlib import Path
+        root = Path(__file__).resolve().parents[1] / "data" / "legal_corpus"
+        verified = json.loads((root / "ipc_bns_mapping.json").read_text(encoding="utf-8"))
+        titles = json.loads((root / "statutes" / "bns_section_titles.json").read_text())["sections"]
+        for k, v in verified.items():
+            if k.startswith("_") or not (v.get("bns") or "").startswith("BNS"):
+                continue
+            assert re.sub(r"\(.*", "", v["bns"].split()[-1]) in titles, k
+        assert verified["IPC 326B"]["bns"] == "BNS 124(2)"     # acid attempt, per the Gazette

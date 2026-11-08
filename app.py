@@ -1219,15 +1219,20 @@ def tabular_compare():
 
     # Define the llm_call closure based on the active provider
     def _llm_call(system_prompt: str, user_prompt: str) -> str:
-        if llm_provider_module.get_provider() == "ollama":
-            out = llm_provider_module.complete(
-                system_messages=[system_prompt],
-                user_message=user_prompt,
-                temperature=0.0,  # we want deterministic JSON, not creative
-                max_tokens=2048,
-                timeout_s=120,
-            )
-            return out.get("text", "") or ""
+        provider = llm_provider_module.get_provider()
+        if provider in ("ollama", "hybrid"):
+            try:
+                out = llm_provider_module.complete_local(
+                    system_messages=[system_prompt],
+                    user_message=user_prompt,
+                    temperature=0.0,  # we want deterministic JSON, not creative
+                    max_tokens=2048,
+                    timeout_s=300,
+                )
+                return out.get("text", "") or ""
+            except Exception:  # noqa: BLE001
+                if provider == "ollama":
+                    raise                      # hybrid falls back to Groq below
         # Groq path
         return llm_provider_module.groq_complete(
             groq_client,
@@ -1424,6 +1429,37 @@ def _repair_prompt(prompt: str, draft: str, feedback: list[str]) -> str:
               "only sections from the retrieved law above.")
 
 
+def _hybrid_generate(prompt: str, generate_local, generate_remote) -> tuple[str, str, dict]:
+    """LLM_PROVIDER=hybrid: the local model drafts from the local index and the
+    verifier checks the draft against the official text. A clean draft ships
+    without any Groq call; a draft with problems goes to Groq with the exact
+    findings to fix (the local model makes the fix if Groq is busy).
+    Returns (text, route, repair_info)."""
+    try:
+        draft = generate_local(prompt)
+    except Exception as e:  # noqa: BLE001 — local server down → Groq writes it all
+        app.logger.warning("local model unavailable (%s); Groq drafts instead", type(e).__name__)
+        text, repair = _check_and_repair(generate_remote(prompt), prompt, generate_remote)
+        return text, "groq (local model unavailable)", repair
+
+    fixer = []
+
+    def fix(message: str) -> str:
+        try:
+            out = generate_remote(message)
+            fixer.append("groq")
+            return out
+        except Exception as e:  # noqa: BLE001 — rate limit / request too large
+            app.logger.warning("Groq fix unavailable (%s); local model fixes", type(e).__name__)
+            fixer.append("local")
+            return generate_local(message)
+
+    text, repair = _check_and_repair(draft, prompt, fix)
+    if not repair["attempted"]:
+        return text, "local", repair
+    return text, f"local draft → {fixer[-1] if fixer else 'no'} fix", repair
+
+
 def _check_and_repair(draft: str, prompt: str, generate) -> tuple[str, dict]:
     """Verify a draft and, if the verifier finds problems (missing sections,
     sections outside the knowledge base, IPC→BNS pairings that contradict the
@@ -1571,7 +1607,7 @@ def analyze():
         # Day-4: drop one retrieval slot when Hindi is requested, because the
         # Hindi system instruction adds ~700 tokens and we'd otherwise blow
         # past Groq's free-tier 12K TPM per request.
-        n_results = 7 if language == "hi" else 8
+        n_results = 9 if language == "hi" else 10   # 6 curated + 1 other offence + 1 procedure + 2 case law
         retrieved_context, sources = retrieve_relevant_sections_structured(
             rag_collection, client_story, n_results=n_results
         )
@@ -1586,18 +1622,21 @@ def analyze():
         if language == "hi":
             system_messages.append(i18n_module.HINDI_SYSTEM_INSTRUCTION)
 
+        def generate_local(user_message: str) -> str:
+            return llm_provider_module.complete_local(
+                system_messages=system_messages,
+                user_message=user_message,
+                temperature=0.2,
+                max_tokens=8192,
+                timeout_s=600,
+            )["text"]
+
         def generate(user_message: str) -> str:
             # Day-13: route through llm_provider so Ollama users get local
             # generation. Groq remains the default; ollama users set
             # LLM_PROVIDER=ollama (and EMBEDDINGS_PROVIDER=ollama for retrieval).
             if llm_provider_module.get_provider() == "ollama":
-                return llm_provider_module.complete(
-                    system_messages=system_messages,
-                    user_message=user_message,
-                    temperature=0.2,
-                    max_tokens=8192,
-                    timeout_s=180,
-                )["text"]
+                return generate_local(user_message)
             # Groq path: brief retries on a rate limit, then give up with a 503.
             # The wait blocks this worker, so it stays short (≤ 6 s total)
             # instead of the minutes a long backoff would hold it.
@@ -1616,12 +1655,21 @@ def analyze():
                     time.sleep(2 * (attempt + 1))
             return ""
 
-        ai_response = generate(prompt)
+        if llm_provider_module.get_provider() == "hybrid":
+            # Local model drafts from the local index; the verifier checks it
+            # against the official text; only a draft with problems goes to
+            # Groq, which fixes exactly the listed problems.
+            ai_response, route, repair = _hybrid_generate(prompt, generate_local, generate)
+            _audit_extra["route"] = route
+        else:
+            ai_response = generate(prompt)
+            repair = None
         if not ai_response:
             return jsonify({"error": "AI model did not return a response. Try again."}), 500
 
         # ── Step 2b: check the draft; one targeted correction pass if needed ──
-        ai_response, repair = _check_and_repair(ai_response, prompt, generate)
+        if repair is None:
+            ai_response, repair = _check_and_repair(ai_response, prompt, generate)
         _audit_extra["self_correction"] = repair
 
         # ── Step 3: Save text output ──────────────────────────────────────────
@@ -1891,6 +1939,33 @@ def _retrieve_for_chat(user_msg: str, n_results: int = 4):
     return retrieve_relevant_sections_structured(rag_collection, user_msg, n_results)
 
 
+def _chat_reply(retrieved_context: str, user_msg: str) -> tuple[str, str]:
+    """LEXI's model step. Under ollama/hybrid the local model answers from the
+    local index; under hybrid a reply that cites a section that doesn't exist
+    or names the wrong offence for its number — or a local failure — goes to
+    Groq instead. Returns (reply, answered_by)."""
+    provider = llm_provider_module.get_provider()
+    if provider in ("ollama", "hybrid"):
+        try:
+            reply = llm_provider_module.complete_local(
+                system_messages=[ASSISTANT_SYSTEM_PROMPT, retrieved_context],
+                user_message=user_msg, temperature=0.2, max_tokens=600, timeout_s=300,
+            )["text"].strip()
+            if provider == "ollama" or not (verifier_module.nonexistent_sections(reply)
+                                            or verifier_module.label_mismatches(reply)):
+                return reply, "local"
+        except Exception:  # noqa: BLE001
+            if provider == "ollama":
+                raise
+    reply = llm_provider_module.groq_complete(
+        groq_client,
+        [{"role": "system", "content": ASSISTANT_SYSTEM_PROMPT},
+         {"role": "system", "content": retrieved_context},
+         {"role": "user",   "content": user_msg}],
+        temperature=0.2, max_tokens=400).strip()
+    return reply, "groq"
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     """
@@ -1931,13 +2006,7 @@ def chat():
 
     try:
         retrieved_context, sources = _retrieve_for_chat(user_msg, n_results=4)
-
-        reply = llm_provider_module.groq_complete(
-            groq_client,
-            [{"role": "system", "content": ASSISTANT_SYSTEM_PROMPT},
-             {"role": "system", "content": retrieved_context},
-             {"role": "user",   "content": user_msg}],
-            temperature=0.2, max_tokens=400).strip()
+        reply, answered_by = _chat_reply(retrieved_context, user_msg)
 
         suggest_intake = any(kw in reply.lower() for kw in [
             "intake form", "case analysis", "full analysis", "use the form",
@@ -1953,6 +2022,7 @@ def chat():
             status="ok",
             duration_ms=int((time.monotonic() - t_start) * 1000),
             response_chars=len(reply or ""),
+            extra={"answered_by": answered_by},
         )
 
         return jsonify({
@@ -2851,7 +2921,7 @@ def api_analyze():
     # Reuse the existing retrieval + Groq pipeline directly
     try:
         retrieved_context, sources = retrieve_relevant_sections_structured(
-            rag_collection, story, n_results=8,
+            rag_collection, story, n_results=10,
         )
         prompt = build_legal_prompt(story, retrieved_context)
 

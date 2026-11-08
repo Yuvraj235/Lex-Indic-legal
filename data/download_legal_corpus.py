@@ -90,77 +90,18 @@ OFFICIAL_SOURCES = {
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# FULL IPC → BNS SECTION MAPPING TABLE
-# (Hardcoded for reliability — covers 95% of common criminal cases)
+# IPC → BNS SECTION MAPPING (read from the verified concordance file)
 # ══════════════════════════════════════════════════════════════════════════════
-IPC_TO_BNS_MAPPING = {
-    # OFFENCES AGAINST WOMEN
-    "IPC 302": {"bns": "BNS 103", "title": "Murder", "change": "Same punishment, new section number"},
-    "IPC 304": {"bns": "BNS 80", "title": "Culpable Homicide not Murder", "change": "Consolidated"},
-    "IPC 304B": {"bns": "BNS 80", "title": "Dowry Death", "change": "Minimum 7 years retained"},
-    "IPC 306": {"bns": "BNS 108", "title": "Abetment of Suicide", "change": "Similar provisions"},
-    "IPC 307": {"bns": "BNS 109", "title": "Attempt to Murder", "change": "Same"},
-    "IPC 354": {"bns": "BNS 74", "title": "Outraging Modesty", "change": "Now explicitly non-bailable"},
-    "IPC 354A": {"bns": "BNS 75", "title": "Sexual Harassment", "change": "Categories now explicit"},
-    "IPC 354B": {"bns": "BNS 76", "title": "Assault to Disrobe", "change": "Same"},
-    "IPC 354C": {"bns": "BNS 77", "title": "Voyeurism", "change": "Dissemination explicitly covered"},
-    "IPC 354D": {"bns": "BNS 78", "title": "Stalking", "change": "Cyber-stalking now explicit"},
-    "IPC 376": {"bns": "BNS 64", "title": "Rape", "change": "Minimum 10 years now codified"},
-    "IPC 376A": {"bns": "BNS 66", "title": "Rape causing Death", "change": "Death/life imprisonment"},
-    "IPC 376C": {"bns": "BNS 67", "title": "Sexual intercourse by authority", "change": "Expanded scope"},
-    "IPC 498A": {"bns": "BNS 85", "title": "Matrimonial Cruelty", "change": "Cognizable & Non-bailable retained"},
-    "IPC 509": {"bns": "BNS 79", "title": "Insult to Modesty (Words/Gesture)", "change": "Punishment increased to 3 years"},
+def load_ipc_bns_mapping() -> dict:
+    """IPC → BNS pairs from the verified concordance file — the one source of
+    truth. A second hand-typed copy used to live here; 11 of its 51 pairs were
+    wrong (e.g. IPC 304 → "BNS 80", which is dowry death) and it fed the search
+    index, so the model was handed wrong pairings as context."""
+    raw = json.loads((CORPUS_DIR / "ipc_bns_mapping.json").read_text(encoding="utf-8"))
+    return {k: v for k, v in raw.items() if not k.startswith("_") and isinstance(v, dict)}
 
-    # OFFENCES AGAINST BODY
-    "IPC 319": {"bns": "BNS 114", "title": "Hurt (Definition)", "change": "Consolidated"},
-    "IPC 320": {"bns": "BNS 114", "title": "Grievous Hurt (Definition)", "change": "Expanded definition"},
-    "IPC 323": {"bns": "BNS 115(1)", "title": "Voluntarily Causing Hurt", "change": "Fine increased to ₹10,000"},
-    "IPC 324": {"bns": "BNS 115(2)", "title": "Hurt by Dangerous Weapons", "change": "Consolidated"},
-    "IPC 325": {"bns": "BNS 115(2)", "title": "Voluntarily Causing Grievous Hurt", "change": "Consolidated with 323"},
-    "IPC 326A": {"bns": "BNS 124", "title": "Acid Attack", "change": "Minimum 10 years, max life"},
-    "IPC 326B": {"bns": "BNS 125", "title": "Attempt to throw Acid", "change": "Minimum 5 years"},
 
-    # KIDNAPPING & ABDUCTION
-    "IPC 359": {"bns": "BNS 136", "title": "Kidnapping (Definition)", "change": "Same"},
-    "IPC 362": {"bns": "BNS 137", "title": "Abduction", "change": "Same"},
-    "IPC 363": {"bns": "BNS 138", "title": "Punishment for Kidnapping", "change": "Similar"},
-    "IPC 366": {"bns": "BNS 141", "title": "Kidnapping to force Marriage", "change": "Expanded"},
-    "IPC 376D": {"bns": "BNS 70", "title": "Gang Rape", "change": "Mandatory 20 years to life"},
-
-    # PROPERTY OFFENCES
-    "IPC 378": {"bns": "BNS 303", "title": "Theft (Definition)", "change": "Same"},
-    "IPC 379": {"bns": "BNS 303(2)", "title": "Punishment for Theft", "change": "Up to 3 years"},
-    "IPC 383": {"bns": "BNS 308", "title": "Extortion (Definition)", "change": "Same"},
-    "IPC 384": {"bns": "BNS 308(2)", "title": "Punishment for Extortion", "change": "Up to 3 years"},
-    "IPC 390": {"bns": "BNS 309", "title": "Robbery (Definition)", "change": "Same"},
-    "IPC 392": {"bns": "BNS 309(4)", "title": "Punishment for Robbery", "change": "Up to 10 years"},
-    "IPC 395": {"bns": "BNS 310", "title": "Dacoity", "change": "Up to 10 years"},
-    "IPC 406": {"bns": "BNS 316", "title": "Criminal Breach of Trust", "change": "Up to 3 years"},
-    "IPC 415": {"bns": "BNS 318(1)", "title": "Cheating (Definition)", "change": "Same"},
-    "IPC 420": {"bns": "BNS 318(4)", "title": "Cheating & Dishonest Delivery", "change": "Up to 7 years"},
-
-    # CRIMINAL INTIMIDATION & COMMUNICATION
-    "IPC 499": {"bns": "BNS 356(1)", "title": "Defamation (Definition)", "change": "Same"},
-    "IPC 500": {"bns": "BNS 356(2)", "title": "Punishment for Defamation", "change": "Up to 2 years SI"},
-    "IPC 503": {"bns": "BNS 351(1)", "title": "Criminal Intimidation (Definition)", "change": "Same"},
-    "IPC 506": {"bns": "BNS 351(2)", "title": "Punishment for Criminal Intimidation", "change": "Up to 7 years for serious threats"},
-    "IPC 507": {"bns": "BNS 352", "title": "Anonymous Threats", "change": "Up to 2 additional years"},
-
-    # CONFINEMENT
-    "IPC 339": {"bns": "BNS 126(1)", "title": "Wrongful Restraint", "change": "Same"},
-    "IPC 340": {"bns": "BNS 126(2)", "title": "Wrongful Confinement", "change": "Same"},
-    "IPC 342": {"bns": "BNS 127", "title": "Punishment for Wrongful Confinement", "change": "Same"},
-
-    # RELIGIOUS / COMMUNITY
-    "IPC 295": {"bns": "BNS 298", "title": "Injuring Places of Worship", "change": "Same"},
-    "IPC 295A": {"bns": "BNS 299", "title": "Outraging Religious Feelings", "change": "Same"},
-    "IPC 153A": {"bns": "BNS 196", "title": "Promoting Enmity Between Groups", "change": "Expanded to include digital medium"},
-    "IPC 505": {"bns": "BNS 353", "title": "Statements Conducing to Public Mischief", "change": "Includes social media"},
-
-    # ORGANIZED CRIME (NEW IN BNS)
-    "IPC N/A": {"bns": "BNS 111", "title": "Organised Crime (NEW)", "change": "BRAND NEW — No IPC equivalent. Covers criminal syndicates, extortion networks"},
-    "IPC N/A2": {"bns": "BNS 113", "title": "Terrorist Act (NEW)", "change": "BRAND NEW — Anti-terror provisions now in BNS"},
-}
+IPC_TO_BNS_MAPPING = load_ipc_bns_mapping()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -347,11 +288,8 @@ LEGAL_CIRCULARS = [
 def save_all_legal_data():
     """Saves all legal corpus data to structured files for use by the RAG engine."""
 
-    # 1. Save IPC → BNS Mapping
-    mapping_file = CORPUS_DIR / "ipc_bns_mapping.json"
-    with open(mapping_file, "w", encoding="utf-8") as f:
-        json.dump(IPC_TO_BNS_MAPPING, f, indent=2, ensure_ascii=False)
-    console.print(f"[green]✓[/green] IPC→BNS Mapping saved: {mapping_file}")
+    # 1. IPC → BNS mapping: ipc_bns_mapping.json is maintained by hand against
+    #    the government concordance and is never regenerated from here.
 
     # 2. Save Case Summaries
     for i, case in enumerate(CASE_SUMMARIES):
@@ -389,7 +327,7 @@ def save_all_legal_data():
     table.add_column("Status", style="yellow")
 
     table.add_row("BNS Sections (Curated)", str(len([])), "[dim]In bns_knowledge_base.py[/dim]")
-    table.add_row("IPC → BNS Mappings", str(len(IPC_TO_BNS_MAPPING)), "[green]Saved to JSON[/green]")
+    table.add_row("IPC → BNS Mappings", str(len(IPC_TO_BNS_MAPPING)), "[green]Verified file[/green]")
     table.add_row("Supreme Court Case Summaries", str(len(CASE_SUMMARIES)), "[green]Saved to JSON[/green]")
     table.add_row("Legal Circulars / Orders", str(len(LEGAL_CIRCULARS)), "[green]Saved to JSON[/green]")
     table.add_row("Official PDF Sources", str(len(OFFICIAL_SOURCES)), "[yellow]Manual download required[/yellow]")
@@ -458,17 +396,23 @@ def get_corpus_as_rag_documents():
 
     # Add IPC→BNS Mapping as searchable documents
     for ipc_section, bns_info in IPC_TO_BNS_MAPPING.items():
+        bns = bns_info.get("bns") or ""
+        if bns.startswith("BNS"):
+            also = "".join(f" and {b}" for b in bns_info.get("also_bns", []))
+            head = f"SECTION MAPPING: {ipc_section} is now {bns}{also}"
+        else:
+            head = f"SECTION MAPPING: {ipc_section} has no BNS equivalent"
         doc_text = (
-            f"SECTION MAPPING: {ipc_section} is now {bns_info['bns']}\n"
-            f"TITLE: {bns_info['title']}\n"
-            f"CHANGE FROM IPC TO BNS: {bns_info['change']}"
+            f"{head}\n"
+            f"TITLE: {bns_info.get('title', '')}\n"
+            f"CHANGE FROM IPC TO BNS: {bns_info.get('change') or bns_info.get('note', '')}"
         )
         documents.append(doc_text)
         metadatas.append({
             "type": "ipc_bns_mapping",
             "ipc_section": ipc_section,
-            "bns_section": bns_info["bns"],
-            "title": bns_info["title"],
+            "bns_section": bns,
+            "title": bns_info.get("title", ""),
         })
         safe_id = ipc_section.replace(" ", "_").replace("/", "_")
         ids.append(f"mapping_{safe_id}")
@@ -502,18 +446,18 @@ def get_corpus_as_rag_documents():
     # answers. Extraction is automatic, so the doc text says so.
     for r in load_sc_rulings_for_rag():
         doc_text = (
-            f"RECENT SC RULING: {r.get('title', '')}\n"
-            f"DATE: {r.get('date', '')}  SOURCE: {r.get('source', '')}\n"
-            f"SECTIONS: {', '.join(r.get('sections', []))}\n"
-            f"RATIO: {r.get('ratio', '')}\n"
-            f"PRACTICE IMPACT: {r.get('practice_impact', '')}"
+            f"RECENT SC RULING (news report — verify against the judgment before citing): "
+            f"{r.get('title', '')}\n"
+            f"DATE: {r.get('date', '')}  SOURCE: {r.get('source_url', '')}\n"
+            f"SECTIONS: {', '.join(r.get('sections') or [])}\n"
+            f"REPORT: {r.get('ratio', '')}"
         )
         documents.append(doc_text)
         metadatas.append({
             "type": "sc_ruling",
             "title": r.get("title", ""),
             "date": r.get("date", ""),
-            "source": r.get("source", ""),
+            "source": r.get("source_url", ""),
         })
         ids.append(f"sc_{r.get('id', abs(hash(r.get('title', ''))) % 10**8)}")
 
@@ -541,7 +485,12 @@ def load_sc_rulings_for_rag() -> list:
     except (OSError, ValueError):
         return []
     rulings = data if isinstance(data, list) else data.get("rulings", [])
-    return [r for r in rulings if r.get("source") and r.get("source") != "stub"]
+    # Only rows scraped from a live feed carry a source_url. The hand-written
+    # seed rows in monitors.SEED_RULINGS have none — and their citations could
+    # not be found in any public record — so they never ground an answer.
+    return [r for r in rulings
+            if (r.get("source_url") or "").startswith("https://")
+            and not str(r.get("id", "")).startswith(("scr_stub_", "scr_test_"))]
 
 
 if __name__ == "__main__":

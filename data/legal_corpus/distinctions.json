@@ -1,0 +1,118 @@
+{
+ "_note": "Look-alike BNS sections that similarity search returns together. When any listed section is retrieved, its note is added to the prompt so the model applies the ingredient that separates them instead of charging every retrieved section. Section numbers checked against data/legal_corpus/statutes/bns_section_titles.json (Gazette, 25 Dec 2023).",
+ "groups": [
+  {
+   "sections": [
+    "303",
+    "304",
+    "305",
+    "306",
+    "307",
+    "308",
+    "309",
+    "310"
+   ],
+   "note": "Theft (303) is a dishonest taking without consent. Snatching (304) is theft by suddenly, quickly or forcibly seizing property from a person; a stealthy taking the victim does not notice at the time (pickpocketing, lifting from a bag) is ordinarily theft, not snatching. Theft in a dwelling house or vehicle is 305; by a clerk or servant, 306. Extortion (308) is property delivered out of fear of injury. Robbery (309) needs theft or extortion with instant fear of death, hurt or wrongful restraint. Dacoity (310) is robbery by five or more persons."
+  },
+  {
+   "sections": [
+    "303",
+    "314",
+    "316",
+    "318",
+    "319"
+   ],
+   "note": "Criminal breach of trust (316) needs property entrusted to the accused and then dishonestly misappropriated. Theft (303) has no entrustment. Dishonest misappropriation (314) is of property that came to the accused innocently. Cheating (318) needs deception from the start that induced delivery; a later failure to pay or perform, or poor work, is a civil dispute unless dishonest intention existed at the outset. Cheating by pretending to be someone else is 319."
+  },
+  {
+   "sections": [
+    "100",
+    "101",
+    "103",
+    "105",
+    "106"
+   ],
+   "note": "Murder (101, punished under 103) needs the intention or knowledge in section 101. If an exception to 101 applies (grave and sudden provocation, sudden fight without premeditation in the heat of passion, exceeding private defence) it is culpable homicide not amounting to murder (105). Death by a rash or negligent act without intention or knowledge is 106(1). Section 106(2) (failing to report after a hit-and-run) has NOT been brought into force — never charge it; say so."
+  },
+  {
+   "sections": [
+    "109",
+    "110",
+    "114",
+    "115",
+    "116",
+    "117",
+    "118",
+    "125"
+   ],
+   "note": "Hurt (115) and grievous hurt (117) depend on the injury; grievous hurt is defined in 116 (fracture or dislocation of a bone or tooth, permanent loss of sight or hearing, disfigurement, etc.). Use 118 when a dangerous weapon or means is used. Attempt to murder (109) needs proof of intention or knowledge to cause death — serious injuries alone do not make it. Section 125 punishes RASH or NEGLIGENT acts endangering life (e.g. driving); it does not apply to an intentional assault."
+  },
+  {
+   "sections": [
+    "80",
+    "85",
+    "86",
+    "108"
+   ],
+   "note": "Dowry death (80) applies only when a woman dies of burns, bodily injury or in abnormal circumstances WITHIN SEVEN YEARS of marriage and was subjected to dowry-related cruelty soon before her death. Beyond seven years section 80 does not apply; consider abetment of suicide (108) with cruelty (85). Cruelty by the husband or his relatives is 85 (cruelty is defined in 86)."
+  },
+  {
+   "sections": [
+    "329",
+    "331",
+    "305",
+    "333"
+   ],
+   "note": "Criminal trespass and house-trespass (329) cover entering or remaining without permission. Section 331 is for lurking house-trespass or house-breaking — entry by breaking, forcing or a secret route (night aggravates). Walking in through an open door is house-trespass under 329, not 331."
+  },
+  {
+   "sections": [
+    "74",
+    "75",
+    "76",
+    "77",
+    "78",
+    "79"
+   ],
+   "note": "Stalking (78) is following or repeatedly contacting a woman despite clear disinterest, or monitoring her electronic communication. Sexual harassment (75) needs unwelcome physical contact and explicit sexual advances, a demand or request for sexual favours, showing pornography against her will, or sexually coloured remarks — persistent unwanted messages alone are stalking, not 75. Assault or criminal force to outrage modesty (74) needs actual assault or force. Words, gestures or acts insulting modesty are 79; voyeurism is 77."
+  },
+  {
+   "sections": [
+    "63",
+    "64",
+    "69",
+    "70"
+   ],
+   "note": "Rape (defined in 63, punished under 64) requires intercourse without consent as defined in 63. Where a woman consented because of a false promise to marry made with no intention of keeping it, the specific offence is 69 (sexual intercourse by deceitful means). Gang rape is 70."
+  },
+  {
+   "sections": [
+    "111",
+    "112"
+   ],
+   "note": "Organised crime (111) needs a continuing unlawful activity by a syndicate — serious offences with more than one charge-sheet filed in the preceding ten years. Petty organised crime (112) covers group theft, snatching, cheating, unauthorised selling of tickets and similar offences that cause general insecurity."
+  },
+  {
+   "sections": [
+    "137",
+    "140"
+   ],
+   "note": "Kidnapping (137) is taking a child or person of unsound mind out of lawful guardianship without consent. Kidnapping or abducting for ransom or murder is 140 — ransom falls under 140(2)."
+  },
+  {
+   "sections": [
+    "152",
+    "196",
+    "299"
+   ],
+   "note": "Sedition (old IPC 124A) has no BNS equivalent. Section 152 requires acts that excite secession, armed rebellion or subversive activities, or that endanger the sovereignty, unity and integrity of India. Criticism of a government, however strong, is not an offence under 152."
+  },
+  {
+   "sections": [
+    "82",
+    "84"
+   ],
+   "note": "Adultery (old IPC 497) is not an offence under the BNS (struck down in Joseph Shine, 2018). Consensual sexual acts between adults of the same sex (old IPC 377) are not an offence either. Marrying again during the lifetime of a spouse is 82."
+  }
+ ]
+}

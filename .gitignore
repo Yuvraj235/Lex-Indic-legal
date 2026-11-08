@@ -26,6 +26,10 @@ chroma_db/
 # Regenerate locally with: python3 tools/prewarm_embeddings.py
 # Then `git add data/legal_corpus/embedding_cache.json && git commit`
 # data/legal_corpus/embedding_cache.json    ← ALLOWED IN GIT NOW
+# Local-model (Ollama) vectors are much larger — one set per model — and
+# stay on the machine that made them.
+data/legal_corpus/embedding_cache.local.json
+data/legal_corpus/embedding_cache*.tmp
 
 # macOS
 .DS_Store
@@ -54,3 +58,6 @@ data/finetune/review_sample.jsonl
 # Eval reports are regenerable evidence (change per model run) — keep eval.jsonl only.
 data/finetune/eval_report.*
 data/finetune/pipeline_eval_report.*
+
+# Supreme Court judgment store (rebuilt by tools/ingest_judgments.py)
+data/judgments/

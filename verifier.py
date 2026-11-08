@@ -199,16 +199,18 @@ def mapping_mismatches(text: str, window: int = 80) -> list[dict]:
 
 
 def known_sections() -> dict[str, set[str]]:
-    """statute → set of verified section numbers.  Sources: the curated
-    knowledge bases + the govt-concordance mapping tables.  Cached."""
+    """statute → set of verified section numbers.  Sources: the official
+    Gazette text (every section of each Act, also in the retrieval index), the
+    curated knowledge bases and the govt-concordance mapping tables.  Cached."""
     global _KNOWN
     if _KNOWN is None:
+        official = {code: set(t) for code, t in official_titles().items()}
         _KNOWN = {
-            "BNS":  _nums_from_kb(_bns_kb.BNS_SECTIONS)
+            "BNS":  official["BNS"] | _nums_from_kb(_bns_kb.BNS_SECTIONS)
                     | _nums_from_mapping(_CORPUS / "ipc_bns_mapping.json", "bns"),
-            "BNSS": _nums_from_kb(_bnss_bsa_kb.BNSS_SECTIONS)
+            "BNSS": official["BNSS"] | _nums_from_kb(_bnss_bsa_kb.BNSS_SECTIONS)
                     | _nums_from_mapping(_CORPUS / "crpc_bnss_mapping.json", "bnss"),
-            "BSA":  _nums_from_kb(_bnss_bsa_kb.BSA_SECTIONS)
+            "BSA":  official["BSA"] | _nums_from_kb(_bnss_bsa_kb.BSA_SECTIONS)
                     | _nums_from_mapping(_CORPUS / "iea_bsa_mapping.json", "bsa"),
         }
     return _KNOWN
@@ -259,6 +261,146 @@ def _ipc_cited(text: str) -> set[str]:
     return out
 
 
+# ─── Official statute text (Gazette of India, 25 Dec 2023) ───────────────────
+# All 358 BNS / 531 BNSS / 170 BSA sections with their official marginal
+# titles. The knowledge base covers only part of each Act, so "not in the KB"
+# can't tell an invented section from a real one we don't cover; this can.
+_OFFICIAL: dict[str, dict[str, str | None]] | None = None
+
+
+def official_titles() -> dict[str, dict[str, str | None]]:
+    global _OFFICIAL
+    if _OFFICIAL is None:
+        _OFFICIAL = {}
+        for code in ("BNS", "BNSS", "BSA"):
+            path = _CORPUS / "statutes" / f"{code.lower()}_section_titles.json"
+            _OFFICIAL[code] = json.loads(path.read_text(encoding="utf-8"))["sections"]
+    return _OFFICIAL
+
+
+def nonexistent_sections(text: str) -> list[str]:
+    """Citations of sections the Act does not have ('BNS 420', 'BNS 498A')."""
+    titles = official_titles()
+    return [f"{code} {c}" for code in ("BNS", "BNSS", "BSA")
+            for c in sorted(cited_sections(text, code))
+            if _base_num(c) not in titles[code]]
+
+
+# Offence words a draft writes next to a citation → words the official title
+# must contain for that label to be right. "BNS 302 (murder)" is wrong: 302 is
+# about wounding religious feelings; murder is 101/103.
+_LABEL_WORDS = {
+    "murder": ["murder"], "culpable homicide": ["culpable homicide"],
+    "negligen": ["negligen"], "grievous": ["grievous"], "theft": ["theft"],
+    "robbery": ["robbery"], "dacoity": ["dacoity"], "snatching": ["snatching"],
+    "extortion": ["extortion"], "cheating": ["cheat"], "personation": ["personation"],
+    "breach of trust": ["breach of trust"], "misappropriation": ["misappropriation"],
+    "forg": ["forg"], "trespass": ["trespass"], "mischief": ["mischief"],
+    "house-breaking": ["house-breaking", "house- breaking", "house breaking"],
+    "intimidation": ["intimidation"], "defamation": ["defamation"], "stalking": ["stalking"],
+    "voyeurism": ["voyeurism"], "rape": ["rape"], "sexual harassment": ["sexual harassment"],
+    "modesty": ["modesty"], "cruelty": ["cruelty"], "dowry": ["dowry"], "suicide": ["suicide"],
+    "kidnap": ["kidnap"], "ransom": ["ransom"], "confinement": ["confinement"],
+    "conspiracy": ["conspiracy"], "rioting": ["rioting"], "unlawful assembly": ["unlawful assembly"],
+    "enmity": ["enmity"], "organised crime": ["organised crime"], "acid": ["acid"],
+    "stolen property": ["stolen property"], "bigamy": ["marrying again"],
+    "deceitful": ["deceitful"], "rash driving": ["rash driving"],
+}
+# Right labels whose words aren't in the title: 3(5) is common intention; 125
+# is the rash-or-negligent act section, (b) where grievous hurt is caused.
+_LABEL_OK = {("BNS", "3"): {"common intention"},
+             ("BNS", "125"): {"negligen", "grievous", "rash driving"}}
+_BNSS_LABELS = {
+    "anticipatory bail": {"482"}, "first information": {"173"}, "fir": {"173"},
+    "zero fir": {"173"}, "chargesheet": {"193"}, "charge sheet": {"193"},
+    "inherent power": {"528"}, "quash": {"528"}, "remand": {"187"},
+    "notice of appearance": {"35"},
+}
+# A label sits right after the number: "BNS 302 (murder)", "BNS 302 – murder",
+# "BNS 302: murder", "BNS 302 for murder". Prose ("BNS 114. The injury is not
+# grievous") is not a label.
+_LABEL_START = re.compile(r"^\s*(?:\*\*|</?strong>)?\s*(?:[(\[:–—-]|,\s*which|\s+for\b)", re.I)
+
+
+# "BNS 115 – ruled out because the injury is grievous" explains why a section
+# does NOT apply; the words after it are not a label for it.
+_RULED_OUT = re.compile(r"\b(?:ruled out|not|no|rather than|instead|inapplicable|"
+                        r"does not|doesn't|excluded|unlike|because|since|as the)\b", re.I)
+
+
+def _label_after(text: str, end: int) -> str:
+    if not _LABEL_START.match(text[end:end + 12]):
+        return ""
+    tail = text[end:end + 80]
+    stop = re.search(r"[)\].;\n]|\b(?:BNS|BNSS|BSA|IPC|CrPC)\b", tail[1:])
+    label = (tail[:stop.start() + 1] if stop else tail).lower()
+    return "" if _RULED_OUT.search(label) else label
+
+
+def _sections_titled(word: str) -> list[str]:
+    titles = official_titles()["BNS"]
+    return [n for n, t in titles.items() if t and word in t.lower()][:4]
+
+
+def label_mismatches(text: str) -> list[dict]:
+    """Real section numbers tied to an offence their official title doesn't
+    cover — the usual shape of a recalled-from-memory citation."""
+    titles = official_titles()
+    out: list[dict] = []
+    seen: set[str] = set()
+    for code in ("BNS", "BNSS"):
+        for m in _CITE_RES[code].finditer(text or ""):
+            nums = re.findall(r"\d{1,3}", m.group(1))
+            if len(nums) != 1 or nums[0] not in titles[code]:
+                continue          # lists can't be pinned to one label; fakes are reported elsewhere
+            num, label = nums[0], _label_after(text, m.end())
+            if not label:
+                continue
+            if code == "BNS":
+                title = (titles["BNS"][num] or "").lower()
+                said = [k for k in _LABEL_WORDS if k in label]
+                ok = _LABEL_OK.get(("BNS", num), set())
+                if not said or any(k in ok or any(w in title for w in _LABEL_WORDS[k]) for k in said):
+                    continue
+                hint = ", ".join(f"BNS {n}" for n in _sections_titled(_LABEL_WORDS[said[0]][0]))
+            else:
+                said = [k for k in _BNSS_LABELS if re.search(rf"\b{re.escape(k)}\b", label)]
+                if not said or any(num in _BNSS_LABELS[k] for k in said):
+                    continue
+                hint = ", ".join(f"BNSS {n}" for n in sorted(_BNSS_LABELS[said[0]]))
+            key = f"{code} {num}:{said[0]}"
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append({"cited": f"{code} {num}", "label": said[0],
+                        "official_title": titles[code][num], "suggest": hint})
+    return out
+
+
+# Provisions enacted but never brought into force. S.O. 850(E) (23 Feb 2024)
+# commenced the BNS on 1 July 2024 "except the provision of sub-section (2) of
+# section 106" (hit-and-run without reporting).
+_NOT_IN_FORCE = {"BNS 106(2)": "the hit-and-run clause has not been brought into force — "
+                               "charge under BNS 106(1)"}
+_IN_FORCE_CAVEAT = re.compile(r"not\s+(?:yet\s+)?(?:been\s+)?(?:brought\s+into\s+force|in\s+force|"
+                              r"notified|operational|enforced)|abeyance|on\s+hold|kept\s+out", re.I)
+
+
+def not_in_force(text: str) -> list[str]:
+    """Provisions relied on as live law although they aren't in force."""
+    out = []
+    for label in _NOT_IN_FORCE:
+        code, num = label.split(" ", 1)
+        if num not in {c for c in cited_sections(text, code)}:
+            continue
+        for sent in re.split(r"(?<=[.!?\n])\s+", text):
+            if re.search(rf"\b{re.escape(num)}", sent) and code in sent.upper() \
+                    and not _IN_FORCE_CAVEAT.search(sent):
+                out.append(label)
+                break
+    return out
+
+
 def verify_analysis(sections: dict) -> dict:
     """Verify one /analyze output (dict with section_1..section_6).
 
@@ -304,6 +446,10 @@ def verify_analysis(sections: dict) -> dict:
     foreign = foreign_citations(combined)
     mismatches = mapping_mismatches(combined)
     precedents = precedent_check(combined)
+    fake = nonexistent_sections(combined)
+    labels = label_mismatches(combined)
+    inactive = not_in_force(combined)
+    sc_record = sc_record_check(combined)
     bns_cited_anywhere = any(c["statute"] == "BNS" for c in citations)
     ipc_without_bns = bool(_ipc_cited(combined)) and not bns_cited_anywhere
 
@@ -316,10 +462,15 @@ def verify_analysis(sections: dict) -> dict:
         "foreign_citations": foreign,
         "mapping_mismatches": mismatches,
         "precedents": precedents,
+        "nonexistent": fake,
+        "label_mismatches": labels,
+        "not_in_force": inactive,
+        "sc_record": sc_record,
         "ipc_without_bns": ipc_without_bns,
         "all_verified": (not ungrounded and not foreign and not mismatches
                          and not precedents["unverified"] and not precedents["bad_law"]
-                         and not precedents["wrong_citation"]),
+                         and not precedents["wrong_citation"]
+                         and not fake and not labels and not inactive and not sc_record),
     }
 
 
@@ -330,6 +481,17 @@ def verification_stamp(v: dict) -> str:
                 f"{v['verified_count']} statute citations verified against the "
                 "Lex-Indic knowledge base.")
     problems = []
+    if v.get("nonexistent"):
+        problems.append("sections that DO NOT EXIST in the Act: " + ", ".join(v["nonexistent"]))
+    if v.get("label_mismatches"):
+        problems.append("section number does not match the offence named: " + "; ".join(
+            f"{m['cited']} is '{m['official_title']}', not {m['label']}"
+            for m in v["label_mismatches"]))
+    if v.get("not_in_force"):
+        problems.append("relied on a provision not in force: " + ", ".join(v["not_in_force"]))
+    if v.get("sc_record"):
+        problems.append("Supreme Court citation not matching the official record: " + "; ".join(
+            f"{r['cited']} ({r['case'] or 'case not named'}) — {r['problem']}" for r in v["sc_record"]))
     if v["ungrounded"]:
         problems.append("UNVERIFIED citations: " + ", ".join(v["ungrounded"]))
     if v["foreign_citations"]:
@@ -378,10 +540,25 @@ def repair_feedback(sections: dict, verification: dict) -> list[str]:
         issues.append("These sections are missing or empty — write each under its "
                       "exact heading: " + ", ".join(k.replace("section_", "SECTION ")
                                                     for k in missing) + ".")
+    for label in verification.get("nonexistent", []):
+        issues.append(f"{label} does not exist in the Act — remove it; cite only sections "
+                      "from the law provided.")
+    for m in verification.get("label_mismatches", []):
+        hint = (f" Sections whose official title covers {m['label']}: {m['suggest']}."
+                if m["suggest"] else "")
+        issues.append(f"{m['cited']} is '{m['official_title']}' — it is not {m['label']}.{hint} "
+                      "Correct every occurrence.")
+    for label in verification.get("not_in_force", []):
+        issues.append(f"{label}: {_NOT_IN_FORCE[label]}, and state that it is not in force.")
+    for r in verification.get("sc_record", []):
+        issues.append(f"The citation {r['cited']} given for '{r['case'] or 'a case'}' is {r['problem']} — "
+                      "remove the case or cite it exactly as given in the LANDMARK CASE entries.")
     for m in verification.get("mapping_mismatches", []):
         issues.append(f"IPC {m['ipc']} corresponds to BNS {' / '.join(m['expected_bns'])}, "
                       f"not BNS {m['cited_bns']} — correct every occurrence.")
     for label in verification.get("ungrounded", []):
+        if label in verification.get("nonexistent", []):
+            continue
         issues.append(f"{label} is not in the law provided to you — remove it or "
                       "replace it with one of the provided sections.")
     for f in verification.get("foreign_citations", []):
@@ -402,6 +579,10 @@ def issue_score(sections: dict, verification: dict) -> int:
     """Weighted problem count used to pick the better of two drafts (lower wins).
     A wrong mapping or a missing section costs more than an unverifiable cite."""
     return (3 * len(missing_sections(sections))
+            + 3 * len(verification.get("nonexistent", []))
+            + 3 * len(verification.get("label_mismatches", []))
+            + 3 * len(verification.get("not_in_force", []))
+            + 3 * len(verification.get("sc_record", []))
             + 3 * len(verification.get("mapping_mismatches", []))
             + 2 * len(verification.get("ungrounded", []))
             + 2 * len(verification.get("foreign_citations", []))
@@ -483,6 +664,13 @@ def precedent_check(text: str) -> dict:
         reported = bool(re.search(r"SCC|AIR|INSC|SCR|Cri", cite))
         j = _find_judgment(case)
         if not j:
+            if _in_sc_record(case, cite):
+                # Not a curated case, but a real Supreme Court judgment cited
+                # with its own neutral citation — verified by the official record.
+                if case not in seen_case:
+                    seen_case.add(case)
+                    out["cited"].append({"case": case, "citation": cite, "status": "official_record"})
+                continue
             parties = re.split(r"\s+(?:v\.|vs\.?|versus)\s+", case, maxsplit=1)
             if reported or any(_GENERIC_PARTY.match(p.strip()) for p in parties):
                 out["unverified"].append(f"{case} {cite}")
@@ -500,3 +688,80 @@ def precedent_check(text: str) -> dict:
             out["bad_law"].append({"case": j["case"], "status": j["status"],
                                    "note": j.get("status_note", "")})
     return out
+
+
+# ─── Supreme Court record check ──────────────────────────────────────────────
+# Every Supreme Court judgment 1950–2026 with its neutral citation, official
+# S.C.R. report and party names (tools/build_sc_citation_index.py, from the
+# CC-BY open dataset). Any cited "2024 INSC 891" or "[2014] 8 S.C.R. 128" must
+# exist there and belong to the case named next to it — the check that caught
+# all 15 fabricated rulings once shipped in monitors.SEED_RULINGS.
+_SC_INDEX: dict | None = None
+_INSC_RE = re.compile(r"\b((?:19|20)\d{2})\s*INSC\s*(\d{1,4})\b")
+_SCR_RE = re.compile(r"\[\s*((?:19|20)\d{2})\s*\]\s*(SUPP\.?\s*)?(\d{1,2})\s*S\.?\s*C\.?\s*R\.?\s*(\d{1,4})", re.I)
+
+
+def _sc_index() -> dict:
+    global _SC_INDEX
+    if _SC_INDEX is None:
+        import gzip
+        path = _CORPUS / "sc_citations.json.gz"
+        try:
+            _SC_INDEX = json.loads(gzip.decompress(path.read_bytes()))
+        except (OSError, ValueError):
+            _SC_INDEX = {"insc": {}, "scr": {}, "years": [0, 0]}
+    return _SC_INDEX
+
+
+def _case_before(text: str, start: int) -> str:
+    """The 'X v. Y' named just before a citation, if any."""
+    window = text[max(0, start - 160):start]
+    m = None
+    for m in re.finditer(rf"{_PARTY}\s+(?:v\.|vs\.?|versus)\s+{_PARTY}", window):
+        pass
+    return _LEAD_IN.sub("", m.group(0).strip()) if m else ""
+
+
+def sc_record_check(text: str) -> list[dict]:
+    """Supreme Court citations that are not in the official record, or that
+    belong to a different case than the one named with them."""
+    idx = _sc_index()
+    if not idx["insc"]:
+        return []
+    first, last = idx["years"]
+    out: list[dict] = []
+    seen: set[str] = set()
+    hits = [(m.start(), f"{m.group(1)} INSC {int(m.group(2))}", "insc", int(m.group(1)))
+            for m in _INSC_RE.finditer(text or "")]
+    hits += [(m.start(), f"[{m.group(1)}] {'SUPP ' if m.group(2) else ''}{m.group(3)} S.C.R. {m.group(4)}",
+              "scr", int(m.group(1))) for m in _SCR_RE.finditer(text or "")]
+    for start, cite, kind, year in sorted(hits):
+        if cite in seen or not (first <= year <= last):
+            continue
+        seen.add(cite)
+        insc = cite if kind == "insc" else idx["scr"].get(cite.upper())
+        record = idx["insc"].get(insc) if insc else None
+        case = _case_before(text, start)
+        if record is None:
+            out.append({"cited": cite, "case": case, "problem": "not in the Supreme Court record"})
+            continue
+        keys = _party_keys(case) if case else []
+        rkeys = _party_keys(record[0].replace(" versus ", " v. "))
+        if keys and rkeys and not any(
+                k == r or (min(len(k), len(r)) >= 6 and (k in r or r in k)) for k in keys for r in rkeys):
+            out.append({"cited": cite, "case": case,
+                        "problem": f"belongs to {record[0].title()} ({record[1]})"})
+    return out
+
+
+def _in_sc_record(case: str, cite: str) -> bool:
+    """True when `cite` is a neutral / S.C.R. citation in the official record
+    and belongs to the case named."""
+    m = _INSC_RE.search(cite or "")
+    if not m:
+        return False
+    record = _sc_index()["insc"].get(f"{m.group(1)} INSC {int(m.group(2))}")
+    if not record:
+        return False
+    keys, rkeys = _party_keys(case), _party_keys(record[0].replace(" versus ", " v. "))
+    return any(k == r or (min(len(k), len(r)) >= 6 and (k in r or r in k)) for k in keys for r in rkeys)
