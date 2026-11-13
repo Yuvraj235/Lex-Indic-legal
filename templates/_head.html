@@ -1,0 +1,208 @@
+<!--
+  Shared <head> content: favicon, link-preview cards, theme colour, the
+  motion layer and the top-bar styles. Include inside <head> on every page
+  (link previews and browsers ignore these tags when they sit in <body>).
+-->
+<link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
+<link rel="apple-touch-icon" href="/static/img/favicon.svg">
+<meta property="og:title" content="Lex-Indic — AI Junior Associate for Indian Law">
+<meta property="og:description" content="The BNS Transition Engine. Citation-traceable legal analysis, DPDP-compliant audit, white-label PDFs. Free for NALSA panel advocates.">
+<meta property="og:image" content="/static/img/og-card.svg">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://lex-indic.in">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Lex-Indic — AI Junior Associate for Indian Law">
+<meta name="twitter:description" content="BNS / BNSS / BSA — citation-traceable, checked against the official text, DPDP-compliant.">
+<meta name="twitter:image" content="/static/img/og-card.svg">
+<meta name="theme-color" content="#0f2850">
+<link rel="stylesheet" href="/static/lex-motion.css">
+<style>
+  .lex-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    width: 100%;
+    background: linear-gradient(135deg, #0a1a35 0%, #0f2850 55%, #16346a 100%);
+    color: #fff;
+    box-shadow: 0 1px 0 rgba(240,196,79,0.18), 0 2px 10px rgba(5,13,31,0.18);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 13.5px;
+    transition: box-shadow 220ms ease, background-color 220ms ease;
+  }
+  .lex-topbar.is-scrolled { box-shadow: 0 1px 0 rgba(240,196,79,0.25), 0 8px 24px rgba(5,13,31,0.28); }
+  .lex-topbar-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 8px 18px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .lex-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 800;
+    color: #f0c44f;
+    font-size: 14.5px;
+    margin-right: 14px;
+    text-decoration: none;
+    letter-spacing: 0.6px;
+    white-space: nowrap;
+  }
+  .lex-brand-mark {
+    width: 24px; height: 24px; border-radius: 7px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, #b48c28, #f0c44f);
+    color: #0a1a35; font-size: 13px; font-weight: 800;
+    box-shadow: 0 2px 8px rgba(240,196,79,0.35);
+    transition: transform 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .lex-brand:hover .lex-brand-mark { transform: rotate(-8deg) scale(1.08); }
+  .lex-brand:hover { color: #ffd76e; }
+  .lex-nav-group { display: flex; gap: 1px; align-items: center; }
+  .lex-nav-link {
+    position: relative;
+    color: rgba(255,255,255,0.82);
+    text-decoration: none;
+    padding: 6px 10px;
+    border-radius: 7px;
+    transition: background-color 160ms ease, color 160ms ease;
+    white-space: nowrap;
+  }
+  .lex-nav-link::after {
+    content: '';
+    position: absolute;
+    left: 10px; right: 10px; bottom: 2px;
+    height: 2px; border-radius: 2px;
+    background: #f0c44f;
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .lex-nav-link:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .lex-nav-link:hover::after { transform: scaleX(0.5); }
+  .lex-nav-link.active { color: #f0c44f; font-weight: 600; background: rgba(240,196,79,0.12); }
+  .lex-nav-link.active::after { transform: scaleX(1); }
+  .lex-nav-link:focus-visible, .lex-menu > summary:focus-visible, .lex-signin:focus-visible {
+    outline: 2px solid #f0c44f; outline-offset: 2px;
+  }
+  .lex-nav-divider { width: 1px; height: 16px; background: rgba(255,255,255,0.18); margin: 0 6px; flex: none; }
+  .lex-nav-right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+
+  /* "More" and account menus — <details> works without JavaScript. Reset
+     anything a page's own details/summary styles might apply. */
+  .lex-topbar .lex-menu { position: relative; background: none; border: 0; margin: 0; padding: 0;
+                          overflow: visible; box-shadow: none; border-radius: 0; }
+  .lex-topbar .lex-menu > summary::before { content: none; display: none; }
+  .lex-topbar .lex-menu > summary {
+    list-style: none;
+    margin: 0; font-size: inherit; line-height: inherit; font-weight: 400;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    color: rgba(255,255,255,0.82);
+    padding: 6px 10px; border-radius: 7px;
+    white-space: nowrap;
+    transition: background-color 160ms ease, color 160ms ease;
+    user-select: none;
+  }
+  .lex-menu > summary::-webkit-details-marker { display: none; }
+  .lex-menu > summary:hover, .lex-menu[open] > summary { background: rgba(255,255,255,0.08); color: #fff; }
+  .lex-menu > summary.active { color: #f0c44f; }
+  .lex-caret { width: 8px; height: 8px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor;
+               transform: translateY(-2px) rotate(45deg); transition: transform 200ms ease; }
+  .lex-menu[open] .lex-caret { transform: translateY(1px) rotate(225deg); }
+  .lex-menu-panel {
+    position: absolute; right: 0; top: calc(100% + 8px);
+    min-width: 210px;
+    background: #fff; color: #0f2850;
+    border-radius: 12px;
+    border: 1px solid rgba(15,40,80,0.08);
+    box-shadow: 0 18px 44px -12px rgba(5,13,31,0.38);
+    padding: 6px;
+    z-index: 1001;
+    transform-origin: top right;
+    animation: lex-menu-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes lex-menu-in { from { opacity: 0; transform: translateY(-6px) scale(0.97); } to { opacity: 1; transform: none; } }
+  .lex-menu-panel a, .lex-menu-panel button {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; text-align: left;
+    padding: 8px 10px; border-radius: 8px;
+    color: #0f2850; text-decoration: none;
+    font: inherit; font-size: 13px;
+    background: none; border: 0; cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease;
+  }
+  .lex-menu-panel a:hover, .lex-menu-panel button:hover { background: #f6f1e2; color: #6d5009; }
+  .lex-menu-panel a.active { background: #f6f1e2; color: #6d5009; font-weight: 600; }
+  .lex-menu-label { padding: 8px 10px 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.8px;
+                    text-transform: uppercase; color: #5b6372; }
+  .lex-menu-email { padding: 6px 10px 8px; font-size: 12.5px; color: #5b6372; border-bottom: 1px solid #ecf0f7;
+                    margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lex-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, #b48c28, #f0c44f);
+    color: #0a1a35; font-weight: 800; font-size: 12px;
+  }
+  .lex-signin {
+    color: #0a1a35; background: linear-gradient(135deg, #d4a843, #f0c44f);
+    padding: 6px 14px; border-radius: 8px; font-weight: 700; text-decoration: none; white-space: nowrap;
+    box-shadow: 0 2px 10px rgba(240,196,79,0.25);
+    transition: transform 160ms ease, box-shadow 160ms ease;
+  }
+  .lex-signin:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(240,196,79,0.4); color: #0a1a35; }
+  .lex-account[hidden], .lex-signin[hidden] { display: none; }
+
+  .lex-lang { display: flex; }
+  .lex-lang[hidden] { display: none; }
+  .lex-lang button {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.78);
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 160ms ease, color 160ms ease;
+  }
+  .lex-lang button:first-child { border-radius: 7px 0 0 7px; }
+  .lex-lang button:last-child { border-radius: 0 7px 7px 0; border-left: 0; }
+  .lex-lang button.active { background: rgba(240,196,79,0.18); color: #f0c44f; }
+
+  @media (max-width: 1340px) {
+    .lex-nav-link, .lex-menu > summary { padding: 6px 8px; font-size: 13px; }
+    .lex-brand { margin-right: 8px; }
+  }
+  @media (max-width: 1100px) {
+    /* Small laptops / tablets: wrap to a second row rather than overflow. */
+    .lex-topbar-inner { flex-wrap: wrap; row-gap: 4px; }
+    .lex-nav-divider, .lex-brand-text { display: none; }
+  }
+  @media (max-width: 760px) {
+    /* Phones: one swipeable row instead of links spilling past the screen edge. */
+    .lex-topbar-inner { padding: 7px 10px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .lex-nav-right { margin-left: 6px; }
+    .lex-topbar-inner::-webkit-scrollbar { display: none; }
+    .lex-nav-link, .lex-menu > summary { padding: 5px 8px; font-size: 12.5px; }
+    .lex-menu-panel { position: fixed; top: 52px; right: 10px; left: auto; }
+  }
+
+  /* Shared empty-state styling — used by /matters /monitors /status etc. */
+  .lex-empty {
+    text-align: center;
+    padding: 40px 22px;
+    color: #5b6372;
+    background: rgba(15,40,80,0.03);
+    border: 2px dashed rgba(15,40,80,0.15);
+    border-radius: 10px;
+    margin: 16px 0;
+  }
+  .lex-empty .lex-empty-icon { font-size: 42px; margin-bottom: 10px; opacity: 0.6; }
+  .lex-empty h3 { color: #0f2850; font-size: 17px; margin: 0 0 6px; }
+  .lex-empty p { font-size: 13px; margin: 0 0 14px; max-width: 380px; margin-left: auto; margin-right: auto; }
+  .lex-empty .btn { display: inline-block; padding: 9px 16px; background: #0f2850; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; }
+  .lex-empty .btn:hover { background: #1a3a6e; color: #fff; }
+</style>

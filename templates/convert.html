@@ -18,7 +18,7 @@
     --navy-deep:   #0a1a35;
     --gold:        #b48c28;
     --gold-light:  #d4a843;
-    --gold-glow:   #f0c44f;
+    --gold-glow:   #f0c44f; --gold-ink:#86650f;
     --cream:       #f5f1e8;
     --grey-100:    #f6f7fb;
     --grey-200:    #ecf0f7;
@@ -85,7 +85,7 @@
   .eyebrow{
     display:inline-block;
     font-size:12px; font-weight:700;
-    color:var(--gold);
+    color:var(--gold-ink);
     text-transform:uppercase; letter-spacing:1.5px;
     margin-bottom:10px;
   }
@@ -166,7 +166,7 @@
   .drop-zone-sub{
     color:var(--grey-500); font-size:14px;
   }
-  .drop-zone-sub strong{color:var(--gold)}
+  .drop-zone-sub strong{color:var(--gold-ink)}
   input[type=file]{display:none}
 
   /* ─── Paste textarea ─────────────────────────────────────────────────── */
@@ -214,7 +214,7 @@
     color:var(--navy);
     border:1px solid var(--grey-300);
   }
-  .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold-ink)}
 
   /* ─── Loading ────────────────────────────────────────────────────────── */
   .loading{
@@ -299,7 +299,7 @@
     border:1px solid #f5e0a0;
     width:fit-content;
   }
-  .match-arrow{color:var(--gold);font-size:18px;text-align:center;font-weight:700}
+  .match-arrow{color:var(--gold-ink);font-size:18px;text-align:center;font-weight:700}
   .match-bns{
     background:var(--green-light);
     padding:4px 10px; border-radius:6px;
@@ -384,6 +384,7 @@
     .match-arrow{transform:rotate(90deg)}
   }
 </style>
+  {% include '_head.html' %}
 </head>
 <body>
   {% include '_nav.html' %}

@@ -16,7 +16,7 @@ short_description: AI Junior Associate for Indian law — BNS transition engine
 
 [![Status](https://img.shields.io/badge/status-v1.9-success)]()
 [![Stack](https://img.shields.io/badge/stack-Flask%20%2B%20Three.js%20%2B%20ChromaDB-blue)]()
-[![Tests](https://img.shields.io/badge/tests-519%20passing-success)]()
+[![Tests](https://img.shields.io/badge/tests-566%20passing-success)]()
 [![SOC2](https://img.shields.io/badge/SOC2-9%2F10%20controls%20passing-success)]()
 [![API](https://img.shields.io/badge/API-v1%20%2B%20OpenAPI-blue)]()
 [![License](https://img.shields.io/badge/license-Educational-lightgrey)]()
@@ -34,6 +34,26 @@ and within seconds the system produces a **complete legal case brief with 6 outp
 > India replaced the 163-year-old Indian Penal Code (IPC) with the BNS on **1 July 2024**.
 > Lex-Indic helps lawyers navigate this transition instantly — without trusting a chatbot
 > that hallucinates section numbers.
+
+---
+
+## What's New — UI and reliability pass
+
+Every page was checked in a browser at desktop, tablet and phone widths, with
+text contrast measured against WCAG AA (4.5:1) and every internal link followed.
+
+| Area | Change | File(s) | Why it matters |
+|---|---|---|---|
+| **One navigation bar** | Main tools, a **More** menu (status, statute audit, Word add-in, API docs, API keys, webhooks, admin) and an **account menu** with Sign out — "Sign in" when signed out. Wraps on tablets, swipes on phones | `templates/_nav.html`, `templates/_head.html` | The old bar ran to two rows of 18 links, always showed "Login" and had no sign-out |
+| **Broken links fixed** | Login pointed to `/auth/login`, Webhooks to `/webhooks`, Pricing to `/nalsa/register` — none existed. A test now follows every internal link on every page | `tests/test_routes.py` | Dead ends on the most-used buttons |
+| **Shared `<head>`** | Favicon, link-preview tags and bar styles moved from `<body>` into `<head>` on every page | `templates/_head.html` | Link previews ignore tags in the body |
+| **Colour contrast** | Gold text on white was 3.1:1 and white on gold buttons 2.1:1. New `--colour-gold-ink` (5.4:1), navy text on gold buttons, one gold everywhere (the stray orange is gone), darker greys. All pages now ≥ 4.5:1; Profile, Pricing, Billing and Audit restyled on the design tokens | `static/lex-design-system.css`, page templates | Readability, and one consistent look |
+| **Motion** | Cards, tiles and the six result sections rise in with a stagger as they scroll into view; small cards lift on hover; button press feedback; gold-button sheen; loading shimmer; animated nav underline and menus. Reduced-motion is respected, and a timer backstop guarantees nothing stays hidden | `static/lex-motion.css`, `static/lex-design-system.js` | A livelier interface without risking hidden content |
+| **No more blank pages** | Pressing Back after a link, or clicking a download link, left the page faded out. Restored pages and file links now keep the page visible | `static/lex-design-system.js` | The page went blank in two common flows |
+| **Profile and billing** | Profile showed "(anonymous)" for a signed-in user and had no way to create an API key; `/billing/success` said "subscription active" to anyone who opened the URL. Both now show the real account state | `templates/profile.html`, `templates/billing_success.html`, `app.py` | Wrong information on account pages |
+| **Self-correction on the free tier** | One analysis uses most of Groq's per-minute tokens, so the correction call right after it was refused and flagged drafts shipped unrepaired. The pass now waits the seconds Groq asks for (`REPAIR_MAX_WAIT_S`, default 65) — never for a used-up daily allowance | `app.py` | Wrong sections the checker caught were reaching the lawyer |
+| **Honest busy messages** | Rate-limit errors now say whether the daily allowance is used up and how long to wait, instead of always "try again in a minute" | `app.py` | The real wait can be 40+ minutes |
+| **Label check reads the definition** | A label is checked against the section's title *and* its official definition ("deceitful inducement" is right for BNS 138, Abduction) | `verifier.py` | Fewer false alarms; wrong labels are still caught |
 
 ---
 
@@ -188,13 +208,16 @@ STEP 1: LAWYER INPUTS THE CLIENT STORY
         v
 
 STEP 2: RAG SEARCH (Retrieval-Augmented Generation)
-  The system searches a curated knowledge base of:
-    - 38 BNS sections (criminal law provisions)
-    - 51 IPC-to-BNS mapping entries
-    - 7 Supreme Court landmark judgments
-    - 3 Legal circulars (MHA, NHRC, Supreme Court)
-  Total: 99 indexed documents, embedded via Gemini.
-  Finds the TOP 8 most relevant entries for THIS specific case.
+  The system searches the official text of the criminal-law Acts plus a
+  verified corpus:
+    - All 358 BNS, 531 BNSS and 170 BSA sections (Gazette text), with
+      plain-language cards for 89 BNS and 25 BNSS/BSA sections
+    - 76 verified IPC-to-BNS mappings
+    - 58 Supreme Court case summaries and 3 circulars (MHA, NHRC, SC)
+    - Supreme Court criminal judgments 2014–2025, when the local store is built
+  Embedded with Gemini (default) or a local model (EMBEDDINGS_PROVIDER=ollama).
+  Finds the 10 most relevant entries for THIS case, in fixed slots
+  (offences, rest of the Act, procedure, case law).
   Returns the structured source list to the UI for citation provenance.
 
         |
@@ -276,41 +299,56 @@ STEP 6: PDF CASE BRIEF + AUDIT LOG
 ```
 legal_ai/
 |
-|-- main.py                          <-- Core legal triage engine
-|-- app.py                           <-- Flask web server (routes, /analyze, /chat, audit hooks)
+|-- app.py                           <-- Flask web server (routes, /analyze, /chat, auth, billing, API)
+|-- main.py                          <-- RAG pipeline, prompt rules, retrieval pools
+|-- llm_provider.py                  <-- Groq / Ollama / hybrid model routing
+|-- verifier.py                      <-- Checks every citation against the official text
+|-- statutes.py                      <-- Official BNS / BNSS / BSA sections as search documents
+|-- sc_judgments.py                  <-- Supreme Court judgments as "similar real cases"
 |-- pdf_generator.py                 <-- PDF Case Brief generator (white-label via .env)
 |-- audit.py                         <-- DPDP audit logger (JSONL, hashed PII)
 |-- requirements.txt
-|-- .env                             <-- API keys + branding + audit salt (never committed)
-|-- .env.example                     <-- Template for the above
-|-- .gitignore
-|-- README.md
+|-- .env.example                     <-- Template for API keys, branding, audit salt
 |
 |-- data/
-|   |-- bns_knowledge_base.py        <-- 38 curated BNS sections
-|   |-- download_legal_corpus.py     <-- Corpus loader (SC cases, circulars, mappings)
+|   |-- bns_knowledge_base.py        <-- 89 curated BNS cards (keywords, practice notes)
+|   |-- bnss_bsa_knowledge_base.py   <-- 25 curated BNSS / BSA cards
+|   |-- download_legal_corpus.py     <-- Corpus loader (cases, circulars, mappings, SC rulings)
+|   |-- eval/stress_67.json          <-- 67 graded scenarios, easy → hard
 |   |-- legal_corpus/
-|       |-- ipc_bns_mapping.json     <-- 51 IPC-to-BNS section mappings
-|       |-- embedding_cache.json     <-- Cached embeddings (auto-generated)
-|       |-- official_sources.txt
-|       |-- case_summaries/          <-- 7 Supreme Court landmark cases
-|       |-- circulars/               <-- 3 legal circulars (MHA, SC, NHRC)
+|       |-- statutes/                <-- Gazette text + titles of every BNS/BNSS/BSA section, POCSO
+|       |-- ipc_bns_mapping.json     <-- 76 verified IPC-to-BNS mappings
+|       |-- sc_citations.json.gz     <-- Official SC citation record (38,139 neutral citations)
+|       |-- distinctions.json        <-- Notes separating look-alike sections
+|       |-- embedding_cache.json     <-- Gemini embeddings (local-model cache is gitignored)
 |
 |-- templates/
-|   |-- landing.html                 <-- 3D marketing landing page (/)
+|   |-- _head.html                   <-- Shared <head>: favicon, preview tags, bar styles
+|   |-- _nav.html                    <-- Shared top bar (More + account menus)
+|   |-- landing.html                 <-- Marketing landing page (/)
 |   |-- index.html                   <-- Intake/results UI (/app)
+|   |-- convert.html, tabular.html, monitors.html, matters.html, ecourts.html,
+|       audit.html, trust.html, nalsa.html, pricing.html, profile.html, status.html …
 |
 |-- static/
-|   |-- style.css                    <-- Brand colours, source cards, citation badges
+|   |-- lex-design-system.css / .js  <-- Design tokens, components, page runtime
+|   |-- lex-motion.css               <-- Entrance, hover and loading animations
+|   |-- style.css                    <-- /app styles: source cards, citation badges
 |
 |-- tools/
+|   |-- eval_stress.py               <-- Runs + grades the 67-case stress test
+|   |-- eval_retrieval.py            <-- Retrieval-only recall (no model calls)
+|   |-- ingest_judgments.py          <-- Builds the local SC judgment store
+|   |-- add_special_act.py           <-- Adds a special law from an official PDF
+|   |-- prewarm_embeddings.py        <-- Embeds the whole index ahead of a deploy
 |   |-- audit_report.py              <-- Daily/weekly audit summary CLI
+|
+|-- tests/                           <-- pytest suite (no network)
 |
 |-- outputs/                         <-- Generated artefacts (gitignored)
     |-- case_analysis_YYYYMMDD_HHMMSS.txt
     |-- CaseBrief_YYYYMMDD_HHMMSS.pdf
-    |-- audit/
-        |-- audit-YYYY-MM-DD.log     <-- JSONL audit trail (daily rotation)
+    |-- audit/audit-YYYY-MM-DD.log   <-- JSONL audit trail (daily rotation)
 ```
 
 ---
@@ -376,7 +414,7 @@ Then open: **http://localhost:8080** (or **https://localhost:8443** for the add-
 pip3 install -r requirements-dev.txt
 python3 -m pytest tests/
 ```
-519 tests, runs in ~5 seconds, zero network calls (DNS and the webhook retry thread are stubbed).
+566 tests, runs in ~5 seconds, zero network calls (DNS and the webhook retry thread are stubbed).
 `tests/test_security.py` pins every access-control rule — who gets a 401/403/404;
 `tests/test_accuracy.py` pins the citation, concordance, precedent and self-correction checks.
 See [`tests/README.md`](tests/README.md) for details.
@@ -427,12 +465,18 @@ actual engine at `/app`.
 1. Open **http://localhost:8080/app** in your browser (or click "Try the engine" from `/`)
 2. Type or paste the client's story in the text area
 3. (Optional) Click **"Attach Evidence"** to upload PDF reports or photos
-4. Click **"Run Legal Analysis"** — wait ~7 seconds
-5. The **Verified Sources** panel appears at the top with 8 cards
+4. Click **"Run Legal Analysis"** — an analysis takes about a minute
+5. The **Verified Sources** panel appears at the top with the retrieved entries
 6. All 6 sections appear as colour-coded accordion cards below
 7. Inside the legal analysis, every "BNS Section NN" is a **clickable citation badge**
 8. Click any source card or citation badge to view the verified KB text
 9. Click **"Download PDF Case Brief"** for the printable 9-page PDF
+
+### Getting around
+- The top bar holds the main tools; **More** opens system status, the statute
+  migration audit, the Word add-in, API docs, API keys, webhooks and the admin pages.
+- The round **account** button (top right) shows who is signed in, the profile
+  page and **Sign out**; when signed out it reads **Sign in**.
 
 ### Edit & Re-run
 1. After getting results, click **"Edit & Supplement"**
@@ -466,12 +510,12 @@ After any analysis, scroll down to **"Find Help Near You"**:
 ### 1. Citation Provenance — every claim traceable
 
 The model never gets to invent law. The Verified Sources panel above the analysis
-shows the 8 KB entries the RAG system actually retrieved, with their relevance
+shows the entries the RAG system actually retrieved, with their relevance
 scores. Inside the legal analysis, every "BNS Section NN" mention is wrapped in
 a citation badge. Sections that weren't retrieved stay plain text — your visual
 signal that the model has wandered off-source.
 
-A senior advocate audits the output by clicking 8 cards. Trust restored.
+A senior advocate audits the output by clicking the source cards. Trust restored.
 
 ### 2. Audit Trail — DPDP Act 2023 compliance built in
 
@@ -632,8 +676,9 @@ All 358 sections are indexed from the official text. The curated plain-language 
 **Defamation / intimidation:** 351, 356
 **Inchoate offences:** 45, 61
 
-Plus 51 IPC→BNS mapping entries, 7 Supreme Court landmark cases, and 3 legal
-circulars (MHA, SC, NHRC) — all retrievable via the same RAG pipeline.
+Plus 76 verified IPC→BNS mappings, 58 Supreme Court case summaries, 3 legal
+circulars (MHA, SC, NHRC) and, once the local store is built, Supreme Court
+criminal judgments 2014–2025 — all retrievable via the same RAG pipeline.
 
 ---
 

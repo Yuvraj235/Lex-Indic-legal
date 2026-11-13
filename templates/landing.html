@@ -18,6 +18,7 @@
     --gold:        #b48c28;
     --gold-light:  #d4a843;
     --gold-glow:   #f0c44f;
+    --gold-ink:    #86650f;
     --cream:       #f5f1e8;
     --grey-100:    #f6f7fb;
     --grey-300:    #d9dde6;
@@ -69,8 +70,8 @@
     display:flex; flex-direction:column;
   }
   .nav{
-    display:flex; justify-content:space-between; align-items:center;
-    padding:12px 0;
+    display:flex; justify-content:center; align-items:center;
+    padding:6px 0 4px;
   }
   .logo{
     display:flex; align-items:center; gap:10px;
@@ -89,7 +90,9 @@
     display:flex; gap:28px;
     font-size:14px; font-weight:500;
   }
-  .nav-links a{color:rgba(255,255,255,.78);text-decoration:none;transition:color .2s}
+  .nav-links{padding:6px 8px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
+  .nav-links a{color:rgba(255,255,255,.78);text-decoration:none;transition:color .2s, background-color .2s;padding:4px 12px;border-radius:999px}
+  .nav-links a:hover{background:rgba(240,196,79,.12)}
   .nav-links a:hover{color:var(--gold-glow)}
   .btn{
     display:inline-flex; align-items:center; gap:8px;
@@ -218,7 +221,7 @@
   .eyebrow{
     display:inline-block;
     font-size:12px; font-weight:700;
-    color:var(--gold);
+    color:var(--gold-ink);
     text-transform:uppercase; letter-spacing:1.5px;
     margin-bottom:12px;
   }
@@ -536,6 +539,7 @@
     section{padding:60px 20px}
   }
 </style>
+  {% include '_head.html' %}
 </head>
 <body>
   {% include '_nav.html' %}
@@ -545,18 +549,13 @@
   <canvas id="heroCanvas" aria-hidden="true"></canvas>
 
   <div class="hero-content">
-    <nav class="nav">
-      <div class="logo">
-        <div class="logo-mark">L</div>
-        <span>Lex-Indic</span>
-      </div>
+    <nav class="nav" aria-label="On this page">
       <div class="nav-links">
         <a href="#how">How it works</a>
         <a href="#moat">Provenance</a>
         <a href="#compliance">Compliance</a>
         <a href="https://github.com/Yuvraj235/Lex-Indic-legal" target="_blank" rel="noopener">GitHub</a>
       </div>
-      <a href="/try" class="btn btn-primary">Try the engine</a>
     </nav>
 
     <div class="hero-main">
@@ -580,16 +579,16 @@
 
       <div class="hero-stats">
         <div class="stat">
-          <div class="stat-num" data-count="38">0</div>
-          <div class="stat-label">BNS sections curated</div>
+          <div class="stat-num" data-count="358">0</div>
+          <div class="stat-label">BNS sections, official text</div>
         </div>
         <div class="stat">
           <div class="stat-num" data-count="6">0</div>
           <div class="stat-label">Documents per case</div>
         </div>
         <div class="stat">
-          <div class="stat-num" data-count="7">0</div>
-          <div class="stat-label">Sec. avg analysis</div>
+          <div class="stat-num" data-count="531">0</div>
+          <div class="stat-label">BNSS sections indexed</div>
         </div>
         <div class="stat">
           <div class="stat-num">100%</div>
@@ -651,8 +650,8 @@
     <h2 class="section-title reveal">Three steps. One brief. Every citation verified.</h2>
     <p class="section-lead reveal">
       Lex-Indic is a retrieval-augmented engine: we never let the model invent
-      law. The relevant BNS sections are pulled from a curated knowledge base
-      first, then handed to the model with strict instructions to cite only what
+      law. The relevant BNS sections are pulled from the official text of the
+      Acts first, then handed to the model with strict instructions to cite only what
       it was given.
     </p>
 
@@ -673,8 +672,8 @@
         <h3>Retrieve the law</h3>
         <p>
           ChromaDB vector search finds the most relevant BNS sections,
-          IPC→BNS mappings, and Supreme Court precedents from a curated
-          KB of 38 sections + 61 corpus documents.
+          IPC→BNS mappings, and Supreme Court precedents — searched across
+          the official Gazette text of every BNS, BNSS and BSA section.
         </p>
       </div>
       <div class="step">
@@ -801,7 +800,7 @@
 <!-- ═══════════════════════════════ FINAL CTA ═══════════════════════════════ -->
 <section class="final-cta">
   <div class="container">
-    <h2 class="section-title reveal">Run a real case in 7 seconds.</h2>
+    <h2 class="section-title reveal">Run a real case in about a minute.</h2>
     <p class="reveal">
       The engine is live on this machine. Paste any client story — see for
       yourself how the citation badges, sources panel, and audit log behave on

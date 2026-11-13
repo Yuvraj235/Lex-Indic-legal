@@ -43,6 +43,64 @@ class TestPublicPages:
         assert html.count('id="lexLangEn"') == 1, path
 
 
+_UI_PAGES = ["/", "/app", "/trust", "/convert", "/monitors", "/tabular", "/ecourts",
+             "/matters", "/nalsa", "/status", "/login", "/try", "/pricing", "/profile",
+             "/audit", "/dashboard", "/admin/soc2", "/addin/install", "/billing/success"]
+
+
+class TestUiIntegrity:
+    @pytest.mark.parametrize("path", _UI_PAGES)
+    def test_no_dead_internal_links(self, client, path):
+        # The bar linked to /auth/login and /webhooks, pricing to /nalsa/register —
+        # none of which existed.
+        import re
+        html = client.get(path).get_data(as_text=True)
+        links = {m for m in re.findall(r'(?:href|src|action)="(/[^"#?{}$ ]*)"', html)}
+        dead = [u for u in sorted(links) if client.get(u).status_code == 404]
+        assert not dead, f"{path} links to missing pages: {dead}"
+
+    @pytest.mark.parametrize("path", _UI_PAGES)
+    def test_preview_tags_and_styles_sit_in_head(self, client, path):
+        html = client.get(path).get_data(as_text=True)
+        head, _, body = html.partition("</head>")
+        assert head.count('property="og:title"') == 1, path
+        assert "lex-motion.css" in head, path
+        assert 'property="og:' not in body, path
+
+    def test_bar_offers_sign_in_and_account_menu(self, client):
+        html = client.get("/convert").get_data(as_text=True)
+        assert 'href="/login"' in html and "/auth/login" not in html
+        assert 'id="lexAccount"' in html and 'id="lexSignOut"' in html
+
+    def test_billing_success_needs_a_real_subscription(self, client):
+        # Anyone could open the redirect URL and be told their plan was active.
+        html = client.get("/billing/success?tier=firm").get_data(as_text=True)
+        assert "You're on the" not in html
+        assert "Sign in to see your plan" in html
+
+    def test_page_transitions_never_strand_a_blank_page(self):
+        from pathlib import Path
+        js = (Path(__file__).resolve().parents[1] / "static" / "lex-design-system.js").read_text()
+        assert "pageshow" in js                      # back/forward restores the page
+        assert "download|export" in js               # file links don't fade the page out
+        assert "__lexDesignSystem" in js             # loaded by _nav.html and by pages: runs once
+
+
+class TestBusyMessage:
+    def test_daily_limit_says_so_with_the_real_wait(self):
+        import app as app_module
+        msg = app_module._busy_message(
+            "Rate limit reached ... on tokens per day (TPD): Limit 200000, Used 199718, "
+            "Requested 6344. Please try again in 43m38.784s.")
+        assert "daily limit" in msg and "about 44 minutes" in msg
+
+    def test_per_minute_limit(self):
+        import app as app_module
+        msg = app_module._busy_message("Rate limit ... tokens per minute (TPM). Please try again in 2.1s.")
+        assert msg.endswith("try again in a minute.")
+        assert "daily" not in app_module._busy_message("Error code: 429 - rate_limit_exceeded")
+
+
 # ────────────────────────────── JSON contracts ─────────────────────────────
 class TestJsonContracts:
     def test_status_json_shape(self, client):

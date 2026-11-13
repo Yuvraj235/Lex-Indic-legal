@@ -10,7 +10,7 @@
 <style>
   :root{
     --navy:#0f2850; --navy-deep:#0a1a35;
-    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f; --gold-ink:#86650f;
     --grey-100:#f6f7fb; --grey-300:#d9dde6; --grey-500:#6b7280; --grey-700:#2d3748;
     --green:#146432; --green-light:#e8f7ed;
     --red:#b41e1e; --red-light:#fff0f0;
@@ -59,13 +59,14 @@
   .msg.ok{background:var(--green-light);color:var(--green);border:1px solid #c8e8d0}
   .msg.err{background:var(--red-light);color:var(--red);border:1px solid #f0c8c8}
   .footer{margin-top:24px;text-align:center;font-size:12px;color:var(--grey-500)}
-  .footer a{color:var(--gold);text-decoration:none}
+  .footer a{color:var(--gold-ink);text-decoration:none}
   .footer a:hover{text-decoration:underline}
   .dev-banner{
     background:#fff7d6;border:1px solid #f5e0a0;color:#7a5a00;
     border-radius:8px;padding:9px 12px;font-size:12px;margin-top:14px;
   }
 </style>
+  {% include '_head.html' %}
 </head>
 <body>
   {% include '_nav.html' %}

@@ -26,6 +26,7 @@
   --colour-gold:        #b48c28;
   --colour-gold-light:  #d4a843;
   --colour-gold-glow:   #f0c44f;
+  --colour-gold-ink:    #86650f;   /* gold for text on light backgrounds (5.4:1 on white) */
   --colour-cream:       #f5f1e8;
   --colour-grey-100:    #f6f7fb;
   --colour-grey-200:    #ecf0f7;
@@ -291,7 +292,7 @@ body {
 }
 .ds-btn-ghost:hover:not(:disabled) {
   border-color: var(--colour-gold);
-  color: var(--colour-gold);
+  color: var(--colour-gold-ink);
   transform: translateY(-1px);
   box-shadow: var(--shadow-2);
 }
@@ -537,7 +538,7 @@ body {
   display: inline-block;
   font-size: var(--type-xs);
   font-weight: 700;
-  color: var(--colour-gold);
+  color: var(--colour-gold-ink);
   text-transform: uppercase;
   letter-spacing: 1.6px;
   margin-bottom: var(--space-3);

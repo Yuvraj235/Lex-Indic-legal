@@ -10,7 +10,7 @@
 <style>
   :root{
     --navy:#0f2850; --navy-deep:#0a1a35;
-    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f; --gold-ink:#86650f;
     --green:#146432; --green-light:#e8f7ed;
     --red:#b41e1e; --red-light:#fff0f0;
     --amber:#fff7d6; --amber-text:#7a5a00;
@@ -55,7 +55,7 @@
   .drop{display:block;border:2px dashed var(--grey-300);border-radius:10px;padding:24px;text-align:center;
         cursor:pointer;transition:all .3s;color:var(--grey-500);font-size:13px}
   .drop.dragging,.drop:hover{border-color:var(--gold);background:#fffbf0;color:var(--navy)}
-  .drop strong{color:var(--gold);font-weight:600}
+  .drop strong{color:var(--gold-ink);font-weight:600}
 
   .filelist{margin-top:12px}
   .file-chip{display:inline-flex;align-items:center;gap:6px;
@@ -82,7 +82,7 @@
   .btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 22px rgba(180,140,40,.45)}
   .btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
   .btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--grey-300);font-size:12.5px;padding:7px 12px}
-  .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold-ink)}
 
   .loading{text-align:center;padding:30px;color:var(--grey-500);font-size:14px}
   .spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--grey-200);
@@ -114,6 +114,7 @@
   .cell-missing{color:var(--grey-500);font-style:italic}
   .cell-error{color:var(--red);font-style:italic}
 </style>
+  {% include '_head.html' %}
 </head>
 <body>
   {% include '_nav.html' %}

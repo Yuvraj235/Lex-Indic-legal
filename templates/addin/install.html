@@ -10,7 +10,7 @@
 <style>
   :root{
     --navy:#0f2850; --navy-deep:#0a1a35;
-    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f; --gold-ink:#86650f;
     --cream:#f5f1e8; --grey-100:#f6f7fb; --grey-200:#ecf0f7;
     --grey-300:#d9dde6; --grey-500:#6b7280; --grey-700:#2d3748;
     --green:#146432; --green-light:#e8f7ed;
@@ -48,7 +48,7 @@
   main{max-width:840px;margin:48px auto;padding:0 clamp(20px,4vw,40px)}
   .eyebrow{
     display:inline-block;font-size:12px;font-weight:700;
-    color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;
+    color:var(--gold-ink);text-transform:uppercase;letter-spacing:1.5px;
     margin-bottom:10px;
   }
   h1{font-family:'Playfair Display',serif;font-size:clamp(28px,4vw,42px);line-height:1.15;margin-bottom:14px;font-weight:700}
@@ -109,7 +109,7 @@
   }
   .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(180,140,40,.45)}
   .btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--grey-300)}
-  .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold-ink)}
 
   .callout{
     background:linear-gradient(135deg,rgba(180,140,40,.06),rgba(180,140,40,.02));
@@ -132,30 +132,11 @@
     border-top:1px solid var(--grey-300);
   }
 </style>
+  {% include '_head.html' %}
 </head>
 <body>
 
-<header class="top">
-  <div class="top-inner">
-    <a href="/" class="brand">
-      <div class="brand-mark">L</div>
-      <span class="brand-name">Lex-Indic</span>
-    </a>
-    <nav class="nav">
-      <a href="/" data-i18n="nav.landing">Landing</a>
-      <a href="/app" data-i18n="nav.analyze">Analyze a case</a>
-      <a href="/convert" data-i18n="nav.convert">Convert IPC → BNS</a>
-      <a href="/addin/install" style="color:var(--gold-glow)" data-i18n="nav.addin">Word add-in</a>
-    
-      <div class="btn-group btn-group-sm" role="group" aria-label="Language" style="margin-left:auto;display:flex;gap:0">
-        <button type="button" onclick="setLexLang('en')" id="lexLangEn"
-                style="background:transparent;border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.78);padding:5px 12px;border-radius:6px 0 0 6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">EN</button>
-        <button type="button" onclick="setLexLang('hi')" id="lexLangHi"
-                style="background:transparent;border:1px solid rgba(255,255,255,.25);border-left:0;color:rgba(255,255,255,.78);padding:5px 12px;border-radius:0 6px 6px 0;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">हिन्दी</button>
-      </div>
-    </nav>
-  </div>
-</header>
+{% include '_nav.html' %}
 
 <main>
   <div class="eyebrow">Day-2 wedge feature</div>
@@ -270,7 +251,7 @@ https://localhost:8443</pre>
 
   <div class="footer">
     Lex-Indic v1.2 · Word Add-in v1.0 ·
-    <a href="https://github.com/Yuvraj235/Lex-Indic-legal" target="_blank" style="color:var(--gold)">Source on GitHub</a>
+    <a href="https://github.com/Yuvraj235/Lex-Indic-legal" target="_blank" style="color:var(--gold-ink)">Source on GitHub</a>
   </div>
 </main>
 

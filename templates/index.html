@@ -160,7 +160,7 @@
       cursor: pointer;
       transition: all var(--dur-fast) var(--ease-out);
     }
-    .speak-btn:hover { border-color: var(--colour-gold); color: var(--colour-gold); }
+    .speak-btn:hover { border-color: var(--colour-gold); color: var(--colour-gold-ink); }
     .speak-btn.listening { background: var(--colour-red); color: #fff; border-color: var(--colour-red); }
 
     /* Analyze (run) button — premium gold gradient */
@@ -195,7 +195,7 @@
     .btn-outline-secondary:hover {
       background: var(--colour-grey-100);
       border-color: var(--colour-gold) !important;
-      color: var(--colour-gold);
+      color: var(--colour-gold-ink);
     }
 
     /* Language radio (Day-4) */
@@ -268,7 +268,7 @@
       margin-bottom: 14px;
       display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
     }
-    .sources-header strong { color: var(--colour-gold); font-weight: 700; }
+    .sources-header strong { color: var(--colour-gold-ink); font-weight: 700; }
     .sources-list {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(244px, 1fr));
@@ -524,7 +524,7 @@
     }
     .btn-find-resource:hover {
       border-color: var(--colour-gold);
-      color: var(--colour-gold);
+      color: var(--colour-gold-ink);
       transform: translateY(-1px);
       box-shadow: var(--shadow-2);
     }
@@ -556,6 +556,7 @@
       to { opacity: 1; transform: translateY(0); }
     }
   </style>
+  {% include '_head.html' %}
 </head>
 <body>
   {% include '_nav.html' %}
@@ -1170,7 +1171,7 @@
       &bull; "What is BNS Section 85?"<br>
       &bull; "My husband is demanding dowry — which law applies?"<br>
       &bull; "What replaced IPC 498A?"<br><br>
-      <i class="bi bi-mic-fill" style="color:var(--gold)"></i> <strong>Voice enabled</strong> — click the mic to speak your question!
+      <i class="bi bi-mic-fill" style="color:var(--colour-gold-ink)"></i> <strong>Voice enabled</strong> — click the mic to speak your question!
     </div>
   </div>
 
@@ -1224,7 +1225,7 @@ function updateCharCount() {
   const n = document.getElementById('clientStory').value.length;
   const el = document.getElementById('charCount');
   el.textContent = n + ' characters';
-  el.className = n < 50 ? 'text-warning small' : 'text-muted small';
+  el.className = n < 50 ? 'small lx-text-warn' : 'text-muted small';
 }
 
 // ── Panel visibility helpers ─────────────────────────────────────────────────

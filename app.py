@@ -1416,7 +1416,41 @@ def _convert_preflight():
 # ROUTE 2: Run legal triage — the core API endpoint
 # ═══════════════════════════════════════════════════════════════════════════════
 class _ProviderBusy(Exception):
-    """The hosted LLM is rate-limiting us; the caller should retry later."""
+    """The hosted LLM is rate-limiting us; the caller should retry later.
+    retry_after: seconds the provider asked for (None if it didn't say);
+    daily: the daily allowance is used up (waiting a minute won't help)."""
+
+    def __init__(self, message: str, retry_after: float | None = None, daily: bool = False):
+        super().__init__(message)
+        self.retry_after, self.daily = retry_after, daily
+
+
+def _retry_after_seconds(provider_error: str) -> float | None:
+    m = re.search(r"try again in (?:(\d+)h)?(?:(\d+)m)?([\d.]+)s", provider_error)
+    if not m:
+        return None
+    return int(m.group(1) or 0) * 3600 + int(m.group(2) or 0) * 60 + float(m.group(3))
+
+
+def _is_daily_limit(provider_error: str) -> bool:
+    return bool(re.search(r"tokens per day|TPD|requests per day|RPD", provider_error))
+
+
+def _busy_message(provider_error: str) -> str:
+    """What to tell the user when the hosted model refuses a request. A
+    per-minute limit clears within a minute; the daily token allowance can
+    take much longer, and the provider says how long."""
+    wait = re.search(r"try again in ((?:\d+h)?(?:\d+m)?[\d.]+s)", provider_error)
+    when = ""
+    if wait:
+        h, m, sec = (re.search(r"(\d+)h", wait.group(1)), re.search(r"(\d+)m", wait.group(1)),
+                     re.search(r"([\d.]+)s", wait.group(1)))
+        minutes = (int(h.group(1)) * 60 if h else 0) + (int(m.group(1)) if m else 0) + (1 if sec else 0)
+        when = f"about {minutes} minutes" if minutes > 1 else "a minute"
+    if re.search(r"tokens per day|TPD|requests per day|RPD", provider_error):
+        return ("The AI provider's daily limit for this server has been reached. "
+                f"Please try again in {when or 'a few hours'}.")
+    return f"The AI provider is rate-limiting requests. Please try again in {when or 'a minute'}."
 
 
 def _repair_prompt(prompt: str, draft: str, feedback: list[str]) -> str:
@@ -1458,6 +1492,11 @@ def _hybrid_generate(prompt: str, generate_local, generate_remote) -> tuple[str,
     if not repair["attempted"]:
         return text, "local", repair
     return text, f"local draft → {fixer[-1] if fixer else 'no'} fix", repair
+
+
+# Longest wait for the hosted model's per-minute window before the correction
+# pass gives up and the verified-but-flagged first draft ships.
+_REPAIR_MAX_WAIT_S = float(os.getenv("REPAIR_MAX_WAIT_S", "65"))
 
 
 def _check_and_repair(draft: str, prompt: str, generate) -> tuple[str, dict]:
@@ -1651,7 +1690,8 @@ def analyze():
                     if not ("429" in err or "rate_limit" in err.lower()):
                         raise
                     if attempt == 2:
-                        raise _ProviderBusy("The AI provider is rate-limiting requests.") from e
+                        raise _ProviderBusy(_busy_message(err), _retry_after_seconds(err),
+                                            _is_daily_limit(err)) from e
                     time.sleep(2 * (attempt + 1))
             return ""
 
@@ -1669,7 +1709,21 @@ def analyze():
 
         # ── Step 2b: check the draft; one targeted correction pass if needed ──
         if repair is None:
-            ai_response, repair = _check_and_repair(ai_response, prompt, generate)
+            def repair_generate(message: str) -> str:
+                # On Groq's free tier one analysis uses most of the per-minute
+                # token allowance, so the correction call right after it is
+                # usually refused. Wait the few seconds Groq asks for (never for
+                # a used-up daily allowance) instead of shipping the flagged draft.
+                try:
+                    return generate(message)
+                except _ProviderBusy as busy:
+                    wait = busy.retry_after
+                    if busy.daily or wait is None or wait > _REPAIR_MAX_WAIT_S:
+                        raise
+                    _audit_extra["repair_waited_s"] = round(wait + 1, 1)
+                    time.sleep(wait + 1)
+                    return generate(message)
+            ai_response, repair = _check_and_repair(ai_response, prompt, repair_generate)
         _audit_extra["self_correction"] = repair
 
         # ── Step 3: Save text output ──────────────────────────────────────────
@@ -1752,7 +1806,7 @@ def analyze():
         )
         if isinstance(e, _ProviderBusy):
             return jsonify({
-                "error": f"{e} Please try again in a minute.",
+                "error": str(e),
                 "request_id": request_id,
             }), 503
         return jsonify({
@@ -2662,10 +2716,14 @@ def billing_stub_confirm():
 
 @app.route("/billing/success")
 def billing_success():
-    """Real Stripe success-redirect target."""
-    return render_template("billing_success.html", subscription=None,
-                           mode=billing_module.get_mode(),
-                           tier=request.args.get("tier", "firm"))
+    """Stripe success-redirect target. Shows the plan only once the signed-in
+    user's subscription is actually active — Stripe's webhook can arrive a few
+    seconds after the redirect, and the URL alone proves nothing."""
+    user = _current_user()
+    sub = billing_module.active_subscription(user["id"]) if user else None
+    return render_template("billing_success.html", subscription=sub,
+                           mode=billing_module.get_mode(), signed_in=bool(user),
+                           tier=(sub or {}).get("tier") or request.args.get("tier", "firm"))
 
 
 @app.route("/billing/stripe-webhook", methods=["POST"])

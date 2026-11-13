@@ -9,7 +9,7 @@
 <style>
   :root{
     --navy:#0f2850; --navy-deep:#0a1a35;
-    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f; --gold-ink:#86650f;
     --green:#146432; --green-light:#e8f7ed;
     --red:#b41e1e; --red-light:#fff0f0;
     --grey-100:#f6f7fb; --grey-200:#ecf0f7; --grey-300:#d9dde6;
@@ -42,7 +42,7 @@
     font-weight:900;font-size:20px;
   }
   .brand-name{font-weight:800;font-size:18px}
-  .eyebrow{font-size:12px;font-weight:700;color:var(--gold);
+  .eyebrow{font-size:12px;font-weight:700;color:var(--gold-ink);
            text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px}
   h1{font-family:'Playfair Display',serif;font-size:30px;font-weight:700;
      line-height:1.15;margin-bottom:8px;letter-spacing:-.01em}
@@ -84,7 +84,7 @@
   .msg.err{background:var(--red-light);color:var(--red);border:1px solid #f0c8c8}
 
   .skip{text-align:center;margin-top:18px;font-size:13px;color:var(--grey-500)}
-  .skip a{color:var(--gold);text-decoration:none;font-weight:600}
+  .skip a{color:var(--gold-ink);text-decoration:none;font-weight:600}
   .skip a:hover{text-decoration:underline}
 
   .reassurance{
@@ -94,6 +94,7 @@
   }
   .reassurance strong{color:var(--navy)}
 </style>
+  {% include '_head.html' %}
 </head>
 <body>
   {% include '_nav.html' %}
@@ -158,7 +159,7 @@
     <div class="reassurance">
       <strong>Your info stays with Lex-Indic.</strong>  We use it only to
       reply to you about your interest.  No mailing list, no third-party
-      sharing.  Audit trail in our <a href="/trust" style="color:var(--gold);text-decoration:none">trust page</a>.
+      sharing.  Audit trail in our <a href="/trust" style="color:var(--gold-ink);text-decoration:none">trust page</a>.
     </div>
 
     <div class="skip">

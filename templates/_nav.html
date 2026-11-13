@@ -1,157 +1,13 @@
 <!--
-  Lex-Indic shared top-navigation bar + favicon + Open Graph meta.
-  Include in every template with the standard Jinja include directive.
-  Highlights the active page via data-current-path.
+  Lex-Indic shared top bar. Include right after <body>; the matching styles,
+  favicon and preview tags live in _head.html (include that inside <head>).
+  Highlights the active page; shows "Sign in" or the account menu.
 -->
-
-<!-- Favicon + Open Graph + Twitter Card (polish sprint) -->
-<link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
-<link rel="apple-touch-icon" href="/static/img/favicon.svg">
-<meta property="og:title" content="Lex-Indic — AI Junior Associate for Indian Law">
-<meta property="og:description" content="The BNS Transition Engine. Citation-traceable legal analysis, DPDP-compliant audit, white-label PDFs. Free for NALSA panel advocates.">
-<meta property="og:image" content="/static/img/og-card.svg">
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://lex-indic.in">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Lex-Indic — AI Junior Associate for Indian Law">
-<meta name="twitter:description" content="BNS / BNSS / BSA — citation-traceable, DPDP-compliant. 31 days shipped.">
-<meta name="twitter:image" content="/static/img/og-card.svg">
-<meta name="theme-color" content="#0f2850">
-<style>
-  .lex-topbar {
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    width: 100%;
-    background: linear-gradient(135deg, #0f2850 0%, #1a3a6e 100%);
-    color: #fff;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    font-size: 13.5px;
-  }
-  .lex-topbar-inner {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 9px 18px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-wrap: wrap;
-  }
-  .lex-brand {
-    font-weight: 700;
-    color: #f0a500;
-    font-size: 15px;
-    margin-right: 18px;
-    text-decoration: none;
-    letter-spacing: 0.5px;
-  }
-  .lex-brand:hover { color: #ffc94c; }
-  .lex-nav-link {
-    color: rgba(255,255,255,0.85);
-    text-decoration: none;
-    padding: 6px 11px;
-    border-radius: 6px;
-    transition: all 0.15s;
-    white-space: nowrap;
-  }
-  .lex-nav-link:hover {
-    background: rgba(255,255,255,0.1);
-    color: #fff;
-  }
-  .lex-nav-link.active {
-    background: rgba(240, 165, 0, 0.2);
-    color: #f0a500;
-    font-weight: 600;
-  }
-  .lex-nav-group {
-    display: flex;
-    gap: 2px;
-    align-items: center;
-  }
-  .lex-nav-divider {
-    width: 1px;
-    height: 16px;
-    background: rgba(255,255,255,0.2);
-    margin: 0 6px;
-  }
-  .lex-nav-admin {
-    margin-left: auto;
-    display: flex;
-    gap: 2px;
-    align-items: center;
-  }
-  .lex-nav-admin .lex-nav-link {
-    font-size: 12px;
-    color: rgba(255,255,255,0.6);
-  }
-  .lex-nav-admin .lex-nav-link:hover {
-    color: #f0a500;
-  }
-  .lex-lang {
-    display: flex;
-    margin-left: 10px;
-  }
-  .lex-lang[hidden] { display: none; }
-  .lex-lang button {
-    background: transparent;
-    border: 1px solid rgba(255,255,255,0.25);
-    color: rgba(255,255,255,0.78);
-    padding: 4px 11px;
-    font-family: inherit;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .lex-lang button:first-child { border-radius: 6px 0 0 6px; }
-  .lex-lang button:last-child { border-radius: 0 6px 6px 0; border-left: 0; }
-  .lex-lang button.active {
-    background: rgba(240,196,79,0.18);
-    color: #f0c44f;
-  }
-  @media (max-width: 900px) {
-    .lex-nav-divider, .lex-brand { display: none; }
-    .lex-nav-admin { margin-left: 0; }
-    .lex-topbar-inner { padding: 7px 10px; gap: 2px; }
-    .lex-nav-link { padding: 5px 8px; font-size: 12.5px; }
-  }
-  @media (max-width: 600px) {
-    .lex-nav-link { padding: 5px 7px; font-size: 12px; }
-    .lex-nav-admin .lex-nav-link { font-size: 11px; }
-    /* One swipeable row instead of links spilling past the screen edge
-       (which made phones render every page zoomed out). */
-    .lex-topbar-inner {
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-    .lex-topbar-inner::-webkit-scrollbar { display: none; }
-    .lex-lang { order: -1; margin: 0 6px 0 0; }
-  }
-
-  /* Shared empty-state styling — used by /matters /monitors /webhooks etc. */
-  .lex-empty {
-    text-align: center;
-    padding: 40px 22px;
-    color: #888;
-    background: rgba(15,40,80,0.03);
-    border: 2px dashed rgba(15,40,80,0.15);
-    border-radius: 10px;
-    margin: 16px 0;
-  }
-  .lex-empty .lex-empty-icon { font-size: 42px; margin-bottom: 10px; opacity: 0.5; }
-  .lex-empty h3 { color: #0f2850; font-size: 17px; margin: 0 0 6px; }
-  .lex-empty p { font-size: 13px; margin: 0 0 14px; max-width: 380px; margin-left: auto; margin-right: auto; }
-  .lex-empty .btn { display: inline-block; padding: 9px 16px; background: #0f2850; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; }
-  .lex-empty .btn:hover { background: #1a3a6e; color: #fff; }
-</style>
-
-<nav class="lex-topbar" id="lexTopbar" data-current-path="{{ request.path if request else '/' }}">
+<nav class="lex-topbar" id="lexTopbar" data-current-path="{{ request.path if request else '/' }}" aria-label="Main">
   <div class="lex-topbar-inner">
-    <a href="/" class="lex-brand">LEX-INDIC</a>
+    <a href="/" class="lex-brand" aria-label="Lex-Indic home"><span class="lex-brand-mark">L</span><span class="lex-brand-text">LEX-INDIC</span></a>
 
     <div class="lex-nav-group">
-      <a href="/" class="lex-nav-link" data-path="/">Home</a>
       <a href="/app" class="lex-nav-link" data-path="/app">Case Brief</a>
       <a href="/convert" class="lex-nav-link" data-path="/convert">Convert</a>
       <a href="/tabular" class="lex-nav-link" data-path="/tabular">Contract Review</a>
@@ -160,63 +16,123 @@
       <a href="/ecourts" class="lex-nav-link" data-path="/ecourts">e-Courts</a>
     </div>
 
-    <span class="lex-nav-divider"></span>
+    <span class="lex-nav-divider" aria-hidden="true"></span>
 
     <div class="lex-nav-group">
       <a href="/pricing" class="lex-nav-link" data-path="/pricing">Pricing</a>
       <a href="/nalsa" class="lex-nav-link" data-path="/nalsa">NALSA (Free)</a>
       <a href="/trust" class="lex-nav-link" data-path="/trust">Trust + DPDP</a>
-      <a href="/status" class="lex-nav-link" data-path="/status">Status</a>
     </div>
 
-    <div class="lex-nav-admin">
-      <a href="/api/v1/docs" class="lex-nav-link" data-path="/api/v1/docs">API Docs</a>
-      <a href="/dashboard" class="lex-nav-link" data-path="/dashboard">Dashboard</a>
-      <a href="/admin/soc2" class="lex-nav-link" data-path="/admin/soc2">SOC 2</a>
-      <a href="/admin/api-keys" class="lex-nav-link" data-path="/admin/api-keys">API Keys</a>
-      <a href="/webhooks" class="lex-nav-link" data-path="/webhooks">Webhooks</a>
-      <a href="/profile" class="lex-nav-link" data-path="/profile">Profile</a>
-      <a href="/auth/login" class="lex-nav-link" data-path="/auth/login">Login</a>
-    </div>
+    <div class="lex-nav-right">
+      <details class="lex-menu" id="lexMore">
+        <summary data-paths="/status /audit /dashboard /admin/soc2 /api/v1/docs /addin/install">More <span class="lex-caret" aria-hidden="true"></span></summary>
+        <div class="lex-menu-panel" role="menu">
+          <div class="lex-menu-label">Workspace</div>
+          <a href="/audit" data-path="/audit" role="menuitem">Statute migration audit</a>
+          <a href="/status" data-path="/status" role="menuitem">System status</a>
+          <a href="/addin/install" data-path="/addin/install" role="menuitem">Word add-in</a>
+          <div class="lex-menu-label">Developers</div>
+          <a href="/api/v1/docs" data-path="/api/v1/docs" role="menuitem">API docs</a>
+          <a href="/profile#api-keys" role="menuitem">API keys</a>
+          <a href="/status#webhooks" role="menuitem">Webhooks</a>
+          <div class="lex-menu-label">Admin</div>
+          <a href="/dashboard" data-path="/dashboard" role="menuitem">Operator dashboard</a>
+          <a href="/admin/soc2" data-path="/admin/soc2" role="menuitem">SOC 2 readiness</a>
+        </div>
+      </details>
 
-    <div class="lex-lang" id="lexLangSwitch" role="group" aria-label="Language" hidden>
-      <button type="button" id="lexLangEn" data-lang="en">EN</button>
-      <button type="button" id="lexLangHi" data-lang="hi">हिन्दी</button>
+      <div class="lex-lang" id="lexLangSwitch" role="group" aria-label="Language" hidden>
+        <button type="button" id="lexLangEn" data-lang="en">EN</button>
+        <button type="button" id="lexLangHi" data-lang="hi">हिन्दी</button>
+      </div>
+
+      <a href="/login" class="lex-signin" id="lexSignIn" hidden>Sign in</a>
+      <details class="lex-menu lex-account" id="lexAccount" hidden>
+        <summary aria-label="Account"><span class="lex-avatar" id="lexAvatar">·</span><span class="lex-caret" aria-hidden="true"></span></summary>
+        <div class="lex-menu-panel" role="menu">
+          <div class="lex-menu-email" id="lexAccountEmail"></div>
+          <a href="/profile" data-path="/profile" role="menuitem">Profile &amp; preferences</a>
+          <a href="/profile#api-keys" role="menuitem">API keys</a>
+          <button type="button" id="lexSignOut" role="menuitem">Sign out</button>
+        </div>
+      </details>
     </div>
   </div>
 </nav>
 
 <script>
-  // Highlight the active nav link based on current path
-  (function() {
+  (function () {
     const topbar = document.getElementById('lexTopbar');
     if (!topbar) return;
-    const current = (topbar.dataset.currentPath || window.location.pathname).replace(/\/$/, '') || '/';
-    topbar.querySelectorAll('.lex-nav-link').forEach(link => {
-      const linkPath = (link.dataset.path || '').replace(/\/$/, '') || '/';
-      if (linkPath === current ||
-          (linkPath !== '/' && current.startsWith(linkPath))) {
-        link.classList.add('active');
-      }
-    });
-  })();
+    const current = (topbar.dataset.currentPath || location.pathname).replace(/\/$/, '') || '/';
+    const matches = p => p && (p === current || (p !== '/' && current.startsWith(p + '/')));
 
-  // Full-height layouts under the bar (e.g. /app) size themselves with
-  // calc(100vh - var(--lex-topbar-h)); the bar wraps to two rows on narrow screens.
-  (function() {
-    const topbar = document.getElementById('lexTopbar');
-    if (!topbar) return;
+    // Active page: links in the bar and inside the menus; a menu's summary
+    // is highlighted when the current page lives inside it.
+    topbar.querySelectorAll('[data-path]').forEach(a => {
+      if (matches((a.dataset.path || '').replace(/\/$/, ''))) a.classList.add('active');
+    });
+    topbar.querySelectorAll('summary[data-paths]').forEach(s => {
+      if (s.dataset.paths.split(' ').some(matches)) s.classList.add('active');
+    });
+
+    // Full-height layouts under the bar (e.g. /app) size themselves with
+    // calc(100vh - var(--lex-topbar-h)).
     const setHeight = () =>
       document.documentElement.style.setProperty('--lex-topbar-h', topbar.offsetHeight + 'px');
     setHeight();
     if (window.ResizeObserver) new ResizeObserver(setHeight).observe(topbar);
-  })();
 
-  // EN / हिन्दी switch — shown only on pages that ship an i18n runtime
-  // (setLexLang on most pages, setUiLang on /app).
-  (function() {
+    // Deeper shadow once the page scrolls under the bar.
+    const onScroll = () => topbar.classList.toggle('is-scrolled', window.scrollY > 4);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
+    // Menus: one open at a time; close on outside click or Escape.
+    const menus = [...topbar.querySelectorAll('details.lex-menu')];
+    menus.forEach(m => m.addEventListener('toggle', () => {
+      if (m.open) menus.forEach(o => { if (o !== m) o.open = false; });
+    }));
+    document.addEventListener('click', e => {
+      menus.forEach(m => { if (m.open && !m.contains(e.target)) m.open = false; });
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') menus.forEach(m => { if (m.open) { m.open = false; m.querySelector('summary').focus(); } });
+    });
+
+    // Account: "Sign in" when signed out, the account menu when signed in.
+    const signIn = document.getElementById('lexSignIn');
+    const account = document.getElementById('lexAccount');
+    const showUser = user => {
+      if (user && user.email) {
+        document.getElementById('lexAvatar').textContent = user.email.charAt(0).toUpperCase();
+        document.getElementById('lexAccountEmail').textContent = user.email;
+        account.hidden = false; signIn.hidden = true;
+      } else {
+        account.hidden = true; signIn.hidden = current === '/login';
+      }
+    };
+    let cached = null;
+    try { cached = JSON.parse(sessionStorage.getItem('lexindic.me') || 'null'); } catch (e) {}
+    if (cached) showUser(cached.user);
+    fetch('/auth/me', { credentials: 'same-origin' })
+      .then(r => r.ok ? r.json() : { authenticated: false })
+      .then(d => {
+        const user = d.authenticated ? d.user : null;
+        try { sessionStorage.setItem('lexindic.me', JSON.stringify({ user })); } catch (e) {}
+        showUser(user);
+      })
+      .catch(() => showUser(cached && cached.user));
+    document.getElementById('lexSignOut').addEventListener('click', async () => {
+      try { await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch (e) {}
+      try { sessionStorage.removeItem('lexindic.me'); } catch (e) {}
+      location.href = '/login';
+    });
+
+    // EN / हिन्दी switch — shown only on pages that ship an i18n runtime
+    // (setLexLang on most pages, setUiLang on /app).
     const sw = document.getElementById('lexLangSwitch');
-    if (!sw) return;
     const mark = lang => sw.querySelectorAll('button').forEach(
       b => b.classList.toggle('active', b.dataset.lang === lang));
     sw.addEventListener('click', e => {
@@ -235,3 +151,4 @@
     });
   })();
 </script>
+<script src="/static/lex-design-system.js" defer></script>

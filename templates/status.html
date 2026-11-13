@@ -10,7 +10,7 @@
 <style>
   :root{
     --navy:#0f2850; --navy-deep:#0a1a35;
-    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f; --gold-ink:#86650f;
     --green:#146432; --green-light:#e8f7ed;
     --red:#b41e1e; --red-light:#fff0f0;
     --amber:#fff7d6; --amber-text:#7a5a00;
@@ -78,7 +78,7 @@
   th{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--grey-500)}
   .endpoint-ok{color:var(--green);font-weight:700}
   .endpoint-fail{color:var(--red);font-weight:700}
-  code{background:var(--grey-200);padding:1px 6px;border-radius:3px;
+  code{background:var(--grey-200);color:var(--grey-700);padding:1px 6px;border-radius:3px;
        font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px}
   .stamp{font-size:11.5px;color:var(--grey-500);text-align:right;margin-top:10px}
 
@@ -112,6 +112,7 @@
   .ok{padding:9px 12px;border-radius:6px;font-size:12.5px;
       background:var(--green-light);color:var(--green);border:1px solid #c8e8d0;margin-top:8px}
 </style>
+  {% include '_head.html' %}
 </head>
 <body>
   {% include '_nav.html' %}
@@ -147,7 +148,7 @@
   </div>
 
   <!-- Webhooks -->
-  <div class="card" style="margin-top:6px">
+  <div class="card" id="webhooks" style="margin-top:6px;scroll-margin-top:70px">
     <h2><span class="card-icon">↗</span> Webhooks</h2>
     <p style="font-size:12.5px;color:var(--grey-500);margin-bottom:12px">
       Register a URL to receive signed HTTP POSTs when events happen.
@@ -176,10 +177,10 @@
     <button class="btn btn-primary" onclick="addWebhook()">+ Subscribe</button>
     <div id="whMsg"></div>
 
-    <h2 style="margin-top:20px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--gold)">Active subscriptions</h2>
+    <h2 style="margin-top:20px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--gold-ink)">Active subscriptions</h2>
     <div id="whList"></div>
 
-    <h2 style="margin-top:20px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--gold)">Recent deliveries</h2>
+    <h2 style="margin-top:20px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--gold-ink)">Recent deliveries</h2>
     <div id="whDeliveries"></div>
   </div>
 

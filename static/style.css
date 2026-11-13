@@ -55,9 +55,9 @@ body {
 }
 .sidebar-header { padding: 14px 12px 8px; }
 .btn-new-case {
-  background: var(--gold);
+  background: linear-gradient(135deg, var(--gold), #d4a843);
   border: none;
-  color: #fff;
+  color: #0a1a35;
   font-weight: 700;
   font-size: 0.88rem;
   padding: 8px 14px;
@@ -301,7 +301,7 @@ body {
 #chatBubble i { color: var(--gold); font-size: 1.5rem; }
 #chatBubble .chat-badge {
   position: absolute; top: -6px; right: -10px;
-  background: var(--gold); color: #fff;
+  background: #f0c44f; color: #0a1a35;
   font-size: 0.55rem; font-weight: 700;
   padding: 2px 6px; border-radius: 10px;
   letter-spacing: 0.5px;
@@ -338,7 +338,7 @@ body {
   justify-content: space-between;
 }
 .chat-header-title { color: #fff; font-weight: 700; font-size: 0.95rem; }
-.chat-header-sub   { color: rgba(255,255,255,0.55); font-size: 0.72rem; }
+.chat-header-sub   { color: rgba(255,255,255,0.72); font-size: 0.72rem; }
 .chat-close-btn {
   background: none; border: none; color: rgba(255,255,255,0.6);
   font-size: 1.1rem; cursor: pointer; padding: 0; line-height: 1;
@@ -479,7 +479,7 @@ body {
 .voice-toggle-btn {
   background: rgba(255,255,255,0.15);
   border: 1px solid rgba(255,255,255,0.25);
-  color: var(--gold);
+  color: #f0c44f;
   font-size: 0.7rem;
   font-weight: 600;
   border-radius: 12px;
@@ -819,3 +819,6 @@ body {
   .find-help-card { flex-direction: column; align-items: flex-start; }
   .sources-list { grid-template-columns: 1fr; }
 }
+
+/* Short-story hint under the intake box (Bootstrap's yellow is 1.6:1 on white) */
+.lx-text-warn { color: #8a5d00; font-weight: 600; }

@@ -6,27 +6,45 @@
   <title>Subscription active · Lex-Indic</title>
   <link rel="stylesheet" href="/static/lex-design-system.css" />
   <style>
-    body { background: #f7f7fb; color: #222; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; }
-    .success-shell { max-width: 540px; margin: 60px auto; padding: 0 18px; text-align: center; }
-    h1 { color: #0f2850; }
-    .checkmark { font-size: 72px; color: #6bca90; }
-    .tier-pill { display: inline-block; padding: 4px 14px; background: #f0a500; color: #fff; border-radius: 14px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .card { background: #fff; border-radius: 10px; padding: 22px; margin-top: 24px; text-align: left; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
-    .kv { font-size: 13px; color: #666; }
-    .kv b { color: #222; font-weight: 600; }
-    .btn { display: inline-block; padding: 11px 18px; background: #0f2850; color: #fff; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 14px; margin-right: 8px; }
+    body { background: var(--colour-grey-100); color: var(--colour-grey-900); font-family: var(--font-sans); margin: 0; }
+    .success-shell { max-width: 560px; margin: 64px auto; padding: 0 18px; text-align: center; }
+    h1 { font-family: var(--font-serif); color: var(--colour-navy); font-size: 30px; margin: 14px 0 8px; }
+    .lead { color: #4a5263; }
+    .checkmark { width: 76px; height: 76px; margin: 0 auto; border-radius: 50%; display: grid; place-items: center;
+                 background: var(--colour-green-light); color: var(--colour-green); font-size: 38px; font-weight: 700;
+                 animation: lx-pop 520ms var(--ease-spring) both; }
+    .checkmark.pending { background: var(--colour-amber-light); color: #8a5d00; }
+    @keyframes lx-pop { from { transform: scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
+    .tier-pill { display: inline-block; padding: 3px 12px; background: var(--gradient-gold); color: var(--colour-navy-deep); border-radius: 14px; font-weight: 700; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .card { background: #fff; border: 1px solid var(--colour-grey-200); border-radius: var(--radius-5); padding: 20px 22px; margin-top: 24px; text-align: left; box-shadow: var(--shadow-1); }
+    .kv { font-size: 13.5px; color: #4a5263; line-height: 1.9; }
+    .kv b { color: var(--colour-navy); font-weight: 600; }
+    .btn { display: inline-block; padding: 11px 18px; background: var(--colour-navy); color: #fff; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 14px 4px 0; border: 1px solid var(--colour-navy); }
     .btn:hover { background: #1a3a6e; color: #fff; }
-    .btn-ghost { background: transparent; color: #0f2850; border: 1px solid #0f2850; }
-    .mode-note { background: #fff5d5; border: 1px solid #f0a500; padding: 10px; border-radius: 6px; font-size: 12px; color: #735200; margin-top: 18px; }
+    .btn-ghost { background: transparent; color: var(--colour-navy); }
+    .btn-ghost:hover { background: rgba(15,40,80,0.06); color: var(--colour-navy); }
+    .mode-note { background: var(--colour-amber-light); border: 1px solid #ecd28a; padding: 10px 12px; border-radius: 8px; font-size: 12.5px; color: #5c4400; margin-top: 18px; }
   </style>
+  {% include '_head.html' %}
 </head>
 <body>
   {% include '_nav.html' %}
 
   <div class="success-shell">
-    <div class="checkmark">✓</div>
-    <h1>You're on the {{ tier|capitalize }} plan!</h1>
-    <p>Your subscription is active. Welcome to Lex-Indic.</p>
+    {% if subscription %}
+    <div class="checkmark" aria-hidden="true">✓</div>
+    <h1>You're on the {{ subscription.tier|capitalize }} plan</h1>
+    <p class="lead">Your subscription is active. Welcome to Lex-Indic.</p>
+    {% elif signed_in %}
+    <div class="checkmark pending" aria-hidden="true">…</div>
+    <h1>Confirming your payment</h1>
+    <p class="lead">Stripe confirms payments to us separately — this usually takes a few seconds.
+      <a href="/billing/success" style="color:#86650f;font-weight:600">Refresh</a> to check, or see your plan on your profile.</p>
+    {% else %}
+    <div class="checkmark pending" aria-hidden="true">?</div>
+    <h1>Sign in to see your plan</h1>
+    <p class="lead">Your subscription is linked to your account.</p>
+    {% endif %}
 
     {% if subscription %}
     <div class="card">
@@ -38,17 +56,22 @@
     </div>
     {% endif %}
 
-    {% if mode == 'stub' %}
+    {% if mode == 'stub' and subscription %}
     <div class="mode-note">
-      🚧 <b>Stub mode</b> — no real payment was taken. Your Firm tier is activated
+      🚧 <b>Stub mode</b> — no real payment was taken. Your {{ subscription.tier|capitalize }} tier is activated
       in our local database for demo purposes. Switch <code>STRIPE_MODE=live</code>
       to enable real Stripe checkout.
     </div>
     {% endif %}
 
     <div style="margin-top:24px">
+      {% if signed_in or subscription %}
       <a href="/app" class="btn">Start using Lex-Indic →</a>
       <a href="/profile" class="btn btn-ghost">View profile</a>
+      {% else %}
+      <a href="/login" class="btn">Sign in</a>
+      <a href="/pricing" class="btn btn-ghost">See plans</a>
+      {% endif %}
     </div>
   </div>
 </body>

@@ -10,7 +10,7 @@
 <style>
   :root{
     --navy:#0f2850; --navy-deep:#0a1a35;
-    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f; --gold-ink:#86650f;
     --green:#146432; --green-light:#e8f7ed;
     --red:#b41e1e; --red-light:#fff0f0;
     --amber:#fff7d6; --amber-text:#7a5a00;
@@ -59,7 +59,7 @@
   .btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
   .btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--grey-300);
              font-size:12px;padding:7px 12px}
-  .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold-ink)}
 
   .demos{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:24px;font-size:12.5px;color:var(--grey-500)}
   .demos strong{color:var(--navy);margin-right:8px}
@@ -101,7 +101,7 @@
   .chip-transferred{background:var(--grey-200);color:var(--grey-700)}
 
   .case-body{padding:22px 24px}
-  .case-body h3{font-size:13px;font-weight:700;color:var(--gold);
+  .case-body h3{font-size:13px;font-weight:700;color:var(--gold-ink);
                 text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
 
   .sections{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:22px}
@@ -143,6 +143,7 @@
     font-size:12.5px;padding:9px 16px;border-radius:8px;margin:0 24px 4px;
   }
 </style>
+  {% include '_head.html' %}
 </head>
 <body>
   {% include '_nav.html' %}

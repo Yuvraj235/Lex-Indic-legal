@@ -1,0 +1,119 @@
+/* ════════════════════════════════════════════════════════════════════════
+   LEX-INDIC — motion layer (loaded on every page via _head.html)
+   Only motion and micro-interactions: no resets, no layout. Selectors use
+   :where() so a page's own rules always win.
+   Content is hidden for an entrance only after lex-design-system.js has
+   marked <html class="lx-motion">, so a script failure never hides anything.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Entrance: cards, tiles and panels rise in as they scroll into view ── */
+:where(html.lx-motion) :where(.lx-reveal) {
+  opacity: 0;
+  transform: translateY(14px);
+}
+:where(html.lx-motion) :where(.lx-reveal.lx-in) {
+  opacity: 1;
+  transform: none;
+  transition: opacity 520ms cubic-bezier(0.22, 1, 0.36, 1),
+              transform 520ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 240ms ease;
+  transition-delay: var(--lx-delay, 0ms), var(--lx-delay, 0ms), 0ms;
+}
+
+/* ── Cards lift on hover (only small, non-form cards get .lx-lift) ─────── */
+:where(.lx-lift) {
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 240ms ease, border-color 240ms ease;
+}
+:where(.lx-lift:hover) {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 34px -14px rgba(15, 40, 80, 0.28);
+}
+
+/* ── Buttons: press feedback and a soft sheen on gold buttons ─────────── */
+:where(button, .btn, .ds-btn, [role="button"], input[type="submit"]):not(:disabled):active {
+  transform: scale(0.97);
+}
+:where(button, .btn, .ds-btn, input[type="submit"]) {
+  transition: transform 140ms ease, box-shadow 200ms ease, background-color 200ms ease,
+              color 200ms ease, border-color 200ms ease, filter 200ms ease;
+}
+:where(.lx-sheen) { position: relative; overflow: hidden; isolation: isolate; }
+:where(.lx-sheen)::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%);
+  transform: translateX(-120%);
+  pointer-events: none;
+  z-index: 1;
+}
+:where(.lx-sheen:hover)::after { transform: translateX(120%); transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* ── Inputs: focus glow eases in instead of snapping ──────────────────── */
+:where(input, textarea, select) {
+  transition: border-color 180ms ease, box-shadow 220ms ease, background-color 180ms ease;
+}
+
+/* ── Drop zones breathe while a file is dragged over them ─────────────── */
+:where(.drop, .drop-zone, .lx-dropzone).dragover,
+:where(.drop, .drop-zone, .lx-dropzone).drag-over,
+:where(.drop, .drop-zone, .lx-dropzone).is-dragover {
+  animation: lx-breathe 1.2s ease-in-out infinite;
+}
+@keyframes lx-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 168, 67, 0.0); }
+  50%      { box-shadow: 0 0 0 6px rgba(212, 168, 67, 0.22); }
+}
+
+/* ── Status dots pulse ────────────────────────────────────────────────── */
+:where(.lx-pulse) { position: relative; }
+:where(.lx-pulse)::before {
+  content: ''; position: absolute; inset: -3px; border-radius: 50%;
+  border: 2px solid currentColor; opacity: 0;
+  animation: lx-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes lx-ping { 0% { transform: scale(0.8); opacity: 0.6; } 80%, 100% { transform: scale(1.8); opacity: 0; } }
+
+/* ── Skeleton shimmer for "Loading…" placeholders ─────────────────────── */
+:where(.lx-skeleton) {
+  color: transparent !important;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #eef1f6 0%, #f8f9fc 40%, #eef1f6 80%);
+  background-size: 200% 100%;
+  animation: lx-shimmer 1.3s linear infinite;
+  min-height: 1.2em;
+}
+@keyframes lx-shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+
+/* ── Page transitions (shared with lex-design-system.css) ─────────────────
+   Opacity only: a transform on <body> would re-anchor fixed elements (the
+   chat bubble, toasts) while the animation runs. */
+body { animation: lx-page-in 300ms cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes lx-page-in { from { opacity: 0; } to { opacity: 1; } }
+body.is-leaving { animation: lx-page-out 140ms ease-in forwards; }
+@keyframes lx-page-out { to { opacity: 0; transform: translateY(-4px); } }
+
+/* ── Navigation progress bar (created by lex-design-system.js) ────────── */
+#ds-progress {
+  position: fixed; top: 0; left: 0; height: 2px; width: 0%;
+  background: linear-gradient(90deg, #b48c28, #f0c44f, #b48c28);
+  background-size: 200% 100%;
+  box-shadow: 0 0 8px rgba(240, 196, 79, 0.6);
+  z-index: 10000; pointer-events: none; opacity: 0;
+  transition: width 360ms cubic-bezier(0.22, 1, 0.36, 1), opacity 120ms ease;
+}
+#ds-progress.active { opacity: 1; animation: lx-progress 1.4s linear infinite; }
+@keyframes lx-progress { from { background-position: 0 0; } to { background-position: 200% 0; } }
+#ds-scroll-progress {
+  position: fixed; bottom: 0; left: 0; height: 2px; width: 0%;
+  background: linear-gradient(90deg, #0f2850, #d4a843);
+  z-index: 999; pointer-events: none; transition: width 80ms linear;
+}
+
+/* ── Respect reduced-motion: no movement, content shown at once ───────── */
+@media (prefers-reduced-motion: reduce) {
+  :where(html.lx-motion) :where(.lx-reveal) { opacity: 1; transform: none; }
+  :where(.lx-lift:hover) { transform: none; }
+  :where(.lx-sheen)::after, :where(.lx-pulse)::before { display: none; }
+  :where(.lx-skeleton) { animation: none; }
+  body, body.is-leaving { animation: none; }
+}

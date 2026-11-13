@@ -13,7 +13,7 @@
 <style>
   :root{
     --navy:#0f2850; --navy-deep:#0a1a35;
-    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f; --gold-ink:#86650f;
     --green:#146432; --green-light:#e8f7ed;
     --red:#b41e1e; --red-light:#fff0f0;
     --grey-100:#f6f7fb; --grey-200:#ecf0f7; --grey-300:#d9dde6;
@@ -52,7 +52,7 @@
   }
   .container{max-width:1100px;margin:0 auto}
   .eyebrow{
-    display:inline-block;font-size:12px;font-weight:700;color:var(--gold);
+    display:inline-block;font-size:12px;font-weight:700;color:var(--gold-ink);
     text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;
   }
   h1{
@@ -88,7 +88,7 @@
   }
   .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(180,140,40,.45)}
   .btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--grey-300)}
-  .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold-ink)}
 
   section{padding:50px clamp(20px,4vw,40px)}
   section.bg{background:var(--grey-100)}
@@ -109,12 +109,12 @@
   @media (max-width:640px){.flow-step{grid-template-columns:1fr;gap:8px}}
   .flow-stage{
     font-family:'Playfair Display',serif;font-size:18px;font-weight:700;
-    color:var(--gold);line-height:1.2;
+    color:var(--gold-ink);line-height:1.2;
   }
   .flow-actor{font-size:11.5px;color:var(--grey-500);text-transform:uppercase;letter-spacing:.5px}
   .flow-what{font-size:14px;color:var(--grey-700);margin-top:6px}
   .flow-data{font-size:12px;color:var(--grey-500);margin-top:6px}
-  .flow-data code{background:var(--grey-200);padding:1px 6px;border-radius:3px}
+  .flow-data code{background:var(--grey-200);color:var(--grey-700);padding:1px 6px;border-radius:3px}
   .flow-jurisdiction{
     background:var(--green-light);color:var(--green);
     padding:4px 10px;border-radius:99px;font-size:11px;font-weight:700;
@@ -125,28 +125,28 @@
   /* Q&A */
   .qa-block{margin-bottom:32px}
   .qa-category{
-    font-size:13px;font-weight:700;color:var(--gold);
+    font-size:13px;font-weight:700;color:var(--gold-ink);
     text-transform:uppercase;letter-spacing:1.2px;margin-bottom:14px;
     padding-bottom:6px;border-bottom:2px solid var(--gold);
   }
-  details{
+  .qa-block details{
     background:#fff;border:1px solid var(--grey-300);border-radius:10px;
     margin-bottom:8px;overflow:hidden;
   }
-  details[open]{box-shadow:var(--shadow-md);border-color:var(--gold)}
-  summary{
+  .qa-block details[open]{box-shadow:var(--shadow-md);border-color:var(--gold)}
+  .qa-block summary{
     cursor:pointer;padding:14px 18px;font-weight:600;color:var(--navy);
     font-size:14.5px;line-height:1.45;list-style:none;
     display:flex;align-items:flex-start;gap:10px;
   }
-  summary::-webkit-details-marker{display:none}
-  summary::before{
+  .qa-block summary::-webkit-details-marker{display:none}
+  .qa-block summary::before{
     content:'+';flex-shrink:0;width:22px;height:22px;
     background:var(--navy);color:var(--gold-glow);border-radius:5px;
     display:grid;place-items:center;font-weight:700;font-size:14px;
     transition:transform .2s;
   }
-  details[open] summary::before{content:'−';transform:rotate(0)}
+  .qa-block details[open] summary::before{content:'−';transform:rotate(0)}
   .qa-answer{padding:0 18px 16px 50px;color:var(--grey-700);font-size:14px;line-height:1.7}
 
   /* Final CTA */
@@ -160,6 +160,7 @@
   .cta-card h3{font-family:'Playfair Display',serif;font-size:22px;margin-bottom:8px}
   .cta-card p{color:rgba(255,255,255,.78);font-size:14.5px;line-height:1.6}
 </style>
+  {% include '_head.html' %}
 </head>
 <body>
   {% include '_nav.html' %}

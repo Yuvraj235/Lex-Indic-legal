@@ -5,46 +5,51 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pricing · Lex-Indic</title>
   <link rel="stylesheet" href="/static/lex-design-system.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
   <style>
-    body { background: #f7f7fb; color: #222; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; }
-    .pricing-shell { max-width: 1180px; margin: 30px auto; padding: 0 18px; }
+    body { background: var(--colour-grey-100); color: var(--colour-grey-900); font-family: var(--font-sans); margin: 0; }
+    .pricing-shell { max-width: 1180px; margin: 30px auto; padding: 0 18px 40px; }
+    h1 { font-family: var(--font-serif); color: var(--colour-navy); text-align: center; font-size: 40px; margin: 34px 0 10px; }
+    p.lead { text-align: center; color: #4a5263; margin-bottom: 36px; font-size: 15.5px; }
+    .tier-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; align-items: stretch; }
+    .tier-card { background: #fff; border: 1px solid var(--colour-grey-200); border-radius: var(--radius-5); padding: 24px; box-shadow: var(--shadow-1);
+                 display: flex; flex-direction: column; position: relative; }
+    .tier-card.featured { border: 2px solid var(--colour-gold-light); box-shadow: var(--shadow-gold); }
+    .tier-card.featured::before { content: "MOST POPULAR"; position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+      background: var(--gradient-gold); color: var(--colour-navy-deep); padding: 3px 12px; border-radius: 12px; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; }
+    .tier-name { color: var(--colour-navy); font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    .tier-price { font-family: var(--font-serif); font-size: 34px; font-weight: 700; color: var(--colour-navy); }
+    .tier-price .currency { font-family: var(--font-sans); font-size: 16px; font-weight: 500; color: #4a5263; }
+    .tier-price .period { font-family: var(--font-sans); font-size: 12px; font-weight: 500; color: #5b6372; }
+    .tier-card.free .tier-price, .tier-card.nalsa .tier-price { color: var(--colour-green); }
+    .tier-features { list-style: none; padding: 0; margin: 20px 0; flex: 1; }
+    .tier-features li { font-size: 13px; color: var(--colour-grey-700); padding: 6px 0; border-bottom: 1px dashed var(--colour-grey-200); }
+    .tier-features li::before { content: "✓ "; color: var(--colour-green); font-weight: 700; }
+    .tier-btn { display: block; text-align: center; padding: 12px 16px; background: var(--colour-navy); color: #fff; border: none; border-radius: 8px;
+                cursor: pointer; font-weight: 600; font-family: inherit; font-size: 14px; text-decoration: none; }
+    .tier-btn:hover { background: #1a3a6e; color: #fff; }
+    .tier-btn.btn-gold { background: var(--gradient-gold); color: var(--colour-navy-deep); box-shadow: var(--shadow-gold); }
+    .tier-btn.btn-gold:hover { background: var(--gradient-gold); box-shadow: var(--shadow-gold-hover); color: var(--colour-navy-deep); }
+    .tier-btn.btn-ghost { background: transparent; color: var(--colour-navy); border: 1.5px solid var(--colour-navy); }
+    .tier-btn.btn-ghost:hover { background: rgba(15,40,80,0.05); color: var(--colour-navy); }
+    .mode-banner { background: var(--colour-amber-light); border: 1px solid #ecd28a; padding: 10px 16px; border-radius: 10px; margin: 0 auto 28px;
+                   max-width: 760px; text-align: center; font-size: 13px; color: #5c4400; }
+    .mode-banner.live { background: var(--colour-green-light); border-color: #a9dcb9; color: var(--colour-green); }
+    .faq { max-width: 760px; margin: 60px auto; }
+    .faq h2 { font-family: var(--font-serif); color: var(--colour-navy); }
+    .faq-q { font-weight: 600; color: var(--colour-navy); margin-top: 18px; }
+    .faq-a { color: #4a5263; font-size: 14px; margin-top: 4px; }
     @media (max-width: 600px) {
-      .pricing-shell { margin: 16px auto; padding: 0 12px; }
-      h1 { font-size: 22px; }
+      .pricing-shell { margin: 16px auto; padding: 0 12px 30px; }
+      h1 { font-size: 28px; }
       .tier-card { padding: 18px; }
-      .tier-price { font-size: 26px; }
+      .tier-price { font-size: 28px; }
       .tier-features li { font-size: 12.5px; padding: 5px 0; }
       .mode-banner { font-size: 12px; padding: 8px 12px; }
       .faq { margin: 30px auto; }
     }
-    h1 { color: #0f2850; text-align: center; margin: 30px 0 10px; }
-    p.lead { text-align: center; color: #666; margin-bottom: 40px; }
-    .tier-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
-    .tier-card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; flex-direction: column; position: relative; transition: transform .15s; }
-    .tier-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
-    .tier-card.featured { border: 2px solid #f0a500; }
-    .tier-card.featured::before { content: "MOST POPULAR"; position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #f0a500; color: #fff; padding: 3px 12px; border-radius: 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
-    .tier-name { color: #0f2850; font-size: 18px; font-weight: 700; margin-bottom: 6px; }
-    .tier-price { font-size: 32px; font-weight: 700; color: #0f2850; }
-    .tier-price .currency { font-size: 16px; font-weight: 400; color: #666; }
-    .tier-price .period { font-size: 12px; font-weight: 400; color: #888; }
-    .tier-card.free .tier-price, .tier-card.nalsa .tier-price { color: #6bca90; }
-    .tier-features { list-style: none; padding: 0; margin: 20px 0; flex: 1; }
-    .tier-features li { font-size: 13px; color: #444; padding: 6px 0; border-bottom: 1px dashed #eee; }
-    .tier-features li::before { content: "✓ "; color: #6bca90; font-weight: 700; }
-    .tier-btn { display: block; text-align: center; padding: 12px 16px; background: #0f2850; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; text-decoration: none; transition: background .15s; }
-    .tier-btn:hover { background: #1a3a6e; color: #fff; }
-    .tier-btn.btn-gold { background: #f0a500; color: #fff; }
-    .tier-btn.btn-gold:hover { background: #d99000; }
-    .tier-btn.btn-ghost { background: transparent; color: #0f2850; border: 1.5px solid #0f2850; }
-    .tier-btn.btn-ghost:hover { background: rgba(15,40,80,0.05); color: #0f2850; }
-    .mode-banner { background: #fff5d5; border: 1px solid #f0a500; padding: 10px 16px; border-radius: 8px; margin: 0 auto 24px; max-width: 760px; text-align: center; font-size: 13px; color: #735200; }
-    .mode-banner.live { background: #d5f5d5; border-color: #6bca90; color: #2a652a; }
-    .faq { max-width: 760px; margin: 60px auto; }
-    .faq h2 { color: #0f2850; }
-    .faq-q { font-weight: 600; color: #0f2850; margin-top: 18px; }
-    .faq-a { color: #555; font-size: 14px; margin-top: 4px; }
   </style>
+  {% include '_head.html' %}
 </head>
 <body>
   {% include '_nav.html' %}
@@ -75,7 +80,7 @@
         <ul class="tier-features">
           {% for f in tiers.free.features %}<li>{{ f }}</li>{% endfor %}
         </ul>
-        <a href="/auth/login" class="tier-btn btn-ghost">Sign up free</a>
+        <a href="/login" class="tier-btn btn-ghost">Sign up free</a>
       </div>
 
       <!-- NALSA -->
@@ -86,7 +91,7 @@
         <ul class="tier-features">
           {% for f in tiers.nalsa.features %}<li>{{ f }}</li>{% endfor %}
         </ul>
-        <a href="/nalsa/register" class="tier-btn btn-ghost">Register your panel ID</a>
+        <a href="/nalsa#register" class="tier-btn btn-ghost">Register your panel ID</a>
       </div>
 
       <!-- Firm (FEATURED) -->

@@ -13,7 +13,7 @@
 <style>
   :root{
     --navy:#0f2850; --navy-deep:#0a1a35;
-    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f; --gold-ink:#86650f;
     --green:#146432; --green-light:#e8f7ed;
     --grey-100:#f6f7fb; --grey-200:#ecf0f7; --grey-300:#d9dde6;
     --grey-500:#6b7280; --grey-700:#2d3748;
@@ -103,7 +103,7 @@
   section{padding:clamp(40px,7vh,80px) clamp(20px,4vw,40px)}
   .container{max-width:1100px;margin:0 auto}
   .eyebrow{
-    display:inline-block;font-size:12px;font-weight:700;color:var(--gold);
+    display:inline-block;font-size:12px;font-weight:700;color:var(--gold-ink);
     text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;
   }
   h2{
@@ -200,6 +200,7 @@
   }
   .const-card strong{color:var(--green)}
 </style>
+  {% include '_head.html' %}
 </head>
 <body>
   {% include '_nav.html' %}
@@ -211,7 +212,7 @@
     <h1>Process more legal-aid cases<br>without <span class="accent">higher fees</span>.</h1>
     <p class="lead">
       Lex-Indic is a constitutional-grade legal-aid tool for India's ~70,000
-      NALSA panel advocates.  Run BNS triage in 7 seconds, draft FIRs and
+      NALSA panel advocates.  Run BNS triage in about a minute, draft FIRs and
       legal notices on your letterhead, and get every citation traced to a
       verified knowledge base — at zero cost to you or your client.  Built
       for the Article 39A workload, not a $20M ARR roadmap.
@@ -223,8 +224,8 @@
         <div class="stat-lbl">For NALSA panel · forever</div>
       </div>
       <div>
-        <div class="stat-num">7s</div>
-        <div class="stat-lbl">Per-case triage time</div>
+        <div class="stat-num">~1 min</div>
+        <div class="stat-lbl">Per-case analysis time</div>
       </div>
       <div>
         <div class="stat-num">हिन्दी</div>
@@ -253,7 +254,7 @@
       <div class="what-card">
         <div class="what-card-icon">⚖️</div>
         <h3>Full BNS analysis engine</h3>
-        <p>38 curated BNS sections, 6 court-ready output sections per case
+        <p>All 358 BNS sections from the official text, 6 court-ready output sections per case
         (advisory · charges · strategy · FIR draft · legal notice · police
         help report), 9-page PDF case brief on your letterhead.</p>
       </div>

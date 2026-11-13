@@ -278,6 +278,19 @@ def official_titles() -> dict[str, dict[str, str | None]]:
     return _OFFICIAL
 
 
+_OFFICIAL_TEXT: dict[str, str] | None = None
+
+
+def _bns_definition(num: str, chars: int = 400) -> str:
+    """The opening of a BNS section's official text — where a one-word title
+    ('Abduction.') is defined ('…by any deceitful means induces…')."""
+    global _OFFICIAL_TEXT
+    if _OFFICIAL_TEXT is None:
+        path = _CORPUS / "statutes" / "bns_text.json"
+        _OFFICIAL_TEXT = json.loads(path.read_text(encoding="utf-8"))["sections"] if path.exists() else {}
+    return re.sub(r"\s+", " ", (_OFFICIAL_TEXT.get(num) or "")[:chars]).lower()
+
+
 def nonexistent_sections(text: str) -> list[str]:
     """Citations of sections the Act does not have ('BNS 420', 'BNS 498A')."""
     titles = official_titles()
@@ -357,7 +370,7 @@ def label_mismatches(text: str) -> list[dict]:
             if not label:
                 continue
             if code == "BNS":
-                title = (titles["BNS"][num] or "").lower()
+                title = (titles["BNS"][num] or "").lower() + " " + _bns_definition(num)
                 said = [k for k in _LABEL_WORDS if k in label]
                 ok = _LABEL_OK.get(("BNS", num), set())
                 if not said or any(k in ok or any(w in title for w in _LABEL_WORDS[k]) for k in said):

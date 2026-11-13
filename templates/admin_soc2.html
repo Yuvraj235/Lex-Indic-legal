@@ -10,7 +10,7 @@
 <style>
   :root{
     --navy:#0f2850; --navy-deep:#0a1a35;
-    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f;
+    --gold:#b48c28; --gold-light:#d4a843; --gold-glow:#f0c44f; --gold-ink:#86650f;
     --green:#146432; --green-light:#e8f7ed;
     --red:#b41e1e; --red-light:#fff0f0;
     --grey-100:#f6f7fb; --grey-200:#ecf0f7; --grey-300:#d9dde6;
@@ -98,7 +98,7 @@
   tbody tr:hover{background:var(--grey-100)}
   tbody td{padding:14px;vertical-align:top;font-size:13.5px}
   .ctl-id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-          font-size:11.5px;color:var(--gold);font-weight:700}
+          font-size:11.5px;color:var(--gold-ink);font-weight:700}
   .ctl-title{font-weight:600;color:var(--navy);margin-bottom:4px}
   .ctl-desc{font-size:12.5px;color:var(--grey-500);line-height:1.55}
   .ctl-pointer{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -128,6 +128,7 @@
 
   .stamp{font-size:11.5px;color:var(--grey-500);margin-top:18px;text-align:right}
 </style>
+  {% include '_head.html' %}
 </head>
 <body>
   {% include '_nav.html' %}
@@ -137,12 +138,12 @@
   <h1 class="page-title">SOC 2 Readiness <span class="top-pill">Internal · Pre-audit</span></h1>
   <div class="why-card">
     <strong>What this dashboard does:</strong>  Runs the 10 SOC 2 controls
-    defined in <code style="background:var(--grey-200);padding:1px 6px;border-radius:3px">tools/soc2/controls.py</code>
+    defined in <code style="background:var(--grey-200);color:var(--grey-700);padding:1px 6px;border-radius:3px">tools/soc2/controls.py</code>
     and reports their live status.  Take a snapshot to persist evidence to
-    <code style="background:var(--grey-200);padding:1px 6px;border-radius:3px">outputs/soc2_evidence/</code>
+    <code style="background:var(--grey-200);color:var(--grey-700);padding:1px 6px;border-radius:3px">outputs/soc2_evidence/</code>
     — this builds the continuous-operation trail an AICPA auditor will
     require during the Type II observation window.  Schedule
-    <code style="background:var(--grey-200);padding:1px 6px;border-radius:3px">python3 tools/soc2/controls.py --save</code>
+    <code style="background:var(--grey-200);color:var(--grey-700);padding:1px 6px;border-radius:3px">python3 tools/soc2/controls.py --save</code>
     on cron (hourly) once you engage Vanta or Drata.
   </div>
 
@@ -176,7 +177,7 @@
     <a class="btn btn-ghost" href="/admin/soc2/summary.json">Raw JSON</a>
     <span style="flex:1"></span>
     <span style="font-size:12px;color:var(--grey-500);align-self:center">
-      CLI: <code style="background:var(--grey-200);padding:1px 6px;border-radius:3px">python3 tools/soc2/controls.py --save</code>
+      CLI: <code style="background:var(--grey-200);color:var(--grey-700);padding:1px 6px;border-radius:3px">python3 tools/soc2/controls.py --save</code>
     </span>
   </div>
 

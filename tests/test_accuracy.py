@@ -642,3 +642,62 @@ class TestEmbeddingCacheFiles:
         docs = ["full text A", "full text B"]
         metas = [{"search_key": "key A"}, {}]
         assert main.embedding_texts(docs, metas) == ["key A", "full text B"]
+
+
+class TestRepairWaitsForMinuteWindow:
+    """One free-tier analysis uses most of Groq's per-minute tokens, so the
+    correction call right after it was refused and flagged drafts shipped
+    unrepaired. The pass now waits the seconds Groq asks for — but never for
+    a used-up daily allowance."""
+
+    def _fake_groq(self, monkeypatch, replies):
+        import types
+        import app as app_module
+        slept = []
+        monkeypatch.setenv("LLM_PROVIDER", "groq")
+        monkeypatch.setattr(app_module.time, "sleep", lambda s: slept.append(s))
+
+        def create(**kwargs):
+            r = replies.pop(0)
+            if isinstance(r, Exception):
+                raise r
+            msg = types.SimpleNamespace(content=r)
+            return types.SimpleNamespace(choices=[types.SimpleNamespace(message=msg)])
+        monkeypatch.setattr(app_module.groq_client.chat.completions, "create", create)
+        return slept
+
+    def test_flagged_draft_repaired_after_short_wait(self, client, monkeypatch):
+        bad = GOOD_DRAFT.replace("BNS 103 (old IPC 302)", "BNS 302 (old IPC 302)")
+        tpm = RuntimeError("Error code: 429 - Rate limit reached on tokens per minute (TPM). "
+                           "Please try again in 7.5s.")
+        slept = self._fake_groq(monkeypatch, [bad, tpm, tpm, tpm, GOOD_DRAFT])
+        r = client.post("/analyze", json={"client_story": "My neighbour stabbed my brother to death "
+                                                          "with a knife after an argument last night."})
+        assert r.status_code == 200
+        text = " ".join(r.get_json()["sections"].values())
+        assert "BNS 302 (old IPC 302)" not in text and "BNS 103" in text
+        assert 8.5 in slept                                   # waited what Groq asked (+1 s)
+
+    def test_daily_limit_does_not_wait(self, client, monkeypatch):
+        bad = GOOD_DRAFT.replace("BNS 103 (old IPC 302)", "BNS 302 (old IPC 302)")
+        tpd = RuntimeError("Error code: 429 - Rate limit reached on tokens per day (TPD). "
+                           "Please try again in 43m38.7s.")
+        slept = self._fake_groq(monkeypatch, [bad, tpd, tpd, tpd])
+        r = client.post("/analyze", json={"client_story": "My neighbour stabbed my brother to death "
+                                                          "with a knife after an argument last night."})
+        assert r.status_code == 200                           # the verified, flagged draft still ships
+        assert max(slept or [0]) < 10
+        assert r.get_json()["verification"]["all_verified"] is False
+
+
+class TestLabelReadsDefinition:
+    def test_word_from_the_definition_is_accepted(self):
+        # BNS 138's title is just "Abduction."; its text defines it as compelling
+        # by force or inducing "by any deceitful means".
+        import verifier
+        assert verifier.label_mismatches("BNS 138 – abduction (deceitful inducement of a minor).") == []
+
+    def test_wrong_offence_still_caught(self):
+        import verifier
+        out = verifier.label_mismatches("BNS 74 for matrimonial cruelty and assault.")
+        assert out and out[0]["cited"] == "BNS 74" and out[0]["label"] == "cruelty"
